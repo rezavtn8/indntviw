@@ -2,7 +2,8 @@ import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Layers, Grid3X3, Circle, PaintBucket } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Layers, Grid3X3, Circle, PaintBucket, Blend } from 'lucide-react';
 
 export type HeatmapMode = 'dots' | 'filled';
 
@@ -10,18 +11,22 @@ interface VisualizationOptionsProps {
   showContours: boolean;
   showInterpolation: boolean;
   heatmapMode: HeatmapMode;
+  blurIntensity: number;
   onShowContoursChange: (value: boolean) => void;
   onShowInterpolationChange: (value: boolean) => void;
   onHeatmapModeChange: (value: HeatmapMode) => void;
+  onBlurIntensityChange: (value: number) => void;
 }
 
 export const VisualizationOptions: React.FC<VisualizationOptionsProps> = ({
   showContours,
   showInterpolation,
   heatmapMode,
+  blurIntensity,
   onShowContoursChange,
   onShowInterpolationChange,
   onHeatmapModeChange,
+  onBlurIntensityChange,
 }) => {
   return (
     <div className="border-2 border-border bg-card p-3 space-y-3">
@@ -82,6 +87,29 @@ export const VisualizationOptions: React.FC<VisualizationOptionsProps> = ({
               checked={showInterpolation}
               onCheckedChange={onShowInterpolationChange}
             />
+          </div>
+        )}
+
+        {/* Blur Intensity Slider - only show in filled mode */}
+        {heatmapMode === 'filled' && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Blend className="w-4 h-4 text-muted-foreground" />
+              <Label className="font-mono text-xs">
+                Blur Intensity: {blurIntensity}
+              </Label>
+            </div>
+            <Slider
+              value={[blurIntensity]}
+              onValueChange={(v) => onBlurIntensityChange(v[0])}
+              min={0}
+              max={15}
+              step={1}
+              className="w-full"
+            />
+            <p className="font-mono text-xs text-muted-foreground">
+              {blurIntensity === 0 ? 'Sharp cells' : blurIntensity < 5 ? 'Fine detail' : blurIntensity < 10 ? 'Smooth' : 'Very smooth'}
+            </p>
           </div>
         )}
       </div>
