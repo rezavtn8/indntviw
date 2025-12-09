@@ -41,6 +41,7 @@ export const IndentViewApp: React.FC = () => {
   const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('dots');
+  const [blurIntensity, setBlurIntensity] = useState(3);
   
   // Ref for screenshot/export
   const visualizationRef = useRef<HTMLDivElement>(null);
@@ -354,9 +355,11 @@ export const IndentViewApp: React.FC = () => {
                   showContours={showContours}
                   showInterpolation={showInterpolation}
                   heatmapMode={heatmapMode}
+                  blurIntensity={blurIntensity}
                   onShowContoursChange={setShowContours}
                   onShowInterpolationChange={setShowInterpolation}
                   onHeatmapModeChange={setHeatmapMode}
+                  onBlurIntensityChange={setBlurIntensity}
                 />
               )}
 
@@ -419,6 +422,7 @@ export const IndentViewApp: React.FC = () => {
                     showContours={showContours}
                     showInterpolation={showInterpolation}
                     heatmapMode={heatmapMode}
+                    blurIntensity={blurIntensity}
                     onPointSelect={(point) => {
                       setSelectedPoint(point);
                       if (isEditing && point) {

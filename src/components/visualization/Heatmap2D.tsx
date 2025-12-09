@@ -16,6 +16,7 @@ interface Heatmap2DProps {
   showContours?: boolean;
   showInterpolation?: boolean;
   heatmapMode?: HeatmapMode;
+  blurIntensity?: number;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
 }
@@ -31,6 +32,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   showContours = false,
   showInterpolation = false,
   heatmapMode = 'dots',
+  blurIntensity = 3,
   onPointSelect,
   onPointHover,
 }) => {
@@ -161,7 +163,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         )}
         {/* Phase 3: Blur filter for smooth gradient blending */}
         <filter id="gradient-blur" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feGaussianBlur stdDeviation={blurIntensity} result="blur" />
         </filter>
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
