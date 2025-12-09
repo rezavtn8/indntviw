@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
-import { generateBoundaryContour, generateFilledContours, generateBoundaryPath } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateFilledContours, generateBoundaryPath, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 
 export type HeatmapMode = 'dots' | 'filled';
 
@@ -110,18 +110,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     cy: height - padding - (y - yMin) * scale,
   }), [padding, xMin, yMin, scale, height]);
 
-  // Generate SVG clip path from boundary (must be after transformPoint)
-  const clipPathPoints = useMemo(() => {
-    if (points.length < 3) return '';
-    const boundary = generateBoundaryPath(points);
-    return boundary
-      .map(p => {
-        const cx = padding + (p.x - xMin) * scale;
-        const cy = height - padding - (p.y - yMin) * scale;
-        return `${cx},${cy}`;
-      })
-      .join(' ');
-  }, [points, padding, xMin, yMin, scale, height]);
 
   if (points.length === 0) {
     return (
@@ -148,22 +136,30 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             opacity="0.3"
           />
         </pattern>
-        {/* Clip path for filled heatmap - constrains to data boundary */}
-        {clipPathPoints && (
-          <clipPath id="heatmap-boundary-clip">
-            <polygon points={clipPathPoints} />
+        {/* Smooth clip path for filled heatmap */}
+        {boundaryContour.length >= 3 && (
+          <clipPath id="heatmap-smooth-clip">
+            <path
+              d={generateSmoothBoundaryPath(
+                boundaryContour.map(p => {
+                  const { cx, cy } = transformPoint(p.x, p.y);
+                  return { x: cx, y: cy };
+                }),
+                3
+              )}
+            />
           </clipPath>
         )}
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {/* Interpolated fill (clipped to boundary shape) */}
-      {(heatmapMode === 'filled' || showInterpolation) && interpolatedCells.length > 0 && (
-        <g clipPath="url(#heatmap-boundary-clip)">
+      {/* Gradient filled heatmap (clipped to smooth boundary) */}
+      {heatmapMode === 'filled' && interpolatedCells.length > 0 && (
+        <g clipPath="url(#heatmap-smooth-clip)">
           {interpolatedCells.map((cell, i) => {
             const { cx, cy } = transformPoint(cell.x, cell.y);
             const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-            const cellSize = cell.width * scale * 1.2; // Overlap for seamless look
+            const cellSize = cell.width * scale * 1.3;
             return (
               <rect
                 key={`cell-${i}`}
@@ -178,34 +174,58 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         </g>
       )}
 
-      {/* Boundary contour line */}
+      {/* Background interpolation for dots mode */}
+      {heatmapMode === 'dots' && showInterpolation && interpolatedCells.length > 0 && (
+        <g clipPath="url(#heatmap-smooth-clip)" opacity="0.6">
+          {interpolatedCells.map((cell, i) => {
+            const { cx, cy } = transformPoint(cell.x, cell.y);
+            const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
+            const cellSize = cell.width * scale * 1.3;
+            return (
+              <rect
+                key={`cell-${i}`}
+                x={cx - cellSize / 2}
+                y={cy - cellSize / 2}
+                width={cellSize}
+                height={cellSize}
+                fill={color}
+              />
+            );
+          })}
+        </g>
+      )}
+
+      {/* Smooth boundary contour line */}
       {showContours && boundaryContour.length >= 3 && (
-        <polygon
-          points={boundaryContour
-            .map(p => {
+        <path
+          d={generateSmoothBoundaryPath(
+            boundaryContour.map(p => {
               const { cx, cy } = transformPoint(p.x, p.y);
-              return `${cx},${cy}`;
-            })
-            .join(' ')}
+              return { x: cx, y: cy };
+            }),
+            3
+          )}
           fill="none"
           stroke="hsl(var(--primary))"
           strokeWidth="3"
+          strokeLinejoin="round"
         />
       )}
 
-      {/* Solid boundary outline for filled mode */}
-      {heatmapMode === 'filled' && boundaryContour.length > 2 && (
-        <polygon
-          points={boundaryContour
-            .map(p => {
+      {/* Solid smooth boundary outline for filled mode */}
+      {heatmapMode === 'filled' && boundaryContour.length >= 3 && (
+        <path
+          d={generateSmoothBoundaryPath(
+            boundaryContour.map(p => {
               const { cx, cy } = transformPoint(p.x, p.y);
-              return `${cx},${cy}`;
-            })
-            .join(' ')}
+              return { x: cx, y: cy };
+            }),
+            3
+          )}
           fill="none"
           stroke="hsl(var(--foreground))"
           strokeWidth="2"
-          opacity="0.8"
+          strokeLinejoin="round"
         />
       )}
 
