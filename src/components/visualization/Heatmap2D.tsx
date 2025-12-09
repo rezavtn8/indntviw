@@ -1,7 +1,7 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
-import { generateBoundaryContour, generateFilledContours, generateFilledContourBands, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 
 export type HeatmapMode = 'dots' | 'filled';
 
@@ -90,7 +90,17 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return generateBoundaryContour(points);
   }, [points]);
 
-  // Generate interpolated cells for dots mode interpolation
+  // Phase 2: Generate dense interpolation grid for gradient fill
+  const gradientCells = useMemo(() => {
+    if (heatmapMode === 'filled') {
+      if (points.length < 3) return [];
+      // Very dense grid for smooth gradient - 200x200 resolution
+      return generateFilledContours(points, selectedProperty, 200);
+    }
+    return [];
+  }, [points, selectedProperty, heatmapMode]);
+
+  // Interpolated cells for dots mode background
   const interpolatedCells = useMemo(() => {
     if (showInterpolation && heatmapMode === 'dots') {
       if (points.length < 3) return [];
@@ -98,15 +108,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     }
     return [];
   }, [points, selectedProperty, showInterpolation, heatmapMode]);
-
-  // Generate filled contour bands for smooth gradient appearance
-  const contourBands = useMemo(() => {
-    if (heatmapMode === 'filled') {
-      if (points.length < 3) return [];
-      return generateFilledContourBands(points, selectedProperty, 15, 100);
-    }
-    return [];
-  }, [points, selectedProperty, heatmapMode]);
 
   const handlePointClick = useCallback((point: IndentationPoint) => {
     onPointSelect(selectedPoint?.id === point.id ? null : point);
@@ -158,37 +159,35 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             />
           </clipPath>
         )}
-        {/* Blur filter for smooth gradient effect */}
-        <filter id="gradient-blur" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="12" />
+        {/* Phase 3: Blur filter for smooth gradient blending */}
+        <filter id="gradient-blur" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
         </filter>
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {/* Smooth filled contour bands */}
-      {heatmapMode === 'filled' && contourBands.length > 0 && (
+      {/* Phase 1: Boundary shape filled with Phase 2+3: Dense gradient cells with blur */}
+      {heatmapMode === 'filled' && gradientCells.length > 0 && (
         <g clipPath="url(#heatmap-smooth-clip)">
-          {contourBands.map((band, i) => {
-            const midValue = (band.level + band.nextLevel) / 2;
-            const color = getColorForValue(midValue, minValue, maxValue, colorScheme);
-            // Transform path coordinates
-            const transformedPath = band.path.replace(
-              /([ML])\s*([\d.-]+)\s+([\d.-]+)/g,
-              (_, cmd, x, y) => {
-                const { cx, cy } = transformPoint(parseFloat(x), parseFloat(y));
-                return `${cmd} ${cx} ${cy}`;
-              }
-            );
-            return (
-              <path
-                key={`band-${i}`}
-                d={transformedPath}
-                fill={color}
-                stroke={color}
-                strokeWidth="1"
-              />
-            );
-          })}
+          {/* Apply blur for smooth blending between cells */}
+          <g filter="url(#gradient-blur)">
+            {gradientCells.map((cell, i) => {
+              const { cx, cy } = transformPoint(cell.x, cell.y);
+              const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
+              // Cells overlap by 2x to ensure no gaps
+              const cellSize = Math.max(cell.width, cell.height) * scale * 2;
+              return (
+                <rect
+                  key={`g-${i}`}
+                  x={cx - cellSize / 2}
+                  y={cy - cellSize / 2}
+                  width={cellSize}
+                  height={cellSize}
+                  fill={color}
+                />
+              );
+            })}
+          </g>
         </g>
       )}
 
