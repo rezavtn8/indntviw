@@ -90,12 +90,12 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return generateBoundaryContour(points);
   }, [points]);
 
-  // Generate interpolated cells for filled heatmap (higher resolution, clipped to boundary)
+  // Generate interpolated cells for filled heatmap (very high resolution for smooth gradient)
   const interpolatedCells = useMemo(() => {
     if (heatmapMode === 'filled' || showInterpolation) {
       if (points.length < 3) return [];
-      // Use higher grid resolution for smoother appearance
-      return generateFilledContours(points, selectedProperty, 80);
+      // Use very high grid resolution for smooth gradient appearance
+      return generateFilledContours(points, selectedProperty, 150);
     }
     return [];
   }, [points, selectedProperty, showInterpolation, heatmapMode]);
@@ -158,20 +158,24 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       <rect width="100%" height="100%" fill="url(#grid)" />
 
       {/* Smooth gradient filled heatmap */}
-      {heatmapMode === 'filled' && normalizedPoints.length > 0 && (
+      {heatmapMode === 'filled' && interpolatedCells.length > 0 && (
         <g clipPath="url(#heatmap-smooth-clip)">
-          {/* Blurred circles create smooth gradient interpolation */}
-          <g filter="url(#gradient-blur)">
-            {normalizedPoints.map((point, i) => (
-              <circle
-                key={`gradient-${i}`}
-                cx={point.cx}
-                cy={point.cy}
-                r={pointRadius * 3}
-                fill={point.color}
+          {interpolatedCells.map((cell, i) => {
+            const { cx, cy } = transformPoint(cell.x, cell.y);
+            const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
+            // Make cells larger to overlap and create seamless gradient
+            const cellSize = cell.width * scale * 1.5;
+            return (
+              <rect
+                key={`cell-${i}`}
+                x={cx - cellSize / 2}
+                y={cy - cellSize / 2}
+                width={cellSize}
+                height={cellSize}
+                fill={color}
               />
-            ))}
-          </g>
+            );
+          })}
         </g>
       )}
 
