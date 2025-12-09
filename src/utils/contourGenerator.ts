@@ -169,13 +169,12 @@ export function generateBoundaryContour(
 
   const coords = points.map(p => ({ x: p.x, y: p.y }));
   
-  // Use convex hull - simple and reliable
+  // Use convex hull
   const sortedPoints = [...coords].sort((a, b) => a.x - b.x || a.y - b.y);
   
   const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) => 
     (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
   
-  // Build lower hull
   const lower: { x: number; y: number }[] = [];
   for (const p of sortedPoints) {
     while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
@@ -184,7 +183,6 @@ export function generateBoundaryContour(
     lower.push(p);
   }
   
-  // Build upper hull
   const upper: { x: number; y: number }[] = [];
   for (let i = sortedPoints.length - 1; i >= 0; i--) {
     const p = sortedPoints[i];
@@ -194,11 +192,41 @@ export function generateBoundaryContour(
     upper.push(p);
   }
   
-  // Remove last point of each half because it's repeated
   lower.pop();
   upper.pop();
   
   return [...lower, ...upper];
+}
+
+// Generate smooth SVG path from boundary points using Catmull-Rom spline
+export function generateSmoothBoundaryPath(
+  points: { x: number; y: number }[],
+  tension: number = 0.5
+): string {
+  if (points.length < 3) return '';
+  
+  // Close the loop by adding first points at the end
+  const closed = [...points, points[0], points[1]];
+  
+  let path = `M ${points[0].x} ${points[0].y}`;
+  
+  for (let i = 0; i < points.length; i++) {
+    const p0 = closed[i];
+    const p1 = closed[i + 1];
+    const p2 = closed[i + 2];
+    const p3 = closed[(i + 3) % closed.length];
+    
+    // Catmull-Rom to Bezier conversion
+    const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
+    const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
+    const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
+    const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
+    
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  
+  path += ' Z';
+  return path;
 }
 
 // Check if a point is inside a polygon using ray casting
