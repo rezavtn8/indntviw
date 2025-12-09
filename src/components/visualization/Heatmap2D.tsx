@@ -136,7 +136,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             opacity="0.3"
           />
         </pattern>
-        {/* Smooth clip path for filled heatmap */}
+        {/* Smooth clip path for filled heatmap with padding */}
         {boundaryContour.length >= 3 && (
           <clipPath id="heatmap-smooth-clip">
             <path
@@ -145,7 +145,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                   const { cx, cy } = transformPoint(p.x, p.y);
                   return { x: cx, y: cy };
                 }),
-                3
+                pointRadius * 0.5
               )}
             />
           </clipPath>
@@ -203,11 +203,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
               const { cx, cy } = transformPoint(p.x, p.y);
               return { x: cx, y: cy };
             }),
-            3
+            pointRadius * 0.5
           )}
           fill="none"
           stroke="hsl(var(--primary))"
-          strokeWidth="3"
+          strokeWidth="2.5"
           strokeLinejoin="round"
         />
       )}
@@ -220,7 +220,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
               const { cx, cy } = transformPoint(p.x, p.y);
               return { x: cx, y: cy };
             }),
-            3
+            pointRadius * 0.5
           )}
           fill="none"
           stroke="hsl(var(--foreground))"

@@ -169,60 +169,81 @@ export function generateBoundaryContour(
 
   const coords = points.map(p => ({ x: p.x, y: p.y }));
   
-  // Use convex hull
-  const sortedPoints = [...coords].sort((a, b) => a.x - b.x || a.y - b.y);
+  // Get unique Y values sorted from bottom to top
+  const uniqueY = [...new Set(coords.map(p => p.y))].sort((a, b) => a - b);
   
-  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) => 
-    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  // For each Y level, find leftmost and rightmost points
+  const leftEdge: { x: number; y: number }[] = [];
+  const rightEdge: { x: number; y: number }[] = [];
   
-  const lower: { x: number; y: number }[] = [];
-  for (const p of sortedPoints) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
-    }
-    lower.push(p);
+  for (const y of uniqueY) {
+    const pointsAtY = coords.filter(p => Math.abs(p.y - y) < 0.0001);
+    if (pointsAtY.length === 0) continue;
+    
+    const xValues = pointsAtY.map(p => p.x);
+    const minX = Math.min(...xValues);
+    const maxX = Math.max(...xValues);
+    
+    leftEdge.push({ x: minX, y });
+    rightEdge.push({ x: maxX, y });
   }
   
-  const upper: { x: number; y: number }[] = [];
-  for (let i = sortedPoints.length - 1; i >= 0; i--) {
-    const p = sortedPoints[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
-    upper.push(p);
+  // Build outline: left edge bottom to top, then right edge top to bottom
+  const outline: { x: number; y: number }[] = [];
+  
+  // Add left edge points
+  for (const p of leftEdge) {
+    outline.push(p);
   }
   
-  lower.pop();
-  upper.pop();
+  // Add right edge points in reverse (skip if same as left edge point)
+  for (let i = rightEdge.length - 1; i >= 0; i--) {
+    const rp = rightEdge[i];
+    const lp = leftEdge[i];
+    if (Math.abs(rp.x - lp.x) > 0.0001) {
+      outline.push(rp);
+    }
+  }
   
-  return [...lower, ...upper];
+  return outline;
 }
 
-// Generate smooth SVG path from boundary points using Catmull-Rom spline
+// Generate smooth SVG path with padding around points
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
-  tension: number = 0.5
+  padding: number = 0
 ): string {
   if (points.length < 3) return '';
   
-  // Close the loop by adding first points at the end
-  const closed = [...points, points[0], points[1]];
+  // Add padding by expanding points outward from centroid
+  const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+  const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
   
-  let path = `M ${points[0].x} ${points[0].y}`;
+  const paddedPoints = points.map(p => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist === 0) return p;
+    const scale = (dist + padding) / dist;
+    return {
+      x: cx + dx * scale,
+      y: cy + dy * scale
+    };
+  });
   
-  for (let i = 0; i < points.length; i++) {
-    const p0 = closed[i];
-    const p1 = closed[i + 1];
-    const p2 = closed[i + 2];
-    const p3 = closed[(i + 3) % closed.length];
+  // Create smooth path using quadratic bezier curves
+  let path = `M ${paddedPoints[0].x} ${paddedPoints[0].y}`;
+  
+  for (let i = 0; i < paddedPoints.length; i++) {
+    const curr = paddedPoints[i];
+    const next = paddedPoints[(i + 1) % paddedPoints.length];
+    const nextNext = paddedPoints[(i + 2) % paddedPoints.length];
     
-    // Catmull-Rom to Bezier conversion
-    const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
-    const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
-    const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
-    const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
+    // Midpoint for smooth curve
+    const midX = (next.x + nextNext.x) / 2;
+    const midY = (next.y + nextNext.y) / 2;
     
-    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    path += ` Q ${next.x} ${next.y}, ${midX} ${midY}`;
   }
   
   path += ' Z';
