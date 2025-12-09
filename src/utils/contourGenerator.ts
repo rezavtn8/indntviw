@@ -202,6 +202,22 @@ export function generateBoundaryContour(
   return [...lower, ...upper];
 }
 
+// Check if a point is inside a polygon using ray casting
+function isPointInPolygon(x: number, y: number, polygon: { x: number; y: number }[]): boolean {
+  if (polygon.length < 3) return false;
+  
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 // Generate all contour lines for given levels (keeping for backward compatibility)
 export function generateContours(
   points: IndentationPoint[],
@@ -225,7 +241,7 @@ export function generateContours(
   }));
 }
 
-// Generate filled contour regions (for smooth heatmap effect)
+// Generate filled contour data clipped to boundary
 export function generateFilledContours(
   points: IndentationPoint[],
   property: string,
@@ -235,22 +251,35 @@ export function generateFilledContours(
   
   if (grid.length === 0) return [];
 
+  // Get the convex hull boundary
+  const boundary = generateBoundaryContour(points);
+  if (boundary.length < 3) return [];
+
   const cellWidth = (xMax - xMin) / (gridSize - 1);
   const cellHeight = (yMax - yMin) / (gridSize - 1);
 
   const cells: { x: number; y: number; value: number; width: number; height: number }[] = [];
 
+  // Only include cells that are inside the boundary
   for (let i = 0; i < grid.length; i++) {
     for (let j = 0; j < grid[i].length; j++) {
-      cells.push({
-        x: grid[i][j].x,
-        y: grid[i][j].y,
-        value: grid[i][j].value,
-        width: cellWidth,
-        height: cellHeight
-      });
+      const cell = grid[i][j];
+      if (isPointInPolygon(cell.x, cell.y, boundary)) {
+        cells.push({
+          x: cell.x,
+          y: cell.y,
+          value: cell.value,
+          width: cellWidth,
+          height: cellHeight
+        });
+      }
     }
   }
 
   return cells;
+}
+
+// Generate boundary polygon path for SVG clip path
+export function generateBoundaryPath(points: IndentationPoint[]): { x: number; y: number }[] {
+  return generateBoundaryContour(points);
 }
