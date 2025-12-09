@@ -3,6 +3,8 @@ import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
 import { generateBoundaryContour, generateFilledContours } from '@/utils/contourGenerator';
 
+export type HeatmapMode = 'dots' | 'filled';
+
 interface Heatmap2DProps {
   points: IndentationPoint[];
   selectedProperty: string;
@@ -13,6 +15,7 @@ interface Heatmap2DProps {
   highlightedPoints?: number[];
   showContours?: boolean;
   showInterpolation?: boolean;
+  heatmapMode?: HeatmapMode;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
 }
@@ -27,6 +30,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   highlightedPoints = [],
   showContours = false,
   showInterpolation = false,
+  heatmapMode = 'dots',
   onPointSelect,
   onPointHover,
 }) => {
@@ -86,11 +90,14 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return generateBoundaryContour(points);
   }, [points, showContours]);
 
-  // Generate interpolated cells for smooth heatmap
+  // Generate interpolated cells for filled heatmap
   const interpolatedCells = useMemo(() => {
-    if (!showInterpolation || points.length < 3) return [];
-    return generateFilledContours(points, selectedProperty, 40);
-  }, [points, selectedProperty, showInterpolation]);
+    if (heatmapMode === 'filled' || showInterpolation) {
+      if (points.length < 3) return [];
+      return generateFilledContours(points, selectedProperty, 50);
+    }
+    return [];
+  }, [points, selectedProperty, showInterpolation, heatmapMode]);
 
   const handlePointClick = useCallback((point: IndentationPoint) => {
     onPointSelect(selectedPoint?.id === point.id ? null : point);
@@ -130,11 +137,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {/* Interpolated fill (smooth heatmap) */}
-      {showInterpolation && interpolatedCells.map((cell, i) => {
+      {/* Interpolated fill (for filled mode or background) */}
+      {(heatmapMode === 'filled' || showInterpolation) && interpolatedCells.map((cell, i) => {
         const { cx, cy } = transformPoint(cell.x, cell.y);
         const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-        const cellSize = cell.width * scale;
+        const cellSize = cell.width * scale * 1.1; // Slight overlap to avoid gaps
         return (
           <rect
             key={`cell-${i}`}
@@ -143,7 +150,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             width={cellSize}
             height={cellSize}
             fill={color}
-            opacity={0.7}
+            opacity={heatmapMode === 'filled' ? 0.9 : 0.7}
           />
         );
       })}
@@ -165,8 +172,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         />
       )}
 
-      {/* Data points */}
-      {normalizedPoints.map((point) => (
+      {/* Data points - only show in dots mode */}
+      {heatmapMode === 'dots' && normalizedPoints.map((point) => (
         <g key={point.id}>
           {/* Highlight ring for outliers */}
           {point.isHighlighted && (
