@@ -150,27 +150,28 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             />
           </clipPath>
         )}
+        {/* Blur filter for smooth gradient effect */}
+        <filter id="gradient-blur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="12" />
+        </filter>
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {/* Gradient filled heatmap (clipped to smooth boundary) */}
-      {heatmapMode === 'filled' && interpolatedCells.length > 0 && (
+      {/* Smooth gradient filled heatmap */}
+      {heatmapMode === 'filled' && normalizedPoints.length > 0 && (
         <g clipPath="url(#heatmap-smooth-clip)">
-          {interpolatedCells.map((cell, i) => {
-            const { cx, cy } = transformPoint(cell.x, cell.y);
-            const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-            const cellSize = cell.width * scale * 1.3;
-            return (
-              <rect
-                key={`cell-${i}`}
-                x={cx - cellSize / 2}
-                y={cy - cellSize / 2}
-                width={cellSize}
-                height={cellSize}
-                fill={color}
+          {/* Blurred circles create smooth gradient interpolation */}
+          <g filter="url(#gradient-blur)">
+            {normalizedPoints.map((point, i) => (
+              <circle
+                key={`gradient-${i}`}
+                cx={point.cx}
+                cy={point.cy}
+                r={pointRadius * 3}
+                fill={point.color}
               />
-            );
-          })}
+            ))}
+          </g>
         </g>
       )}
 
