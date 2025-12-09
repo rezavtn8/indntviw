@@ -9,7 +9,7 @@ import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
 import { RangeControls } from '@/components/controls/RangeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 import { ExportControls } from '@/components/controls/ExportControls';
-import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
+import { VisualizationOptions, HeatmapMode } from '@/components/controls/VisualizationOptions';
 import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
 import { OutlierDetector } from '@/components/panels/OutlierDetector';
@@ -40,6 +40,7 @@ export const IndentViewApp: React.FC = () => {
   // Visualization options
   const [showContours, setShowContours] = useState(false);
   const [showInterpolation, setShowInterpolation] = useState(false);
+  const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('dots');
   
   // Ref for screenshot/export
   const visualizationRef = useRef<HTMLDivElement>(null);
@@ -352,8 +353,10 @@ export const IndentViewApp: React.FC = () => {
                 <VisualizationOptions
                   showContours={showContours}
                   showInterpolation={showInterpolation}
+                  heatmapMode={heatmapMode}
                   onShowContoursChange={setShowContours}
                   onShowInterpolationChange={setShowInterpolation}
+                  onHeatmapModeChange={setHeatmapMode}
                 />
               )}
 
@@ -415,6 +418,7 @@ export const IndentViewApp: React.FC = () => {
                     highlightedPoints={highlightedOutliers}
                     showContours={showContours}
                     showInterpolation={showInterpolation}
+                    heatmapMode={heatmapMode}
                     onPointSelect={(point) => {
                       setSelectedPoint(point);
                       if (isEditing && point) {
