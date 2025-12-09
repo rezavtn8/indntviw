@@ -179,7 +179,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       )}
 
       {/* Boundary contour line */}
-      {showContours && boundaryContour.length > 2 && (
+      {showContours && boundaryContour.length >= 3 && (
         <polygon
           points={boundaryContour
             .map(p => {
@@ -188,10 +188,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             })
             .join(' ')}
           fill="none"
-          stroke="hsl(var(--foreground))"
-          strokeWidth="2"
-          strokeDasharray="6 3"
-          opacity="0.7"
+          stroke="hsl(var(--primary))"
+          strokeWidth="3"
         />
       )}
 
