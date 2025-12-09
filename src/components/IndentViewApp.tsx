@@ -38,7 +38,7 @@ export const IndentViewApp: React.FC = () => {
   const [highlightedOutliers, setHighlightedOutliers] = useState<number[]>([]);
   
   // Visualization options
-  const [showContours, setShowContours] = useState(false);
+  const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('dots');
   
