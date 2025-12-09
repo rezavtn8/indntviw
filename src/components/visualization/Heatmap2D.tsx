@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
-import { generateBoundaryContour, generateFilledContours, generateBoundaryPath, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateFilledContours, generateFilledContourBands, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 
 export type HeatmapMode = 'dots' | 'filled';
 
@@ -90,15 +90,23 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return generateBoundaryContour(points);
   }, [points]);
 
-  // Generate interpolated cells for filled heatmap (very high resolution for smooth gradient)
+  // Generate interpolated cells for dots mode interpolation
   const interpolatedCells = useMemo(() => {
-    if (heatmapMode === 'filled' || showInterpolation) {
+    if (showInterpolation && heatmapMode === 'dots') {
       if (points.length < 3) return [];
-      // Use very high grid resolution for smooth gradient appearance
-      return generateFilledContours(points, selectedProperty, 150);
+      return generateFilledContours(points, selectedProperty, 80);
     }
     return [];
   }, [points, selectedProperty, showInterpolation, heatmapMode]);
+
+  // Generate filled contour bands for smooth gradient appearance
+  const contourBands = useMemo(() => {
+    if (heatmapMode === 'filled') {
+      if (points.length < 3) return [];
+      return generateFilledContourBands(points, selectedProperty, 15, 100);
+    }
+    return [];
+  }, [points, selectedProperty, heatmapMode]);
 
   const handlePointClick = useCallback((point: IndentationPoint) => {
     onPointSelect(selectedPoint?.id === point.id ? null : point);
@@ -157,22 +165,27 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {/* Smooth gradient filled heatmap */}
-      {heatmapMode === 'filled' && interpolatedCells.length > 0 && (
+      {/* Smooth filled contour bands */}
+      {heatmapMode === 'filled' && contourBands.length > 0 && (
         <g clipPath="url(#heatmap-smooth-clip)">
-          {interpolatedCells.map((cell, i) => {
-            const { cx, cy } = transformPoint(cell.x, cell.y);
-            const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-            // Make cells larger to overlap and create seamless gradient
-            const cellSize = cell.width * scale * 1.5;
+          {contourBands.map((band, i) => {
+            const midValue = (band.level + band.nextLevel) / 2;
+            const color = getColorForValue(midValue, minValue, maxValue, colorScheme);
+            // Transform path coordinates
+            const transformedPath = band.path.replace(
+              /([ML])\s*([\d.-]+)\s+([\d.-]+)/g,
+              (_, cmd, x, y) => {
+                const { cx, cy } = transformPoint(parseFloat(x), parseFloat(y));
+                return `${cmd} ${cx} ${cy}`;
+              }
+            );
             return (
-              <rect
-                key={`cell-${i}`}
-                x={cx - cellSize / 2}
-                y={cy - cellSize / 2}
-                width={cellSize}
-                height={cellSize}
+              <path
+                key={`band-${i}`}
+                d={transformedPath}
                 fill={color}
+                stroke={color}
+                strokeWidth="1"
               />
             );
           })}

@@ -316,6 +316,131 @@ export function generateFilledContours(
   return cells;
 }
 
+// Generate filled contour bands (like topographic maps)
+export function generateFilledContourBands(
+  points: IndentationPoint[],
+  property: string,
+  numLevels: number = 12,
+  gridSize: number = 80
+): { level: number; nextLevel: number; path: string }[] {
+  const { grid, xMin, xMax, yMin, yMax } = generateInterpolatedGrid(points, property, gridSize);
+  
+  if (grid.length === 0) return [];
+
+  const values = points.map(p => p.properties[property] ?? 0);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  
+  const levels = generateContourLevels(minValue, maxValue, numLevels);
+  const allLevels = [minValue, ...levels, maxValue];
+  
+  const bands: { level: number; nextLevel: number; path: string }[] = [];
+  
+  // For each level pair, trace the contour and create a filled region
+  for (let i = 0; i < allLevels.length - 1; i++) {
+    const level = allLevels[i];
+    const nextLevel = allLevels[i + 1];
+    
+    // Create a path that covers all cells within this value range
+    const pathPoints: { x: number; y: number }[][] = [];
+    
+    // Find connected regions for this level
+    const visited = new Set<string>();
+    
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid[row].length; col++) {
+        const cell = grid[row][col];
+        const key = `${row},${col}`;
+        
+        if (visited.has(key)) continue;
+        if (cell.value < level || cell.value >= nextLevel) continue;
+        
+        // Start a new region - trace its boundary
+        const regionBoundary = traceRegionBoundary(grid, row, col, level, nextLevel, visited);
+        if (regionBoundary.length >= 3) {
+          pathPoints.push(regionBoundary);
+        }
+      }
+    }
+    
+    if (pathPoints.length > 0) {
+      // Create SVG path from all regions
+      let path = '';
+      for (const region of pathPoints) {
+        if (region.length < 3) continue;
+        path += `M ${region[0].x} ${region[0].y} `;
+        for (let j = 1; j < region.length; j++) {
+          path += `L ${region[j].x} ${region[j].y} `;
+        }
+        path += 'Z ';
+      }
+      
+      if (path) {
+        bands.push({ level, nextLevel, path });
+      }
+    }
+  }
+  
+  return bands;
+}
+
+// Trace the boundary of a connected region
+function traceRegionBoundary(
+  grid: GridCell[][],
+  startRow: number,
+  startCol: number,
+  minLevel: number,
+  maxLevel: number,
+  visited: Set<string>
+): { x: number; y: number }[] {
+  const rows = grid.length;
+  const cols = grid[0]?.length || 0;
+  
+  // Flood fill to find all cells in this region
+  const regionCells: { row: number; col: number; x: number; y: number }[] = [];
+  const queue: [number, number][] = [[startRow, startCol]];
+  
+  while (queue.length > 0) {
+    const [row, col] = queue.shift()!;
+    const key = `${row},${col}`;
+    
+    if (visited.has(key)) continue;
+    if (row < 0 || row >= rows || col < 0 || col >= cols) continue;
+    
+    const cell = grid[row][col];
+    if (cell.value < minLevel || cell.value >= maxLevel) continue;
+    
+    visited.add(key);
+    regionCells.push({ row, col, x: cell.x, y: cell.y });
+    
+    // Add neighbors
+    queue.push([row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]);
+  }
+  
+  if (regionCells.length === 0) return [];
+  
+  // Find boundary cells (cells with at least one neighbor outside the region)
+  const regionSet = new Set(regionCells.map(c => `${c.row},${c.col}`));
+  const boundaryCells: { x: number; y: number }[] = [];
+  
+  for (const cell of regionCells) {
+    const neighbors = [
+      [cell.row - 1, cell.col],
+      [cell.row + 1, cell.col],
+      [cell.row, cell.col - 1],
+      [cell.row, cell.col + 1]
+    ];
+    
+    const isBoundary = neighbors.some(([r, c]) => !regionSet.has(`${r},${c}`));
+    if (isBoundary) {
+      boundaryCells.push({ x: cell.x, y: cell.y });
+    }
+  }
+  
+  // Sort boundary cells to form a path (convex hull for simplicity)
+  return convexHull(boundaryCells);
+}
+
 // Generate boundary polygon path for SVG clip path
 export function generateBoundaryPath(points: IndentationPoint[]): { x: number; y: number }[] {
   return generateBoundaryContour(points);
