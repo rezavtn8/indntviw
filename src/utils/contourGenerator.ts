@@ -161,45 +161,145 @@ export function generateContourLevels(
   return levels;
 }
 
-// Generate simple boundary contour (convex hull) around all points
+// Generate boundary contour that follows the outer edge of measured points
 export function generateBoundaryContour(
   points: IndentationPoint[]
 ): { x: number; y: number }[] {
   if (points.length < 3) return [];
 
-  // Get 2D coordinates
   const coords = points.map(p => ({ x: p.x, y: p.y }));
   
-  // Convex hull using Graham scan
-  const sortedPoints = [...coords].sort((a, b) => a.x - b.x || a.y - b.y);
+  // Find unique X and Y values to understand the grid structure
+  const uniqueX = [...new Set(coords.map(p => p.x))].sort((a, b) => a - b);
+  const uniqueY = [...new Set(coords.map(p => p.y))].sort((a, b) => a - b);
   
-  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) => 
-    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  // Create a set for quick point lookup
+  const pointSet = new Set(coords.map(p => `${p.x.toFixed(6)},${p.y.toFixed(6)}`));
+  const hasPoint = (x: number, y: number) => pointSet.has(`${x.toFixed(6)},${y.toFixed(6)}`);
   
-  // Build lower hull
-  const lower: { x: number; y: number }[] = [];
-  for (const p of sortedPoints) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
+  // Calculate spacing
+  const xSpacing = uniqueX.length > 1 ? uniqueX[1] - uniqueX[0] : 1;
+  const ySpacing = uniqueY.length > 1 ? uniqueY[1] - uniqueY[0] : 1;
+  
+  // Find boundary points - points that have at least one empty neighbor
+  const boundaryPoints: { x: number; y: number }[] = [];
+  
+  for (const p of coords) {
+    // Check 8 neighbors
+    const neighbors = [
+      { x: p.x - xSpacing, y: p.y },           // left
+      { x: p.x + xSpacing, y: p.y },           // right
+      { x: p.x, y: p.y - ySpacing },           // bottom
+      { x: p.x, y: p.y + ySpacing },           // top
+      { x: p.x - xSpacing, y: p.y - ySpacing }, // bottom-left
+      { x: p.x + xSpacing, y: p.y - ySpacing }, // bottom-right
+      { x: p.x - xSpacing, y: p.y + ySpacing }, // top-left
+      { x: p.x + xSpacing, y: p.y + ySpacing }, // top-right
+    ];
+    
+    // If any neighbor is missing, this is a boundary point
+    const hasEmptyNeighbor = neighbors.some(n => !hasPoint(n.x, n.y));
+    
+    if (hasEmptyNeighbor) {
+      boundaryPoints.push(p);
     }
-    lower.push(p);
+  }
+
+  if (boundaryPoints.length < 3) {
+    return sortPointsClockwise(coords);
+  }
+
+  // Order boundary points to form a continuous outline
+  return orderBoundaryPoints(boundaryPoints, xSpacing, ySpacing);
+}
+
+// Order boundary points to create a continuous outline path
+function orderBoundaryPoints(
+  points: { x: number; y: number }[],
+  xSpacing: number,
+  ySpacing: number
+): { x: number; y: number }[] {
+  if (points.length < 3) return points;
+  
+  const result: { x: number; y: number }[] = [];
+  const used = new Set<string>();
+  const key = (p: { x: number; y: number }) => `${p.x.toFixed(6)},${p.y.toFixed(6)}`;
+  
+  // Start from the leftmost-bottom point
+  let current = points.reduce((min, p) => 
+    p.x < min.x || (p.x === min.x && p.y < min.y) ? p : min
+  );
+  
+  result.push(current);
+  used.add(key(current));
+  
+  // Trace the boundary
+  const maxDist = Math.sqrt(xSpacing * xSpacing + ySpacing * ySpacing) * 1.5;
+  
+  while (result.length < points.length) {
+    let nearest: { x: number; y: number } | null = null;
+    let nearestDist = Infinity;
+    let nearestAngle = Infinity;
+    
+    // Calculate previous direction
+    const prevDir = result.length >= 2 
+      ? Math.atan2(current.y - result[result.length - 2].y, current.x - result[result.length - 2].x)
+      : -Math.PI / 2; // Start going up
+    
+    for (const p of points) {
+      if (used.has(key(p))) continue;
+      
+      const dist = Math.sqrt(Math.pow(p.x - current.x, 2) + Math.pow(p.y - current.y, 2));
+      if (dist > maxDist) continue;
+      
+      // Prefer points that continue in roughly the same direction (turning right)
+      const angle = Math.atan2(p.y - current.y, p.x - current.x);
+      let angleDiff = angle - prevDir;
+      // Normalize to prefer right turns (clockwise)
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+      
+      // Score based on distance and direction continuity
+      const score = dist + Math.abs(angleDiff) * maxDist * 0.5;
+      
+      if (score < nearestDist) {
+        nearestDist = score;
+        nearest = p;
+      }
+    }
+    
+    if (!nearest) {
+      // No nearby point found, find any unused point
+      for (const p of points) {
+        if (!used.has(key(p))) {
+          nearest = p;
+          break;
+        }
+      }
+    }
+    
+    if (!nearest) break;
+    
+    result.push(nearest);
+    used.add(key(nearest));
+    current = nearest;
   }
   
-  // Build upper hull
-  const upper: { x: number; y: number }[] = [];
-  for (let i = sortedPoints.length - 1; i >= 0; i--) {
-    const p = sortedPoints[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
-    upper.push(p);
-  }
-  
-  // Remove last point of each half because it's repeated
-  lower.pop();
-  upper.pop();
-  
-  return [...lower, ...upper];
+  return result;
+}
+
+// Sort points in clockwise order around their centroid (fallback)
+function sortPointsClockwise(points: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (points.length < 3) return points;
+
+  const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+  const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+
+  return [...points].sort((a, b) => {
+    const angleA = Math.atan2(a.y - cy, a.x - cx);
+    const angleB = Math.atan2(b.y - cy, b.x - cx);
+    return angleA - angleB;
+  });
 }
 
 // Check if a point is inside a polygon using ray casting
