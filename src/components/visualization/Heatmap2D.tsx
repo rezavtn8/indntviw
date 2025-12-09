@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
-import { generateContours, generateFilledContours } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateFilledContours } from '@/utils/contourGenerator';
 
 interface Heatmap2DProps {
   points: IndentationPoint[];
@@ -80,11 +80,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     };
   }, [points, selectedProperty, colorScheme, minValue, maxValue, highlightedPoints]);
 
-  // Generate contour lines
-  const contourLines = useMemo(() => {
-    if (!showContours || points.length < 4) return [];
-    return generateContours(points, selectedProperty, 8, 40);
-  }, [points, selectedProperty, showContours]);
+  // Generate simple boundary contour around all points
+  const boundaryContour = useMemo(() => {
+    if (!showContours || points.length < 3) return [];
+    return generateBoundaryContour(points);
+  }, [points, showContours]);
 
   // Generate interpolated cells for smooth heatmap
   const interpolatedCells = useMemo(() => {
@@ -148,28 +148,22 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         );
       })}
 
-      {/* Contour lines */}
-      {showContours && contourLines.map((contour, i) => (
-        <g key={`contour-${i}`}>
-          {contour.paths.map((path, j) => {
-            if (path.length < 2) return null;
-            const start = transformPoint(path[0].x, path[0].y);
-            const end = transformPoint(path[1].x, path[1].y);
-            return (
-              <line
-                key={`path-${i}-${j}`}
-                x1={start.cx}
-                y1={start.cy}
-                x2={end.cx}
-                y2={end.cy}
-                stroke="hsl(var(--foreground))"
-                strokeWidth="0.5"
-                opacity="0.6"
-              />
-            );
-          })}
-        </g>
-      ))}
+      {/* Boundary contour line */}
+      {showContours && boundaryContour.length > 2 && (
+        <polygon
+          points={boundaryContour
+            .map(p => {
+              const { cx, cy } = transformPoint(p.x, p.y);
+              return `${cx},${cy}`;
+            })
+            .join(' ')}
+          fill="none"
+          stroke="hsl(var(--foreground))"
+          strokeWidth="2"
+          strokeDasharray="6 3"
+          opacity="0.7"
+        />
+      )}
 
       {/* Data points */}
       {normalizedPoints.map((point) => (
@@ -219,29 +213,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         </g>
       ))}
 
-      {/* Contour level labels */}
-      {showContours && contourLines.length > 0 && (
-        <g className="pointer-events-none">
-          {contourLines.filter((_, i) => i % 2 === 0).map((contour, i) => {
-            const firstPath = contour.paths[0];
-            if (!firstPath || firstPath.length < 1) return null;
-            const pos = transformPoint(firstPath[0].x, firstPath[0].y);
-            return (
-              <text
-                key={`label-${i}`}
-                x={pos.cx}
-                y={pos.cy - 5}
-                fontSize="8"
-                fill="hsl(var(--foreground))"
-                textAnchor="middle"
-                className="font-mono"
-              >
-                {contour.level.toFixed(1)}
-              </text>
-            );
-          })}
-        </g>
-      )}
 
       {/* Axis labels */}
       <text

@@ -161,14 +161,55 @@ export function generateContourLevels(
   return levels;
 }
 
-// Generate all contour lines for given levels
+// Generate simple boundary contour (convex hull) around all points
+export function generateBoundaryContour(
+  points: IndentationPoint[]
+): { x: number; y: number }[] {
+  if (points.length < 3) return [];
+
+  // Get 2D coordinates
+  const coords = points.map(p => ({ x: p.x, y: p.y }));
+  
+  // Convex hull using Graham scan
+  const sortedPoints = [...coords].sort((a, b) => a.x - b.x || a.y - b.y);
+  
+  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) => 
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  
+  // Build lower hull
+  const lower: { x: number; y: number }[] = [];
+  for (const p of sortedPoints) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+  
+  // Build upper hull
+  const upper: { x: number; y: number }[] = [];
+  for (let i = sortedPoints.length - 1; i >= 0; i--) {
+    const p = sortedPoints[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+  
+  // Remove last point of each half because it's repeated
+  lower.pop();
+  upper.pop();
+  
+  return [...lower, ...upper];
+}
+
+// Generate all contour lines for given levels (keeping for backward compatibility)
 export function generateContours(
   points: IndentationPoint[],
   property: string,
   numLevels: number = 8,
   gridSize: number = 40
 ): { level: number; paths: { x: number; y: number }[][] }[] {
-  const { grid, xMin, xMax, yMin, yMax } = generateInterpolatedGrid(points, property, gridSize);
+  const { grid } = generateInterpolatedGrid(points, property, gridSize);
   
   if (grid.length === 0) return [];
 
