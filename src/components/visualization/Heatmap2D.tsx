@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
-import { generateBoundaryContour, generateFilledContours } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateFilledContours, generateBoundaryPath } from '@/utils/contourGenerator';
 
 export type HeatmapMode = 'dots' | 'filled';
 
@@ -84,17 +84,18 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     };
   }, [points, selectedProperty, colorScheme, minValue, maxValue, highlightedPoints]);
 
-  // Generate simple boundary contour around all points
+  // Generate boundary contour for display and clipping
   const boundaryContour = useMemo(() => {
-    if (!showContours || points.length < 3) return [];
+    if (points.length < 3) return [];
     return generateBoundaryContour(points);
-  }, [points, showContours]);
+  }, [points]);
 
-  // Generate interpolated cells for filled heatmap
+  // Generate interpolated cells for filled heatmap (higher resolution, clipped to boundary)
   const interpolatedCells = useMemo(() => {
     if (heatmapMode === 'filled' || showInterpolation) {
       if (points.length < 3) return [];
-      return generateFilledContours(points, selectedProperty, 50);
+      // Use higher grid resolution for smoother appearance
+      return generateFilledContours(points, selectedProperty, 80);
     }
     return [];
   }, [points, selectedProperty, showInterpolation, heatmapMode]);
@@ -108,6 +109,19 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     cx: padding + (x - xMin) * scale,
     cy: height - padding - (y - yMin) * scale,
   }), [padding, xMin, yMin, scale, height]);
+
+  // Generate SVG clip path from boundary (must be after transformPoint)
+  const clipPathPoints = useMemo(() => {
+    if (points.length < 3) return '';
+    const boundary = generateBoundaryPath(points);
+    return boundary
+      .map(p => {
+        const cx = padding + (p.x - xMin) * scale;
+        const cy = height - padding - (p.y - yMin) * scale;
+        return `${cx},${cy}`;
+      })
+      .join(' ');
+  }, [points, padding, xMin, yMin, scale, height]);
 
   if (points.length === 0) {
     return (
@@ -134,26 +148,35 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             opacity="0.3"
           />
         </pattern>
+        {/* Clip path for filled heatmap - constrains to data boundary */}
+        {clipPathPoints && (
+          <clipPath id="heatmap-boundary-clip">
+            <polygon points={clipPathPoints} />
+          </clipPath>
+        )}
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {/* Interpolated fill (for filled mode or background) */}
-      {(heatmapMode === 'filled' || showInterpolation) && interpolatedCells.map((cell, i) => {
-        const { cx, cy } = transformPoint(cell.x, cell.y);
-        const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-        const cellSize = cell.width * scale * 1.1; // Slight overlap to avoid gaps
-        return (
-          <rect
-            key={`cell-${i}`}
-            x={cx - cellSize / 2}
-            y={cy - cellSize / 2}
-            width={cellSize}
-            height={cellSize}
-            fill={color}
-            opacity={heatmapMode === 'filled' ? 0.9 : 0.7}
-          />
-        );
-      })}
+      {/* Interpolated fill (clipped to boundary shape) */}
+      {(heatmapMode === 'filled' || showInterpolation) && interpolatedCells.length > 0 && (
+        <g clipPath="url(#heatmap-boundary-clip)">
+          {interpolatedCells.map((cell, i) => {
+            const { cx, cy } = transformPoint(cell.x, cell.y);
+            const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
+            const cellSize = cell.width * scale * 1.2; // Overlap for seamless look
+            return (
+              <rect
+                key={`cell-${i}`}
+                x={cx - cellSize / 2}
+                y={cy - cellSize / 2}
+                width={cellSize}
+                height={cellSize}
+                fill={color}
+              />
+            );
+          })}
+        </g>
+      )}
 
       {/* Boundary contour line */}
       {showContours && boundaryContour.length > 2 && (
@@ -169,6 +192,22 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
           strokeWidth="2"
           strokeDasharray="6 3"
           opacity="0.7"
+        />
+      )}
+
+      {/* Solid boundary outline for filled mode */}
+      {heatmapMode === 'filled' && boundaryContour.length > 2 && (
+        <polygon
+          points={boundaryContour
+            .map(p => {
+              const { cx, cy } = transformPoint(p.x, p.y);
+              return `${cx},${cy}`;
+            })
+            .join(' ')}
+          fill="none"
+          stroke="hsl(var(--foreground))"
+          strokeWidth="2"
+          opacity="0.8"
         />
       )}
 
