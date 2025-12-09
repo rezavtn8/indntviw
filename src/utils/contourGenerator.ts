@@ -161,54 +161,54 @@ export function generateContourLevels(
   return levels;
 }
 
-// Generate boundary outline that traces around the outer edge of all points
+// Cross product of vectors OA and OB where O is origin
+function cross(O: { x: number; y: number }, A: { x: number; y: number }, B: { x: number; y: number }): number {
+  return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+}
+
+// Convex hull using Andrew's monotone chain algorithm
+function convexHull(points: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (points.length < 3) return points;
+
+  // Sort by x, then by y
+  const sorted = [...points].sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+
+  // Build lower hull
+  const lower: { x: number; y: number }[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  // Build upper hull
+  const upper: { x: number; y: number }[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  // Remove last point of each half because it's repeated
+  lower.pop();
+  upper.pop();
+
+  return [...lower, ...upper];
+}
+
+// Generate boundary contour - simple convex hull around all points
 export function generateBoundaryContour(
   points: IndentationPoint[]
 ): { x: number; y: number }[] {
   if (points.length < 3) return [];
-
   const coords = points.map(p => ({ x: p.x, y: p.y }));
-  
-  // Get unique Y values sorted from bottom to top
-  const uniqueY = [...new Set(coords.map(p => p.y))].sort((a, b) => a - b);
-  
-  // For each Y level, find leftmost and rightmost points
-  const leftEdge: { x: number; y: number }[] = [];
-  const rightEdge: { x: number; y: number }[] = [];
-  
-  for (const y of uniqueY) {
-    const pointsAtY = coords.filter(p => Math.abs(p.y - y) < 0.0001);
-    if (pointsAtY.length === 0) continue;
-    
-    const xValues = pointsAtY.map(p => p.x);
-    const minX = Math.min(...xValues);
-    const maxX = Math.max(...xValues);
-    
-    leftEdge.push({ x: minX, y });
-    rightEdge.push({ x: maxX, y });
-  }
-  
-  // Build outline: left edge bottom to top, then right edge top to bottom
-  const outline: { x: number; y: number }[] = [];
-  
-  // Add left edge points
-  for (const p of leftEdge) {
-    outline.push(p);
-  }
-  
-  // Add right edge points in reverse (skip if same as left edge point)
-  for (let i = rightEdge.length - 1; i >= 0; i--) {
-    const rp = rightEdge[i];
-    const lp = leftEdge[i];
-    if (Math.abs(rp.x - lp.x) > 0.0001) {
-      outline.push(rp);
-    }
-  }
-  
-  return outline;
+  return convexHull(coords);
 }
 
-// Generate smooth SVG path with padding around points
+// Generate smooth SVG path from points
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
   padding: number = 0
@@ -216,37 +216,28 @@ export function generateSmoothBoundaryPath(
   if (points.length < 3) return '';
   
   // Add padding by expanding points outward from centroid
-  const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-  const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-  
-  const paddedPoints = points.map(p => {
-    const dx = p.x - cx;
-    const dy = p.y - cy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist === 0) return p;
-    const scale = (dist + padding) / dist;
-    return {
-      x: cx + dx * scale,
-      y: cy + dy * scale
-    };
-  });
-  
-  // Create smooth path using quadratic bezier curves
-  let path = `M ${paddedPoints[0].x} ${paddedPoints[0].y}`;
-  
-  for (let i = 0; i < paddedPoints.length; i++) {
-    const curr = paddedPoints[i];
-    const next = paddedPoints[(i + 1) % paddedPoints.length];
-    const nextNext = paddedPoints[(i + 2) % paddedPoints.length];
+  let usedPoints = points;
+  if (padding > 0) {
+    const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+    const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
     
-    // Midpoint for smooth curve
-    const midX = (next.x + nextNext.x) / 2;
-    const midY = (next.y + nextNext.y) / 2;
-    
-    path += ` Q ${next.x} ${next.y}, ${midX} ${midY}`;
+    usedPoints = points.map(p => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist === 0) return p;
+      const scale = (dist + padding) / dist;
+      return { x: cx + dx * scale, y: cy + dy * scale };
+    });
   }
   
+  // Simple closed polygon path
+  let path = `M ${usedPoints[0].x} ${usedPoints[0].y}`;
+  for (let i = 1; i < usedPoints.length; i++) {
+    path += ` L ${usedPoints[i].x} ${usedPoints[i].y}`;
+  }
   path += ' Z';
+  
   return path;
 }
 
@@ -299,7 +290,6 @@ export function generateFilledContours(
   
   if (grid.length === 0) return [];
 
-  // Get the convex hull boundary
   const boundary = generateBoundaryContour(points);
   if (boundary.length < 3) return [];
 
@@ -308,7 +298,6 @@ export function generateFilledContours(
 
   const cells: { x: number; y: number; value: number; width: number; height: number }[] = [];
 
-  // Only include cells that are inside the boundary
   for (let i = 0; i < grid.length; i++) {
     for (let j = 0; j < grid[i].length; j++) {
       const cell = grid[i][j];
