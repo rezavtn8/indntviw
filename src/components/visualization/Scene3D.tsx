@@ -59,7 +59,8 @@ const DataPoints: React.FC<DataPointsProps> = ({
       tempObject.updateMatrix();
       meshRef.current!.setMatrixAt(i, tempObject.matrix);
 
-      tempColor.setRGB(colors[i][0], colors[i][1], colors[i][2]);
+      // Use setRGB with THREE.SRGBColorSpace for correct color display
+      tempColor.setRGB(colors[i][0], colors[i][1], colors[i][2], THREE.SRGBColorSpace);
       meshRef.current!.setColorAt(i, tempColor);
     });
 
@@ -83,7 +84,7 @@ const DataPoints: React.FC<DataPointsProps> = ({
       }}
     >
       <sphereGeometry args={[1, 16, 16]} />
-      <meshStandardMaterial vertexColors />
+      <meshBasicMaterial vertexColors />
     </instancedMesh>
   );
 };
