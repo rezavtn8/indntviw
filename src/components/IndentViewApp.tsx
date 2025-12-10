@@ -10,10 +10,11 @@ import { RangeControls } from '@/components/controls/RangeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 import { ExportControls } from '@/components/controls/ExportControls';
 import { VisualizationOptions, HeatmapMode } from '@/components/controls/VisualizationOptions';
+import { SelectionToolbar, SelectionMode } from '@/components/controls/SelectionToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
 import { OutlierDetector } from '@/components/panels/OutlierDetector';
-import { StatisticsPanel } from '@/components/panels/StatisticsPanel';
+import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatisticsPanel';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
 import { parseTabSeparatedData } from '@/utils/dataParser';
 import { Grid2X2, Box, Info, Edit3, Plus, Undo2 } from 'lucide-react';
@@ -42,6 +43,10 @@ export const IndentViewApp: React.FC = () => {
   const [showInterpolation, setShowInterpolation] = useState(false);
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('dots');
   const [blurIntensity, setBlurIntensity] = useState(3);
+  
+  // Selection state
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('none');
+  const [selectedPointIds, setSelectedPointIds] = useState<number[]>([]);
   
   // Ref for screenshot/export
   const visualizationRef = useRef<HTMLDivElement>(null);
@@ -112,7 +117,45 @@ export const IndentViewApp: React.FC = () => {
     setCustomMin(null);
     setCustomMax(null);
     setHighlightedOutliers([]);
+    setSelectedPointIds([]);
   }, []);
+
+  // Handle lasso selection
+  const handleLassoSelect = useCallback((pointIds: number[]) => {
+    setSelectedPointIds(pointIds);
+    if (pointIds.length > 0) {
+      toast.success(`Selected ${pointIds.length} points`);
+    }
+  }, []);
+
+  // Get selected points
+  const selectedPoints = useMemo(() => {
+    if (!data) return [];
+    return data.points.filter(p => selectedPointIds.includes(p.id));
+  }, [data, selectedPointIds]);
+
+  // Export selected points
+  const handleExportSelected = useCallback(() => {
+    if (!data || selectedPoints.length === 0) return;
+    
+    const headers = ['X', 'Y', 'Z', ...data.propertyNames];
+    const rows = selectedPoints.map(p => [
+      p.x.toString(),
+      p.y.toString(),
+      p.z.toString(),
+      ...data.propertyNames.map(prop => (p.properties[prop] ?? '').toString())
+    ]);
+    
+    const csv = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+    const blob = new Blob([csv], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `selected_points_${selectedPoints.length}.tsv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${selectedPoints.length} selected points`);
+  }, [data, selectedPoints]);
 
   // Recalculate statistics
   const recalculateStatistics = useCallback((points: IndentationPoint[], propertyNames: string[]): IndentationData['statistics'] => {
@@ -380,9 +423,11 @@ export const IndentViewApp: React.FC = () => {
                 />
               )}
 
-              <StatisticsPanel
-                data={data}
+              <SelectionStatisticsPanel
+                allPoints={data.points}
+                selectedPoints={selectedPoints}
                 selectedProperty={selectedProperty}
+                onExportSelected={selectedPoints.length > 0 ? handleExportSelected : undefined}
               />
             </>
           )}
@@ -406,6 +451,18 @@ export const IndentViewApp: React.FC = () => {
             </Tabs>
           </div>
 
+          {/* Selection Toolbar - only in 2D view */}
+          {activeView === '2d' && data && (
+            <div className="px-4 py-2 border-b border-border">
+              <SelectionToolbar
+                selectionMode={selectionMode}
+                selectedCount={selectedPointIds.length}
+                onModeChange={setSelectionMode}
+                onClearSelection={() => setSelectedPointIds([])}
+              />
+            </div>
+          )}
+
           {/* Visualization Area */}
           <div className="flex-1 relative p-4">
             <div ref={visualizationRef} className="w-full h-full">
@@ -419,10 +476,12 @@ export const IndentViewApp: React.FC = () => {
                     maxValue={currentMax}
                     selectedPoint={selectedPoint}
                     highlightedPoints={highlightedOutliers}
+                    selectedPointIds={selectedPointIds}
                     showContours={showContours}
                     showInterpolation={showInterpolation}
                     heatmapMode={heatmapMode}
                     blurIntensity={blurIntensity}
+                    selectionMode={selectionMode}
                     onPointSelect={(point) => {
                       setSelectedPoint(point);
                       if (isEditing && point) {
@@ -430,6 +489,7 @@ export const IndentViewApp: React.FC = () => {
                       }
                     }}
                     onPointHover={setHoveredPoint}
+                    onLassoSelect={handleLassoSelect}
                   />
                 </div>
               ) : (
@@ -503,7 +563,9 @@ export const IndentViewApp: React.FC = () => {
                 <span>
                   {isEditing 
                     ? 'Click points to edit • Add new points • Remove outliers' 
-                    : 'Click points to select • Drag to pan • Scroll to zoom (3D)'}
+                    : selectionMode === 'lasso'
+                      ? 'Draw to select region • Points inside will be selected'
+                      : 'Click points to select • Use Lasso for region selection • Scroll to zoom (3D)'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
