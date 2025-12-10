@@ -9,7 +9,7 @@ import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
 import { RangeControls } from '@/components/controls/RangeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 import { ExportControls } from '@/components/controls/ExportControls';
-import { VisualizationOptions, HeatmapMode } from '@/components/controls/VisualizationOptions';
+import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
 import { SelectionToolbar, SelectionMode } from '@/components/controls/SelectionToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
@@ -18,7 +18,7 @@ import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatistic
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
 import { parseTabSeparatedData } from '@/utils/dataParser';
-import { Grid2X2, Box, Info, Edit3, Plus, Undo2 } from 'lucide-react';
+import { Grid2X2, Box, Edit3, Plus, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const IndentViewApp: React.FC = () => {
@@ -42,8 +42,6 @@ export const IndentViewApp: React.FC = () => {
   // Visualization options
   const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
-  const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('dots');
-  const [blurIntensity, setBlurIntensity] = useState(3);
   
   // Selection state
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('none');
@@ -300,10 +298,12 @@ export const IndentViewApp: React.FC = () => {
     return config?.unit || '';
   };
 
+  // Efficient change detection without JSON.stringify
   const hasChanges = useMemo(() => {
     if (!data || !originalData) return false;
-    return data.points.length !== originalData.points.length ||
-      JSON.stringify(data.points) !== JSON.stringify(originalData.points);
+    if (data.points.length !== originalData.points.length) return true;
+    // Check if any point reference changed (works because we create new objects on edit)
+    return data.points !== originalData.points;
   }, [data, originalData]);
 
   return (
@@ -398,12 +398,8 @@ export const IndentViewApp: React.FC = () => {
                 <VisualizationOptions
                   showContours={showContours}
                   showInterpolation={showInterpolation}
-                  heatmapMode={heatmapMode}
-                  blurIntensity={blurIntensity}
                   onShowContoursChange={setShowContours}
                   onShowInterpolationChange={setShowInterpolation}
-                  onHeatmapModeChange={setHeatmapMode}
-                  onBlurIntensityChange={setBlurIntensity}
                 />
               )}
 
@@ -486,21 +482,14 @@ export const IndentViewApp: React.FC = () => {
                     selectedPointIds={selectedPointIds}
                     showContours={showContours}
                     showInterpolation={showInterpolation}
-                    heatmapMode={heatmapMode}
-                    blurIntensity={blurIntensity}
                     selectionMode={selectionMode}
-                    onPointSelect={(point) => {
-                      setSelectedPoint(point);
-                      if (isEditing && point) {
-                        handlePointEdit(point);
-                      }
-                    }}
+                    onPointSelect={setSelectedPoint}
                     onPointHover={setHoveredPoint}
                     onLassoSelect={handleLassoSelect}
                   />
                 </div>
               ) : (
-                <div className="w-full h-full border-2 border-border bg-card">
+              <div className="w-full h-full border-2 border-border bg-card">
                   <Scene3D
                     points={data?.points || []}
                     selectedProperty={selectedProperty}
@@ -508,81 +497,60 @@ export const IndentViewApp: React.FC = () => {
                     minValue={currentMin}
                     maxValue={currentMax}
                     selectedPoint={selectedPoint}
-                    onPointSelect={(point) => {
-                      setSelectedPoint(point);
-                      if (isEditing && point) {
-                        handlePointEdit(point);
-                      }
-                    }}
+                    onPointSelect={setSelectedPoint}
                   />
                 </div>
               )}
             </div>
-
-            {/* Hovered Point Tooltip */}
-            {hoveredPoint && !selectedPoint && !editingPoint && activeView === '2d' && (
-              <div className="absolute top-6 right-6 bg-card border-2 border-border p-3 shadow-md font-mono text-xs max-w-xs">
-                <div className="font-bold mb-1">Point #{hoveredPoint.id + 1}</div>
-                <div className="text-muted-foreground">
-                  X: {hoveredPoint.x.toFixed(3)} mm | Y: {hoveredPoint.y.toFixed(3)} mm
-                </div>
-                <div className="mt-1 font-bold">
-                  {selectedProperty}: {hoveredPoint.properties[selectedProperty]?.toFixed(4) ?? 'N/A'}
-                  {getPropertyUnit(selectedProperty) && ` ${getPropertyUnit(selectedProperty)}`}
-                </div>
-                {isEditing && (
-                  <div className="mt-2 text-muted-foreground">Click to edit</div>
-                )}
-              </div>
-            )}
-
-            {/* Point Editor (when in edit mode) */}
-            {editingPoint && (
-              <div className="absolute top-6 right-6 w-80">
-                <PointEditor
-                  point={editingPoint}
-                  isNewPoint={isAddingPoint}
-                  onSave={handleSavePoint}
-                  onDelete={handleDeletePoint}
-                  onClose={() => {
-                    setEditingPoint(null);
-                    setIsAddingPoint(false);
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Selected Point Details (when not editing) */}
-            {selectedPoint && !editingPoint && !isEditing && (
-              <div className="absolute top-6 right-6 w-72">
-                <PointDetails
-                  point={selectedPoint}
-                  onClose={() => setSelectedPoint(null)}
-                />
-              </div>
-            )}
           </div>
-
-          {/* Footer */}
-          <footer className="border-t-2 border-border bg-card px-4 py-2">
-            <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
-              <div className="flex items-center gap-4">
-                <span>
-                  {isEditing 
-                    ? 'Click points to edit • Add new points • Remove outliers' 
-                    : selectionMode === 'lasso'
-                      ? 'Draw to select region • Points inside will be selected'
-                      : 'Click points to select • Use Lasso for region selection • Scroll to zoom (3D)'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="w-3 h-3" />
-                <span>Nanoindentation Data Visualization</span>
-              </div>
-            </div>
-          </footer>
         </main>
       </div>
+
+      {/* Point Tooltip */}
+      {hoveredPoint && !selectedPoint && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
+          <PointDetails
+            point={hoveredPoint}
+            onClose={() => setHoveredPoint(null)}
+          />
+        </div>
+      )}
+
+      {/* Selected Point Details */}
+      {selectedPoint && !editingPoint && (
+        <div className="fixed bottom-20 right-8 z-50">
+          <PointDetails
+            point={selectedPoint}
+            onClose={() => setSelectedPoint(null)}
+          />
+        </div>
+      )}
+
+      {/* Point Editor Modal */}
+      {editingPoint && (
+        <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+          <PointEditor
+            point={editingPoint}
+            isNewPoint={isAddingPoint}
+            onSave={handleSavePoint}
+            onDelete={(pointId) => handleDeletePoint(pointId)}
+            onClose={() => {
+              setEditingPoint(null);
+              setIsAddingPoint(false);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="border-t-2 border-border bg-card px-6 py-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
+          <span>
+            {data ? `Viewing: ${selectedProperty} | Range: ${currentMin.toFixed(2)} - ${currentMax.toFixed(2)}` : 'Load data to begin'}
+          </span>
+          <span>Nanoindentation Data Visualization</span>
+        </div>
+      </footer>
     </div>
   );
 };
