@@ -73,6 +73,14 @@ const DataPoints: React.FC<DataPointsProps> = ({
     }
   }, [positions, colors, selectedPoint, points, tempObject, tempColor]);
 
+  // Initialize instanceColor buffer on mount
+  React.useEffect(() => {
+    if (meshRef.current && !meshRef.current.instanceColor) {
+      const colorArray = new Float32Array(points.length * 3);
+      meshRef.current.instanceColor = new THREE.InstancedBufferAttribute(colorArray, 3);
+    }
+  }, [points.length]);
+
   return (
     <instancedMesh
       ref={meshRef}
@@ -87,7 +95,7 @@ const DataPoints: React.FC<DataPointsProps> = ({
       }}
     >
       <sphereGeometry args={[1, 16, 16]} />
-      <meshBasicMaterial vertexColors />
+      <meshStandardMaterial />
     </instancedMesh>
   );
 };
