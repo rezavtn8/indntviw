@@ -58,6 +58,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const [viewState, setViewState] = useState<ViewState>({ scale: 1, translateX: 0, translateY: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [viewStart, setViewStart] = useState({ translateX: 0, translateY: 0 });
 
   const { normalizedPoints, viewBox, pointRadius, scale, padding, xMin, yMin, height } = useMemo(() => {
     if (points.length === 0) {
@@ -175,27 +176,34 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       setIsDrawing(true);
       setLassoPath([coords]);
     } else if (selectionMode === 'none' && e.button === 0) {
-      // Start panning with left click when not in selection mode
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (rect) {
-        setIsPanning(true);
-        setPanStart({ x: e.clientX - viewState.translateX, y: e.clientY - viewState.translateY });
-      }
+      // Start panning - store initial mouse position and current view state
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY });
+      setViewStart({ translateX: viewState.translateX, translateY: viewState.translateY });
     }
-  }, [selectionMode, getSVGCoords, viewState]);
+  }, [selectionMode, getSVGCoords, viewState.translateX, viewState.translateY]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (isDrawing && selectionMode === 'lasso') {
       const coords = getSVGCoords(e);
       setLassoPath(prev => [...prev, coords]);
     } else if (isPanning) {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      // Convert screen delta to SVG units
+      const scaleX = 800 / rect.width;
+      const scaleY = 600 / rect.height;
+      const dx = (e.clientX - panStart.x) * scaleX;
+      const dy = (e.clientY - panStart.y) * scaleY;
+      
       setViewState(prev => ({
         ...prev,
-        translateX: e.clientX - panStart.x,
-        translateY: e.clientY - panStart.y,
+        translateX: viewStart.translateX + dx,
+        translateY: viewStart.translateY + dy,
       }));
     }
-  }, [isDrawing, selectionMode, getSVGCoords, isPanning, panStart]);
+  }, [isDrawing, selectionMode, getSVGCoords, isPanning, panStart, viewStart]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -222,20 +230,27 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setLassoPath([]);
   }, [isDrawing, isPanning, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
 
-  // Zoom handler - smoother with smaller steps
+  // Zoom handler - gentler zoom with proper center point
   const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    // Convert mouse position to SVG coordinates
     const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
     const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
 
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.91;
-    const newScale = Math.max(0.3, Math.min(15, viewState.scale * zoomFactor));
+    // Gentler zoom factor
+    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.93;
+    const newScale = Math.max(0.5, Math.min(8, viewState.scale * zoomFactor));
+    
+    // Only update if scale actually changed
+    if (newScale === viewState.scale) return;
 
-    const newTranslateX = mouseX - (mouseX - viewState.translateX) * (newScale / viewState.scale);
-    const newTranslateY = mouseY - (mouseY - viewState.translateY) * (newScale / viewState.scale);
+    // Zoom toward mouse position
+    const scaleRatio = newScale / viewState.scale;
+    const newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
+    const newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
 
     setViewState({
       scale: newScale,
@@ -244,7 +259,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     });
   }, [viewState]);
 
-  // Double-click to zoom in
+  // Double-click to zoom in (gentler)
   const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (selectionMode !== 'none') return;
     
@@ -254,9 +269,10 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
     const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
 
-    const newScale = Math.min(15, viewState.scale * 1.8);
-    const newTranslateX = mouseX - (mouseX - viewState.translateX) * (newScale / viewState.scale);
-    const newTranslateY = mouseY - (mouseY - viewState.translateY) * (newScale / viewState.scale);
+    const newScale = Math.min(8, viewState.scale * 1.5);
+    const scaleRatio = newScale / viewState.scale;
+    const newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
+    const newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
 
     setViewState({
       scale: newScale,
@@ -270,13 +286,15 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setViewState({ scale: 1, translateX: 0, translateY: 0 });
   }, []);
 
-  // Zoom to specific level
+  // Zoom to specific level (from center)
   const zoomTo = useCallback((newScale: number) => {
+    const clampedScale = Math.max(0.5, Math.min(8, newScale));
     const centerX = 400;
     const centerY = 300;
-    const newTranslateX = centerX - (centerX - viewState.translateX) * (newScale / viewState.scale);
-    const newTranslateY = centerY - (centerY - viewState.translateY) * (newScale / viewState.scale);
-    setViewState({ scale: newScale, translateX: newTranslateX, translateY: newTranslateY });
+    const scaleRatio = clampedScale / viewState.scale;
+    const newTranslateX = centerX - (centerX - viewState.translateX) * scaleRatio;
+    const newTranslateY = centerY - (centerY - viewState.translateY) * scaleRatio;
+    setViewState({ scale: clampedScale, translateX: newTranslateX, translateY: newTranslateY });
   }, [viewState]);
 
   // Generate lasso path string
@@ -302,7 +320,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       {/* Enhanced zoom controls */}
       <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-card/90 border border-border rounded p-1">
         <button
-          onClick={() => zoomTo(Math.min(15, viewState.scale * 1.4))}
+          onClick={() => zoomTo(viewState.scale * 1.3)}
           className="w-8 h-8 bg-card border border-border text-foreground font-mono text-base hover:bg-muted flex items-center justify-center rounded"
           title="Zoom In (+)"
         >
@@ -312,7 +330,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
           {zoomPercent}%
         </div>
         <button
-          onClick={() => zoomTo(Math.max(0.3, viewState.scale * 0.7))}
+          onClick={() => zoomTo(viewState.scale * 0.75)}
           className="w-8 h-8 bg-card border border-border text-foreground font-mono text-base hover:bg-muted flex items-center justify-center rounded"
           title="Zoom Out (-)"
         >
