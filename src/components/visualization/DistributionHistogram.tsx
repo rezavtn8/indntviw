@@ -15,8 +15,14 @@ interface GroupStats {
   ci95Lower: number;
   ci95Upper: number;
   median: number;
+  q1: number;
+  q3: number;
+  iqr: number;
   min: number;
   max: number;
+  whiskerLow: number;
+  whiskerHigh: number;
+  outliers: number[];
 }
 
 const calculateGroupStats = (values: number[]): GroupStats | null => {
@@ -28,7 +34,23 @@ const calculateGroupStats = (values: number[]): GroupStats | null => {
   const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (n - 1 || 1);
   const std = Math.sqrt(variance);
   const sem = std / Math.sqrt(n);
-  const t95 = n > 30 ? 1.96 : 2.0; // Approximate t-value for 95% CI
+  const t95 = n > 30 ? 1.96 : 2.0;
+  
+  // Quartiles
+  const q1Idx = Math.floor(n * 0.25);
+  const q3Idx = Math.floor(n * 0.75);
+  const medianIdx = Math.floor(n * 0.5);
+  const q1 = sorted[q1Idx];
+  const q3 = sorted[q3Idx];
+  const median = sorted[medianIdx];
+  const iqr = q3 - q1;
+  
+  // Whiskers (1.5 * IQR)
+  const whiskerLow = Math.max(sorted[0], q1 - 1.5 * iqr);
+  const whiskerHigh = Math.min(sorted[n - 1], q3 + 1.5 * iqr);
+  
+  // Outliers
+  const outliers = sorted.filter(v => v < whiskerLow || v > whiskerHigh);
   
   return {
     n,
@@ -37,9 +59,15 @@ const calculateGroupStats = (values: number[]): GroupStats | null => {
     sem,
     ci95Lower: mean - t95 * sem,
     ci95Upper: mean + t95 * sem,
-    median: sorted[Math.floor(n / 2)],
+    median,
+    q1,
+    q3,
+    iqr,
     min: sorted[0],
     max: sorted[n - 1],
+    whiskerLow,
+    whiskerHigh,
+    outliers,
   };
 };
 
@@ -57,7 +85,6 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
       .map(p => p.properties[selectedProperty])
       .filter(v => v !== undefined && !isNaN(v));
 
-    // "Unselected" = All - Selected
     const selectedIds = new Set(selectedPoints.map(p => p.id));
     const unselectedValues = allPoints
       .filter(p => !selectedIds.has(p.id))
@@ -89,20 +116,12 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
 
   const hasSelection = selectedPoints.length > 0 && stats.selected && stats.unselected;
 
-  if (!stats.all) {
-    return null;
-  }
+  if (!stats.all) return null;
 
-  // Calculate scale for visualization
-  const allMin = stats.all.ci95Lower;
-  const allMax = stats.all.ci95Upper;
-  const selectedMin = stats.selected?.ci95Lower ?? allMin;
-  const selectedMax = stats.selected?.ci95Upper ?? allMax;
-  const unselectedMin = stats.unselected?.ci95Lower ?? allMin;
-  const unselectedMax = stats.unselected?.ci95Upper ?? allMax;
-  
-  const vizMin = Math.min(allMin, selectedMin, unselectedMin) * 0.95;
-  const vizMax = Math.max(allMax, selectedMax, unselectedMax) * 1.05;
+  // Calculate scale for visualization (include outliers)
+  const allStats = hasSelection ? [stats.selected!, stats.unselected!] : [stats.all];
+  const vizMin = Math.min(...allStats.map(s => Math.min(s.whiskerLow, ...s.outliers))) * 0.98;
+  const vizMax = Math.max(...allStats.map(s => Math.max(s.whiskerHigh, ...s.outliers))) * 1.02;
   const vizRange = vizMax - vizMin || 1;
 
   const getPosition = (value: number) => ((value - vizMin) / vizRange) * 100;
@@ -111,18 +130,20 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
   const label = getPropertyLabel(selectedProperty);
 
   return (
-    <div className="border-2 border-border bg-card p-4 shadow-sm">
-      <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-foreground mb-1">
-        {label} Comparison
-      </h3>
-      <p className="font-mono text-xs text-muted-foreground mb-4">
-        Mean with 95% Confidence Interval
-      </p>
+    <div className="border-2 border-border bg-card p-4 shadow-sm space-y-4">
+      <div>
+        <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-foreground mb-1">
+          {label} Comparison
+        </h3>
+        <p className="font-mono text-xs text-muted-foreground">
+          Box plot with 95% CI
+        </p>
+      </div>
 
-      <div className="space-y-4">
-        {/* All Points (only show when no selection) */}
+      {/* Box Plots */}
+      <div className="space-y-3">
         {!hasSelection && stats.all && (
-          <GroupBar
+          <BoxPlot
             label="All"
             stats={stats.all}
             color="hsl(var(--muted-foreground))"
@@ -132,10 +153,9 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
           />
         )}
 
-        {/* Selected vs Unselected comparison */}
         {hasSelection && stats.selected && stats.unselected && (
           <>
-            <GroupBar
+            <BoxPlot
               label="Selected"
               stats={stats.selected}
               color="hsl(var(--primary))"
@@ -143,7 +163,7 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
               formatValue={formatValue}
               unit={unit}
             />
-            <GroupBar
+            <BoxPlot
               label="Unselected"
               stats={stats.unselected}
               color="hsl(var(--muted-foreground))"
@@ -152,8 +172,7 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
               unit={unit}
             />
             
-            {/* Statistical comparison */}
-            <div className="mt-4 pt-3 border-t border-border">
+            <div className="pt-3 border-t border-border">
               <StatComparison
                 selected={stats.selected}
                 unselected={stats.unselected}
@@ -166,7 +185,7 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
       </div>
 
       {/* Scale labels */}
-      <div className="flex justify-between mt-3 font-mono text-xs text-muted-foreground">
+      <div className="flex justify-between font-mono text-xs text-muted-foreground">
         <span>{formatValue(vizMin)}</span>
         <span>{unit}</span>
         <span>{formatValue(vizMax)}</span>
@@ -175,7 +194,7 @@ export const DistributionHistogram: React.FC<GroupComparisonProps> = ({
   );
 };
 
-interface GroupBarProps {
+interface BoxPlotProps {
   label: string;
   stats: GroupStats;
   color: string;
@@ -184,7 +203,7 @@ interface GroupBarProps {
   unit: string;
 }
 
-const GroupBar: React.FC<GroupBarProps> = ({
+const BoxPlot: React.FC<BoxPlotProps> = ({
   label,
   stats,
   color,
@@ -192,7 +211,12 @@ const GroupBar: React.FC<GroupBarProps> = ({
   formatValue,
   unit,
 }) => {
+  const q1Pos = getPosition(stats.q1);
+  const q3Pos = getPosition(stats.q3);
+  const medianPos = getPosition(stats.median);
   const meanPos = getPosition(stats.mean);
+  const whiskerLowPos = getPosition(stats.whiskerLow);
+  const whiskerHighPos = getPosition(stats.whiskerHigh);
   const ciLowerPos = getPosition(stats.ci95Lower);
   const ciUpperPos = getPosition(stats.ci95Upper);
 
@@ -203,15 +227,15 @@ const GroupBar: React.FC<GroupBarProps> = ({
           {label} (n={stats.n})
         </span>
         <span className="font-mono text-xs text-muted-foreground">
-          {formatValue(stats.mean)} ± {formatValue(stats.sem)} {unit}
+          μ={formatValue(stats.mean)} {unit}
         </span>
       </div>
       
-      {/* Visual bar with CI */}
-      <div className="relative h-8 bg-muted/30 rounded">
-        {/* 95% CI range */}
+      {/* Box plot visualization */}
+      <div className="relative h-10 bg-muted/20 rounded">
+        {/* 95% CI background */}
         <div
-          className="absolute h-full rounded opacity-40"
+          className="absolute h-full rounded opacity-20"
           style={{
             left: `${ciLowerPos}%`,
             width: `${ciUpperPos - ciLowerPos}%`,
@@ -219,38 +243,81 @@ const GroupBar: React.FC<GroupBarProps> = ({
           }}
         />
         
-        {/* CI whiskers */}
+        {/* Whisker line */}
         <div
-          className="absolute top-1 bottom-1 w-0.5"
-          style={{ left: `${ciLowerPos}%`, backgroundColor: color }}
-        />
-        <div
-          className="absolute top-1 bottom-1 w-0.5"
-          style={{ left: `${ciUpperPos}%`, backgroundColor: color }}
+          className="absolute top-1/2 h-0.5 -translate-y-1/2"
+          style={{
+            left: `${whiskerLowPos}%`,
+            width: `${whiskerHighPos - whiskerLowPos}%`,
+            backgroundColor: color,
+            opacity: 0.6,
+          }}
         />
         
-        {/* Mean marker */}
+        {/* Whisker caps */}
         <div
-          className="absolute top-0 bottom-0 w-1 rounded"
-          style={{ left: `${meanPos}%`, backgroundColor: color, transform: 'translateX(-50%)' }}
+          className="absolute top-2 bottom-2 w-0.5"
+          style={{ left: `${whiskerLowPos}%`, backgroundColor: color }}
+        />
+        <div
+          className="absolute top-2 bottom-2 w-0.5"
+          style={{ left: `${whiskerHighPos}%`, backgroundColor: color }}
+        />
+        
+        {/* IQR Box (Q1-Q3) */}
+        <div
+          className="absolute top-1 bottom-1 rounded border-2"
+          style={{
+            left: `${q1Pos}%`,
+            width: `${q3Pos - q1Pos}%`,
+            backgroundColor: `${color}33`,
+            borderColor: color,
+          }}
+        />
+        
+        {/* Median line */}
+        <div
+          className="absolute top-1 bottom-1 w-0.5"
+          style={{ left: `${medianPos}%`, backgroundColor: color }}
         />
         
         {/* Mean diamond */}
         <div
-          className="absolute top-1/2 w-3 h-3 rotate-45"
+          className="absolute top-1/2 w-2.5 h-2.5"
           style={{
             left: `${meanPos}%`,
             transform: 'translate(-50%, -50%) rotate(45deg)',
             backgroundColor: color,
-            border: '2px solid hsl(var(--card))',
+            border: '1.5px solid hsl(var(--card))',
           }}
         />
+        
+        {/* Outliers */}
+        {stats.outliers.slice(0, 10).map((val, i) => (
+          <div
+            key={i}
+            className="absolute top-1/2 w-1.5 h-1.5 rounded-full -translate-y-1/2"
+            style={{
+              left: `${getPosition(val)}%`,
+              backgroundColor: color,
+              opacity: 0.7,
+            }}
+          />
+        ))}
       </div>
       
-      {/* Stats summary */}
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-1 font-mono text-xs text-muted-foreground">
+        <span>Q1: {formatValue(stats.q1)}</span>
+        <span>Med: {formatValue(stats.median)}</span>
+        <span>Q3: {formatValue(stats.q3)}</span>
+        <span>IQR: {formatValue(stats.iqr)}</span>
+      </div>
       <div className="flex justify-between font-mono text-xs text-muted-foreground">
-        <span>CI: [{formatValue(stats.ci95Lower)}, {formatValue(stats.ci95Upper)}]</span>
-        <span>SD: {formatValue(stats.std)}</span>
+        <span>95% CI: [{formatValue(stats.ci95Lower)}, {formatValue(stats.ci95Upper)}]</span>
+        {stats.outliers.length > 0 && (
+          <span className="text-destructive">{stats.outliers.length} outliers</span>
+        )}
       </div>
     </div>
   );
@@ -271,18 +338,9 @@ const StatComparison: React.FC<StatComparisonProps> = ({
 }) => {
   const diff = selected.mean - unselected.mean;
   const percentDiff = (diff / unselected.mean) * 100;
-  
-  // Pooled standard error for difference
-  const seDiff = Math.sqrt(
-    Math.pow(selected.sem, 2) + Math.pow(unselected.sem, 2)
-  );
-  
-  // T-statistic
+  const seDiff = Math.sqrt(Math.pow(selected.sem, 2) + Math.pow(unselected.sem, 2));
   const tStat = Math.abs(diff / seDiff);
-  
-  // Approximate p-value (for large n, t ~ z)
   const pValue = 2 * (1 - normalCDF(tStat));
-  
   const isSignificant = pValue < 0.05;
 
   return (
@@ -305,10 +363,6 @@ const StatComparison: React.FC<StatComparisonProps> = ({
           </span>
         </div>
         <div>
-          <span className="text-muted-foreground">t-statistic:</span>
-          <span className="ml-1">{tStat.toFixed(2)}</span>
-        </div>
-        <div>
           <span className="text-muted-foreground">p-value:</span>
           <span className={`ml-1 font-bold ${isSignificant ? 'text-primary' : ''}`}>
             {pValue < 0.001 ? '<0.001' : pValue.toFixed(3)}
@@ -319,27 +373,19 @@ const StatComparison: React.FC<StatComparisonProps> = ({
       
       {isSignificant && (
         <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded">
-          Statistically significant difference (p &lt; 0.05)
+          Statistically significant (p &lt; 0.05)
         </div>
       )}
     </div>
   );
 };
 
-// Standard normal CDF approximation
 const normalCDF = (x: number): number => {
-  const a1 = 0.254829592;
-  const a2 = -0.284496736;
-  const a3 = 1.421413741;
-  const a4 = -1.453152027;
-  const a5 = 1.061405429;
-  const p = 0.3275911;
-
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
   const sign = x < 0 ? -1 : 1;
   x = Math.abs(x) / Math.sqrt(2);
-
   const t = 1.0 / (1.0 + p * x);
   const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-
   return 0.5 * (1.0 + sign * y);
 };
