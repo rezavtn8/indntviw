@@ -4,7 +4,6 @@ import { getColorForValue } from '@/utils/colorScales';
 import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 import { isPointInPolygon } from '@/utils/statisticsUtils';
 
-export type HeatmapMode = 'dots' | 'filled';
 export type SelectionMode = 'none' | 'lasso';
 
 interface Heatmap2DProps {
@@ -18,8 +17,6 @@ interface Heatmap2DProps {
   selectedPointIds?: number[];
   showContours?: boolean;
   showInterpolation?: boolean;
-  heatmapMode?: HeatmapMode;
-  blurIntensity?: number;
   selectionMode?: SelectionMode;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
@@ -43,8 +40,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   selectedPointIds = [],
   showContours = false,
   showInterpolation = false,
-  heatmapMode = 'dots',
-  blurIntensity = 3,
   selectionMode = 'none',
   onPointSelect,
   onPointHover,
@@ -117,24 +112,13 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return generateBoundaryContour(points);
   }, [points]);
 
-  // Phase 2: Generate dense interpolation grid for gradient fill
-  const gradientCells = useMemo(() => {
-    if (heatmapMode === 'filled') {
-      if (points.length < 3) return [];
-      // Very dense grid for smooth gradient - 200x200 resolution
-      return generateFilledContours(points, selectedProperty, 200);
-    }
-    return [];
-  }, [points, selectedProperty, heatmapMode]);
-
-  // Interpolated cells for dots mode background
+  // Interpolated cells for background
   const interpolatedCells = useMemo(() => {
-    if (showInterpolation && heatmapMode === 'dots') {
-      if (points.length < 3) return [];
+    if (showInterpolation && points.length >= 3) {
       return generateFilledContours(points, selectedProperty, 80);
     }
     return [];
-  }, [points, selectedProperty, showInterpolation, heatmapMode]);
+  }, [points, selectedProperty, showInterpolation]);
 
   const handlePointClick = useCallback((point: IndentationPoint) => {
     if (selectionMode === 'none') {
@@ -389,7 +373,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
               opacity="0.5"
             />
           </pattern>
-          {/* Smooth clip path for filled heatmap with padding */}
+          {/* Smooth clip path for interpolation */}
           {boundaryContour.length >= 3 && (
             <clipPath id="heatmap-smooth-clip">
               <path
@@ -403,170 +387,10 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
               />
             </clipPath>
           )}
-          {/* Phase 3: Blur filter for smooth gradient blending */}
-          <filter id="gradient-blur" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation={blurIntensity} result="blur" />
-          </filter>
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" />
 
-        {/* Transform group for zoom/pan */}
-        <g transform={transformStr}>
-
-      {/* Phase 1: Boundary shape filled with Phase 2+3: Dense gradient cells with blur */}
-      {heatmapMode === 'filled' && gradientCells.length > 0 && (
-        <g clipPath="url(#heatmap-smooth-clip)">
-          {/* Apply blur for smooth blending between cells */}
-          <g filter="url(#gradient-blur)">
-            {gradientCells.map((cell, i) => {
-              const { cx, cy } = transformPoint(cell.x, cell.y);
-              const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-              // Cells overlap by 2x to ensure no gaps
-              const cellSize = Math.max(cell.width, cell.height) * scale * 2;
-              return (
-                <rect
-                  key={`g-${i}`}
-                  x={cx - cellSize / 2}
-                  y={cy - cellSize / 2}
-                  width={cellSize}
-                  height={cellSize}
-                  fill={color}
-                />
-              );
-            })}
-          </g>
-        </g>
-      )}
-
-      {/* Background interpolation for dots mode */}
-      {heatmapMode === 'dots' && showInterpolation && interpolatedCells.length > 0 && (
-        <g clipPath="url(#heatmap-smooth-clip)" opacity="0.6">
-          {interpolatedCells.map((cell, i) => {
-            const { cx, cy } = transformPoint(cell.x, cell.y);
-            const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
-            const cellSize = cell.width * scale * 1.3;
-            return (
-              <rect
-                key={`cell-${i}`}
-                x={cx - cellSize / 2}
-                y={cy - cellSize / 2}
-                width={cellSize}
-                height={cellSize}
-                fill={color}
-              />
-            );
-          })}
-        </g>
-      )}
-
-      {/* Smooth boundary contour line */}
-      {showContours && boundaryContour.length >= 3 && (
-        <path
-          d={generateSmoothBoundaryPath(
-            boundaryContour.map(p => {
-              const { cx, cy } = transformPoint(p.x, p.y);
-              return { x: cx, y: cy };
-            }),
-            pointRadius * 0.5
-          )}
-          fill="none"
-          stroke="hsl(var(--primary))"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-        />
-      )}
-
-      {/* Solid smooth boundary outline for filled mode */}
-      {heatmapMode === 'filled' && boundaryContour.length >= 3 && (
-        <path
-          d={generateSmoothBoundaryPath(
-            boundaryContour.map(p => {
-              const { cx, cy } = transformPoint(p.x, p.y);
-              return { x: cx, y: cy };
-            }),
-            pointRadius * 0.5
-          )}
-          fill="none"
-          stroke="hsl(var(--foreground))"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-      )}
-
-      {/* Data points - only show in dots mode */}
-      {heatmapMode === 'dots' && normalizedPoints.map((point) => (
-        <g key={point.id}>
-          {/* Highlight ring for outliers */}
-          {point.isHighlighted && (
-            <circle
-              cx={point.cx}
-              cy={point.cy}
-              r={pointRadius + 8}
-              fill="none"
-              stroke="hsl(var(--destructive))"
-              strokeWidth="2"
-              strokeDasharray="3 2"
-            />
-          )}
-          {/* Selection ring for lasso-selected points */}
-          {point.isSelected && (
-            <circle
-              cx={point.cx}
-              cy={point.cy}
-              r={pointRadius + 5}
-              fill="none"
-              stroke="hsl(var(--primary))"
-              strokeWidth="2"
-            />
-          )}
-          <circle
-            cx={point.cx}
-            cy={point.cy}
-            r={pointRadius}
-            fill={point.color}
-            stroke={
-              point.isHighlighted 
-                ? 'hsl(var(--destructive))' 
-                : point.isSelected
-                  ? 'hsl(var(--primary))'
-                  : selectedPoint?.id === point.id 
-                    ? 'hsl(var(--foreground))' 
-                    : 'hsl(var(--border))'
-            }
-            strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || point.isSelected ? 3 : 1}
-            className="cursor-pointer transition-all duration-150 hover:opacity-80"
-            onClick={() => handlePointClick(point)}
-            onMouseEnter={() => onPointHover(point)}
-            onMouseLeave={() => onPointHover(null)}
-          />
-          {selectedPoint?.id === point.id && (
-            <circle
-              cx={point.cx}
-              cy={point.cy}
-              r={pointRadius + 6}
-              fill="none"
-              stroke="hsl(var(--foreground))"
-              strokeWidth="2"
-              strokeDasharray="4 2"
-              className="animate-pulse"
-            />
-          )}
-        </g>
-      ))}
-
-
-      {/* Lasso selection path */}
-      {isDrawing && lassoPathString && (
-        <path
-          d={lassoPathString}
-          fill="hsl(var(--primary) / 0.1)"
-          stroke="hsl(var(--primary))"
-          strokeWidth="2"
-          strokeDasharray="5 3"
-        />
-      )}
-
-        {/* Axis labels */}
+        {/* Axis labels - OUTSIDE transform group so they stay fixed */}
         <text
           x="400"
           y="590"
@@ -584,6 +408,119 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         >
           Y Position (mm)
         </text>
+
+        {/* Transform group for zoom/pan */}
+        <g transform={transformStr}>
+
+          {/* Background interpolation */}
+          {showInterpolation && interpolatedCells.length > 0 && (
+            <g clipPath="url(#heatmap-smooth-clip)" opacity="0.6">
+              {interpolatedCells.map((cell, i) => {
+                const { cx, cy } = transformPoint(cell.x, cell.y);
+                const color = getColorForValue(cell.value, minValue, maxValue, colorScheme);
+                const cellSize = cell.width * scale * 1.3;
+                return (
+                  <rect
+                    key={`cell-${i}`}
+                    x={cx - cellSize / 2}
+                    y={cy - cellSize / 2}
+                    width={cellSize}
+                    height={cellSize}
+                    fill={color}
+                  />
+                );
+              })}
+            </g>
+          )}
+
+          {/* Smooth boundary contour line */}
+          {showContours && boundaryContour.length >= 3 && (
+            <path
+              d={generateSmoothBoundaryPath(
+                boundaryContour.map(p => {
+                  const { cx, cy } = transformPoint(p.x, p.y);
+                  return { x: cx, y: cy };
+                }),
+                pointRadius * 0.5
+              )}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {/* Data points */}
+          {normalizedPoints.map((point) => (
+            <g key={point.id}>
+              {/* Highlight ring for outliers */}
+              {point.isHighlighted && (
+                <circle
+                  cx={point.cx}
+                  cy={point.cy}
+                  r={pointRadius + 8}
+                  fill="none"
+                  stroke="hsl(var(--destructive))"
+                  strokeWidth="2"
+                  strokeDasharray="3 2"
+                />
+              )}
+              {/* Selection ring for lasso-selected points */}
+              {point.isSelected && (
+                <circle
+                  cx={point.cx}
+                  cy={point.cy}
+                  r={pointRadius + 5}
+                  fill="none"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="2"
+                />
+              )}
+              <circle
+                cx={point.cx}
+                cy={point.cy}
+                r={pointRadius}
+                fill={point.color}
+                stroke={
+                  point.isHighlighted 
+                    ? 'hsl(var(--destructive))' 
+                    : point.isSelected
+                      ? 'hsl(var(--primary))'
+                      : selectedPoint?.id === point.id 
+                        ? 'hsl(var(--foreground))' 
+                        : 'hsl(var(--border))'
+                }
+                strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || point.isSelected ? 3 : 1}
+                className="cursor-pointer transition-all duration-150 hover:opacity-80"
+                onClick={() => handlePointClick(point)}
+                onMouseEnter={() => onPointHover(point)}
+                onMouseLeave={() => onPointHover(null)}
+              />
+              {selectedPoint?.id === point.id && (
+                <circle
+                  cx={point.cx}
+                  cy={point.cy}
+                  r={pointRadius + 6}
+                  fill="none"
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth="2"
+                  strokeDasharray="4 2"
+                  className="animate-pulse"
+                />
+              )}
+            </g>
+          ))}
+
+          {/* Lasso selection path */}
+          {isDrawing && lassoPathString && (
+            <path
+              d={lassoPathString}
+              fill="hsl(var(--primary) / 0.1)"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2"
+              strokeDasharray="5 3"
+            />
+          )}
         </g>
       </svg>
     </div>
