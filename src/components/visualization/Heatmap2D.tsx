@@ -1,9 +1,11 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useRef } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
 import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
+import { isPointInPolygon } from '@/utils/statisticsUtils';
 
 export type HeatmapMode = 'dots' | 'filled';
+export type SelectionMode = 'none' | 'lasso';
 
 interface Heatmap2DProps {
   points: IndentationPoint[];
@@ -13,12 +15,15 @@ interface Heatmap2DProps {
   maxValue: number;
   selectedPoint: IndentationPoint | null;
   highlightedPoints?: number[];
+  selectedPointIds?: number[];
   showContours?: boolean;
   showInterpolation?: boolean;
   heatmapMode?: HeatmapMode;
   blurIntensity?: number;
+  selectionMode?: SelectionMode;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
+  onLassoSelect?: (pointIds: number[]) => void;
 }
 
 export const Heatmap2D: React.FC<Heatmap2DProps> = ({
@@ -29,13 +34,19 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   maxValue,
   selectedPoint,
   highlightedPoints = [],
+  selectedPointIds = [],
   showContours = false,
   showInterpolation = false,
   heatmapMode = 'dots',
   blurIntensity = 3,
+  selectionMode = 'none',
   onPointSelect,
   onPointHover,
+  onLassoSelect,
 }) => {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lassoPath, setLassoPath] = useState<{ x: number; y: number }[]>([]);
   const { normalizedPoints, viewBox, pointRadius, scale, padding, xMin, yMin, height } = useMemo(() => {
     if (points.length === 0) {
       return { normalizedPoints: [], viewBox: '0 0 100 100', pointRadius: 2, scale: 1, padding: 40, xMin: 0, yMin: 0, height: 600 };
@@ -67,6 +78,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         color: getColorForValue(value, minValue, maxValue, colorScheme),
         value,
         isHighlighted: highlightedPoints.includes(point.id),
+        isSelected: selectedPointIds.includes(point.id),
       };
     });
 
@@ -84,7 +96,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       yMin: yMinVal,
       height: h,
     };
-  }, [points, selectedProperty, colorScheme, minValue, maxValue, highlightedPoints]);
+  }, [points, selectedProperty, colorScheme, minValue, maxValue, highlightedPoints, selectedPointIds]);
 
   // Generate boundary contour for display and clipping
   const boundaryContour = useMemo(() => {
@@ -112,14 +124,74 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   }, [points, selectedProperty, showInterpolation, heatmapMode]);
 
   const handlePointClick = useCallback((point: IndentationPoint) => {
-    onPointSelect(selectedPoint?.id === point.id ? null : point);
-  }, [selectedPoint, onPointSelect]);
+    if (selectionMode === 'none') {
+      onPointSelect(selectedPoint?.id === point.id ? null : point);
+    }
+  }, [selectedPoint, onPointSelect, selectionMode]);
 
   // Transform contour coordinates to SVG space
   const transformPoint = useCallback((x: number, y: number) => ({
     cx: padding + (x - xMin) * scale,
     cy: height - padding - (y - yMin) * scale,
   }), [padding, xMin, yMin, scale, height]);
+
+  // Inverse transform: SVG to data coordinates
+  const inverseTransform = useCallback((cx: number, cy: number) => ({
+    x: xMin + (cx - padding) / scale,
+    y: yMin + (height - padding - cy) / scale,
+  }), [padding, xMin, yMin, scale, height]);
+
+  // Get SVG coordinates from mouse event
+  const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return { x: 0, y: 0 };
+    const rect = svgRef.current.getBoundingClientRect();
+    const svgWidth = 800;
+    const svgHeight = 600;
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * svgWidth,
+      y: ((e.clientY - rect.top) / rect.height) * svgHeight,
+    };
+  }, []);
+
+  // Lasso handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (selectionMode !== 'lasso') return;
+    const coords = getSVGCoords(e);
+    setIsDrawing(true);
+    setLassoPath([coords]);
+  }, [selectionMode, getSVGCoords]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isDrawing || selectionMode !== 'lasso') return;
+    const coords = getSVGCoords(e);
+    setLassoPath(prev => [...prev, coords]);
+  }, [isDrawing, selectionMode, getSVGCoords]);
+
+  const handleMouseUp = useCallback(() => {
+    if (!isDrawing || selectionMode !== 'lasso' || lassoPath.length < 3) {
+      setIsDrawing(false);
+      setLassoPath([]);
+      return;
+    }
+
+    // Convert lasso path to data coordinates
+    const dataPath = lassoPath.map(p => inverseTransform(p.x, p.y));
+
+    // Find points inside lasso
+    const selectedIds = points
+      .filter(point => isPointInPolygon({ x: point.x, y: point.y }, dataPath))
+      .map(p => p.id);
+
+    onLassoSelect?.(selectedIds);
+    setIsDrawing(false);
+    setLassoPath([]);
+  }, [isDrawing, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
+
+  // Generate lasso path string
+  const lassoPathString = useMemo(() => {
+    if (lassoPath.length < 2) return '';
+    return lassoPath.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
+  }, [lassoPath]);
 
 
   if (points.length === 0) {
@@ -132,9 +204,14 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
   return (
     <svg
+      ref={svgRef}
       viewBox={viewBox}
-      className="w-full h-full"
+      className={`w-full h-full ${selectionMode === 'lasso' ? 'cursor-crosshair' : ''}`}
       style={{ background: 'hsl(var(--card))' }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
       {/* Grid */}
       <defs>
@@ -263,6 +340,17 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
               strokeDasharray="3 2"
             />
           )}
+          {/* Selection ring for lasso-selected points */}
+          {point.isSelected && (
+            <circle
+              cx={point.cx}
+              cy={point.cy}
+              r={pointRadius + 5}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2"
+            />
+          )}
           <circle
             cx={point.cx}
             cy={point.cy}
@@ -271,11 +359,13 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             stroke={
               point.isHighlighted 
                 ? 'hsl(var(--destructive))' 
-                : selectedPoint?.id === point.id 
-                  ? 'hsl(var(--foreground))' 
-                  : 'hsl(var(--border))'
+                : point.isSelected
+                  ? 'hsl(var(--primary))'
+                  : selectedPoint?.id === point.id 
+                    ? 'hsl(var(--foreground))' 
+                    : 'hsl(var(--border))'
             }
-            strokeWidth={selectedPoint?.id === point.id || point.isHighlighted ? 3 : 1}
+            strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || point.isSelected ? 3 : 1}
             className="cursor-pointer transition-all duration-150 hover:opacity-80"
             onClick={() => handlePointClick(point)}
             onMouseEnter={() => onPointHover(point)}
@@ -296,6 +386,17 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         </g>
       ))}
 
+
+      {/* Lasso selection path */}
+      {isDrawing && lassoPathString && (
+        <path
+          d={lassoPathString}
+          fill="hsl(var(--primary) / 0.1)"
+          stroke="hsl(var(--primary))"
+          strokeWidth="2"
+          strokeDasharray="5 3"
+        />
+      )}
 
       {/* Axis labels */}
       <text
