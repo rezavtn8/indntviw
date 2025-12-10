@@ -5,6 +5,9 @@ import * as THREE from 'three';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue3D } from '@/utils/colorScales';
 
+// Configure color management for accurate heatmap colors
+THREE.ColorManagement.enabled = true;
+
 interface DataPointsProps {
   points: IndentationPoint[];
   selectedProperty: string;
@@ -59,8 +62,8 @@ const DataPoints: React.FC<DataPointsProps> = ({
       tempObject.updateMatrix();
       meshRef.current!.setMatrixAt(i, tempObject.matrix);
 
-      // Use setRGB with THREE.SRGBColorSpace for correct color display
-      tempColor.setRGB(colors[i][0], colors[i][1], colors[i][2], THREE.SRGBColorSpace);
+      // Set color in linear space - renderer will convert to sRGB output
+      tempColor.setRGB(colors[i][0], colors[i][1], colors[i][2]);
       meshRef.current!.setColorAt(i, tempColor);
     });
 
@@ -154,7 +157,7 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   }
 
   return (
-    <Canvas>
+    <Canvas gl={{ toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}>
       <PerspectiveCamera makeDefault position={[8, 6, 8]} />
       <OrbitControls enableDamping dampingFactor={0.05} />
       
