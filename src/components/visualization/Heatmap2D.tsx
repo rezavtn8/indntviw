@@ -222,7 +222,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setLassoPath([]);
   }, [isDrawing, isPanning, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
 
-  // Zoom handler
+  // Zoom handler - smoother with smaller steps
   const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     const rect = svgRef.current?.getBoundingClientRect();
@@ -231,10 +231,9 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
     const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
 
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    const newScale = Math.max(0.5, Math.min(10, viewState.scale * zoomFactor));
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.91;
+    const newScale = Math.max(0.3, Math.min(15, viewState.scale * zoomFactor));
 
-    // Zoom toward mouse position
     const newTranslateX = mouseX - (mouseX - viewState.translateX) * (newScale / viewState.scale);
     const newTranslateY = mouseY - (mouseY - viewState.translateY) * (newScale / viewState.scale);
 
@@ -245,10 +244,40 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     });
   }, [viewState]);
 
+  // Double-click to zoom in
+  const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (selectionMode !== 'none') return;
+    
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
+    const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
+
+    const newScale = Math.min(15, viewState.scale * 1.8);
+    const newTranslateX = mouseX - (mouseX - viewState.translateX) * (newScale / viewState.scale);
+    const newTranslateY = mouseY - (mouseY - viewState.translateY) * (newScale / viewState.scale);
+
+    setViewState({
+      scale: newScale,
+      translateX: newTranslateX,
+      translateY: newTranslateY,
+    });
+  }, [viewState, selectionMode]);
+
   // Reset zoom
   const resetZoom = useCallback(() => {
     setViewState({ scale: 1, translateX: 0, translateY: 0 });
   }, []);
+
+  // Zoom to specific level
+  const zoomTo = useCallback((newScale: number) => {
+    const centerX = 400;
+    const centerY = 300;
+    const newTranslateX = centerX - (centerX - viewState.translateX) * (newScale / viewState.scale);
+    const newTranslateY = centerY - (centerY - viewState.translateY) * (newScale / viewState.scale);
+    setViewState({ scale: newScale, translateX: newTranslateX, translateY: newTranslateY });
+  }, [viewState]);
 
   // Generate lasso path string
   const lassoPathString = useMemo(() => {
@@ -266,40 +295,50 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   }
 
   const transformStr = `translate(${viewState.translateX}, ${viewState.translateY}) scale(${viewState.scale})`;
+  const zoomPercent = Math.round(viewState.scale * 100);
 
   return (
     <div className="relative w-full h-full">
-      {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+      {/* Enhanced zoom controls */}
+      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-card/90 border border-border rounded p-1">
         <button
-          onClick={() => setViewState(prev => ({ ...prev, scale: Math.min(10, prev.scale * 1.3) }))}
-          className="w-7 h-7 bg-card border-2 border-border text-foreground font-mono text-sm hover:bg-muted flex items-center justify-center"
-          title="Zoom In"
+          onClick={() => zoomTo(Math.min(15, viewState.scale * 1.4))}
+          className="w-8 h-8 bg-card border border-border text-foreground font-mono text-base hover:bg-muted flex items-center justify-center rounded"
+          title="Zoom In (+)"
         >
           +
         </button>
+        <div className="text-center font-mono text-xs text-muted-foreground py-0.5">
+          {zoomPercent}%
+        </div>
         <button
-          onClick={() => setViewState(prev => ({ ...prev, scale: Math.max(0.5, prev.scale * 0.77) }))}
-          className="w-7 h-7 bg-card border-2 border-border text-foreground font-mono text-sm hover:bg-muted flex items-center justify-center"
-          title="Zoom Out"
+          onClick={() => zoomTo(Math.max(0.3, viewState.scale * 0.7))}
+          className="w-8 h-8 bg-card border border-border text-foreground font-mono text-base hover:bg-muted flex items-center justify-center rounded"
+          title="Zoom Out (-)"
         >
           −
         </button>
+        <div className="border-t border-border my-1" />
         <button
           onClick={resetZoom}
-          className="w-7 h-7 bg-card border-2 border-border text-foreground font-mono text-xs hover:bg-muted flex items-center justify-center"
-          title="Reset Zoom"
+          className="w-8 h-8 bg-card border border-border text-foreground font-mono text-xs hover:bg-muted flex items-center justify-center rounded"
+          title="Reset View (R)"
         >
-          ⌂
+          1:1
+        </button>
+        <button
+          onClick={() => zoomTo(2)}
+          className="w-8 h-8 bg-card border border-border text-foreground font-mono text-xs hover:bg-muted flex items-center justify-center rounded"
+          title="Zoom 200%"
+        >
+          2×
         </button>
       </div>
       
-      {/* Zoom level indicator */}
-      {viewState.scale !== 1 && (
-        <div className="absolute bottom-2 right-2 z-10 bg-card/80 border border-border px-2 py-1 font-mono text-xs">
-          {Math.round(viewState.scale * 100)}%
-        </div>
-      )}
+      {/* Help hint */}
+      <div className="absolute bottom-2 left-2 z-10 font-mono text-xs text-muted-foreground bg-card/80 px-2 py-1 rounded">
+        Scroll: zoom • Drag: pan • Double-click: zoom in
+      </div>
 
       <svg
         ref={svgRef}
@@ -309,6 +348,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
       >
