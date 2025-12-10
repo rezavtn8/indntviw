@@ -15,6 +15,7 @@ import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
 import { OutlierDetector } from '@/components/panels/OutlierDetector';
 import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatisticsPanel';
+import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
 import { parseTabSeparatedData } from '@/utils/dataParser';
 import { Grid2X2, Box, Info, Edit3, Plus, Undo2 } from 'lucide-react';
@@ -428,6 +429,12 @@ export const IndentViewApp: React.FC = () => {
                 selectedPoints={selectedPoints}
                 selectedProperty={selectedProperty}
                 onExportSelected={selectedPoints.length > 0 ? handleExportSelected : undefined}
+              />
+
+              <DistributionHistogram
+                allPoints={data.points}
+                selectedPoints={selectedPoints}
+                selectedProperty={selectedProperty}
               />
             </>
           )}
