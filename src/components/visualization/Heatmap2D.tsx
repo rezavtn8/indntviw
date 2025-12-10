@@ -26,6 +26,12 @@ interface Heatmap2DProps {
   onLassoSelect?: (pointIds: number[]) => void;
 }
 
+interface ViewState {
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
+
 export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   points,
   selectedProperty,
@@ -47,6 +53,12 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lassoPath, setLassoPath] = useState<{ x: number; y: number }[]>([]);
+  
+  // Zoom and pan state
+  const [viewState, setViewState] = useState<ViewState>({ scale: 1, translateX: 0, translateY: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
   const { normalizedPoints, viewBox, pointRadius, scale, padding, xMin, yMin, height } = useMemo(() => {
     if (points.length === 0) {
       return { normalizedPoints: [], viewBox: '0 0 100 100', pointRadius: 2, scale: 1, padding: 40, xMin: 0, yMin: 0, height: 600 };
@@ -141,33 +153,56 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     y: yMin + (height - padding - cy) / scale,
   }), [padding, xMin, yMin, scale, height]);
 
-  // Get SVG coordinates from mouse event
+  // Get SVG coordinates from mouse event (accounting for zoom/pan)
   const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
     const svgWidth = 800;
     const svgHeight = 600;
+    const rawX = ((e.clientX - rect.left) / rect.width) * svgWidth;
+    const rawY = ((e.clientY - rect.top) / rect.height) * svgHeight;
+    // Convert to pre-transform coordinates
     return {
-      x: ((e.clientX - rect.left) / rect.width) * svgWidth,
-      y: ((e.clientY - rect.top) / rect.height) * svgHeight,
+      x: (rawX - viewState.translateX) / viewState.scale,
+      y: (rawY - viewState.translateY) / viewState.scale,
     };
-  }, []);
+  }, [viewState]);
 
   // Lasso handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (selectionMode !== 'lasso') return;
-    const coords = getSVGCoords(e);
-    setIsDrawing(true);
-    setLassoPath([coords]);
-  }, [selectionMode, getSVGCoords]);
+    if (selectionMode === 'lasso') {
+      const coords = getSVGCoords(e);
+      setIsDrawing(true);
+      setLassoPath([coords]);
+    } else if (selectionMode === 'none' && e.button === 0) {
+      // Start panning with left click when not in selection mode
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (rect) {
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - viewState.translateX, y: e.clientY - viewState.translateY });
+      }
+    }
+  }, [selectionMode, getSVGCoords, viewState]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (!isDrawing || selectionMode !== 'lasso') return;
-    const coords = getSVGCoords(e);
-    setLassoPath(prev => [...prev, coords]);
-  }, [isDrawing, selectionMode, getSVGCoords]);
+    if (isDrawing && selectionMode === 'lasso') {
+      const coords = getSVGCoords(e);
+      setLassoPath(prev => [...prev, coords]);
+    } else if (isPanning) {
+      setViewState(prev => ({
+        ...prev,
+        translateX: e.clientX - panStart.x,
+        translateY: e.clientY - panStart.y,
+      }));
+    }
+  }, [isDrawing, selectionMode, getSVGCoords, isPanning, panStart]);
 
   const handleMouseUp = useCallback(() => {
+    if (isPanning) {
+      setIsPanning(false);
+      return;
+    }
+    
     if (!isDrawing || selectionMode !== 'lasso' || lassoPath.length < 3) {
       setIsDrawing(false);
       setLassoPath([]);
@@ -185,7 +220,35 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     onLassoSelect?.(selectedIds);
     setIsDrawing(false);
     setLassoPath([]);
-  }, [isDrawing, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
+  }, [isDrawing, isPanning, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
+
+  // Zoom handler
+  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
+    const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
+
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+    const newScale = Math.max(0.5, Math.min(10, viewState.scale * zoomFactor));
+
+    // Zoom toward mouse position
+    const newTranslateX = mouseX - (mouseX - viewState.translateX) * (newScale / viewState.scale);
+    const newTranslateY = mouseY - (mouseY - viewState.translateY) * (newScale / viewState.scale);
+
+    setViewState({
+      scale: newScale,
+      translateX: newTranslateX,
+      translateY: newTranslateY,
+    });
+  }, [viewState]);
+
+  // Reset zoom
+  const resetZoom = useCallback(() => {
+    setViewState({ scale: 1, translateX: 0, translateY: 0 });
+  }, []);
 
   // Generate lasso path string
   const lassoPathString = useMemo(() => {
@@ -202,48 +265,87 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     );
   }
 
+  const transformStr = `translate(${viewState.translateX}, ${viewState.translateY}) scale(${viewState.scale})`;
+
   return (
-    <svg
-      ref={svgRef}
-      viewBox={viewBox}
-      className={`w-full h-full ${selectionMode === 'lasso' ? 'cursor-crosshair' : ''}`}
-      style={{ background: 'hsl(var(--card))' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      {/* Grid */}
-      <defs>
-        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path
-            d="M 40 0 L 0 0 0 40"
-            fill="none"
-            stroke="hsl(var(--border))"
-            strokeWidth="0.5"
-            opacity="0.3"
-          />
-        </pattern>
-        {/* Smooth clip path for filled heatmap with padding */}
-        {boundaryContour.length >= 3 && (
-          <clipPath id="heatmap-smooth-clip">
+    <div className="relative w-full h-full">
+      {/* Zoom controls */}
+      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+        <button
+          onClick={() => setViewState(prev => ({ ...prev, scale: Math.min(10, prev.scale * 1.3) }))}
+          className="w-7 h-7 bg-card border-2 border-border text-foreground font-mono text-sm hover:bg-muted flex items-center justify-center"
+          title="Zoom In"
+        >
+          +
+        </button>
+        <button
+          onClick={() => setViewState(prev => ({ ...prev, scale: Math.max(0.5, prev.scale * 0.77) }))}
+          className="w-7 h-7 bg-card border-2 border-border text-foreground font-mono text-sm hover:bg-muted flex items-center justify-center"
+          title="Zoom Out"
+        >
+          −
+        </button>
+        <button
+          onClick={resetZoom}
+          className="w-7 h-7 bg-card border-2 border-border text-foreground font-mono text-xs hover:bg-muted flex items-center justify-center"
+          title="Reset Zoom"
+        >
+          ⌂
+        </button>
+      </div>
+      
+      {/* Zoom level indicator */}
+      {viewState.scale !== 1 && (
+        <div className="absolute bottom-2 right-2 z-10 bg-card/80 border border-border px-2 py-1 font-mono text-xs">
+          {Math.round(viewState.scale * 100)}%
+        </div>
+      )}
+
+      <svg
+        ref={svgRef}
+        viewBox={viewBox}
+        className={`w-full h-full ${selectionMode === 'lasso' ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{ background: 'hsl(var(--card))' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+      >
+        {/* Grid */}
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
             <path
-              d={generateSmoothBoundaryPath(
-                boundaryContour.map(p => {
-                  const { cx, cy } = transformPoint(p.x, p.y);
-                  return { x: cx, y: cy };
-                }),
-                pointRadius * 0.5
-              )}
+              d="M 40 0 L 0 0 0 40"
+              fill="none"
+              stroke="hsl(var(--border))"
+              strokeWidth="0.5"
+              opacity="0.3"
             />
-          </clipPath>
-        )}
-        {/* Phase 3: Blur filter for smooth gradient blending */}
-        <filter id="gradient-blur" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation={blurIntensity} result="blur" />
-        </filter>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#grid)" />
+          </pattern>
+          {/* Smooth clip path for filled heatmap with padding */}
+          {boundaryContour.length >= 3 && (
+            <clipPath id="heatmap-smooth-clip">
+              <path
+                d={generateSmoothBoundaryPath(
+                  boundaryContour.map(p => {
+                    const { cx, cy } = transformPoint(p.x, p.y);
+                    return { x: cx, y: cy };
+                  }),
+                  pointRadius * 0.5
+                )}
+              />
+            </clipPath>
+          )}
+          {/* Phase 3: Blur filter for smooth gradient blending */}
+          <filter id="gradient-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation={blurIntensity} result="blur" />
+          </filter>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        {/* Transform group for zoom/pan */}
+        <g transform={transformStr}>
 
       {/* Phase 1: Boundary shape filled with Phase 2+3: Dense gradient cells with blur */}
       {heatmapMode === 'filled' && gradientCells.length > 0 && (
@@ -398,24 +500,26 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         />
       )}
 
-      {/* Axis labels */}
-      <text
-        x="400"
-        y="590"
-        textAnchor="middle"
-        className="fill-foreground font-mono text-sm"
-      >
-        X Position (mm)
-      </text>
-      <text
-        x="15"
-        y="300"
-        textAnchor="middle"
-        transform="rotate(-90 15 300)"
-        className="fill-foreground font-mono text-sm"
-      >
-        Y Position (mm)
-      </text>
-    </svg>
+        {/* Axis labels */}
+        <text
+          x="400"
+          y="590"
+          textAnchor="middle"
+          className="fill-foreground font-mono text-sm"
+        >
+          X Position (mm)
+        </text>
+        <text
+          x="15"
+          y="300"
+          textAnchor="middle"
+          transform="rotate(-90 15 300)"
+          className="fill-foreground font-mono text-sm"
+        >
+          Y Position (mm)
+        </text>
+        </g>
+      </svg>
+    </div>
   );
 };
