@@ -378,15 +378,15 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
       >
-        {/* Grid */}
+        {/* Grid pattern - rendered behind transform group */}
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
             <path
               d="M 40 0 L 0 0 0 40"
               fill="none"
               stroke="hsl(var(--border))"
-              strokeWidth="0.5"
-              opacity="0.3"
+              strokeWidth="1"
+              opacity="0.5"
             />
           </pattern>
           {/* Smooth clip path for filled heatmap with padding */}
