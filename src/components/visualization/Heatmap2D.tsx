@@ -197,13 +197,18 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       const dx = (e.clientX - panStart.x) * scaleX;
       const dy = (e.clientY - panStart.y) * scaleY;
       
+      // Limit panning range based on zoom level
+      const maxPan = 200 * viewState.scale;
+      const newX = Math.max(-maxPan, Math.min(maxPan, viewStart.translateX + dx));
+      const newY = Math.max(-maxPan, Math.min(maxPan, viewStart.translateY + dy));
+      
       setViewState(prev => ({
         ...prev,
-        translateX: viewStart.translateX + dx,
-        translateY: viewStart.translateY + dy,
+        translateX: newX,
+        translateY: newY,
       }));
     }
-  }, [isDrawing, selectionMode, getSVGCoords, isPanning, panStart, viewStart]);
+  }, [isDrawing, selectionMode, getSVGCoords, isPanning, panStart, viewStart, viewState.scale]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -230,27 +235,29 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setLassoPath([]);
   }, [isDrawing, isPanning, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
 
-  // Zoom handler - gentler zoom with proper center point
+  // Zoom handler - gentler zoom with limits
   const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Convert mouse position to SVG coordinates
     const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
     const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
 
     // Gentler zoom factor
-    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.93;
-    const newScale = Math.max(0.5, Math.min(8, viewState.scale * zoomFactor));
+    const zoomFactor = e.deltaY < 0 ? 1.06 : 0.94;
+    const newScale = Math.max(0.8, Math.min(4, viewState.scale * zoomFactor));
     
-    // Only update if scale actually changed
     if (newScale === viewState.scale) return;
 
-    // Zoom toward mouse position
     const scaleRatio = newScale / viewState.scale;
-    const newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
-    const newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
+    let newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
+    let newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
+
+    // Limit panning range
+    const maxPan = 200 * newScale;
+    newTranslateX = Math.max(-maxPan, Math.min(maxPan, newTranslateX));
+    newTranslateY = Math.max(-maxPan, Math.min(maxPan, newTranslateY));
 
     setViewState({
       scale: newScale,
@@ -259,7 +266,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     });
   }, [viewState]);
 
-  // Double-click to zoom in (gentler)
+  // Double-click to zoom in
   const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (selectionMode !== 'none') return;
     
@@ -269,16 +276,12 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
     const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
 
-    const newScale = Math.min(8, viewState.scale * 1.5);
+    const newScale = Math.min(4, viewState.scale * 1.4);
     const scaleRatio = newScale / viewState.scale;
     const newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
     const newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
 
-    setViewState({
-      scale: newScale,
-      translateX: newTranslateX,
-      translateY: newTranslateY,
-    });
+    setViewState({ scale: newScale, translateX: newTranslateX, translateY: newTranslateY });
   }, [viewState, selectionMode]);
 
   // Reset zoom
@@ -288,12 +291,17 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
   // Zoom to specific level (from center)
   const zoomTo = useCallback((newScale: number) => {
-    const clampedScale = Math.max(0.5, Math.min(8, newScale));
+    const clampedScale = Math.max(0.8, Math.min(4, newScale));
     const centerX = 400;
     const centerY = 300;
     const scaleRatio = clampedScale / viewState.scale;
-    const newTranslateX = centerX - (centerX - viewState.translateX) * scaleRatio;
-    const newTranslateY = centerY - (centerY - viewState.translateY) * scaleRatio;
+    let newTranslateX = centerX - (centerX - viewState.translateX) * scaleRatio;
+    let newTranslateY = centerY - (centerY - viewState.translateY) * scaleRatio;
+    
+    const maxPan = 200 * clampedScale;
+    newTranslateX = Math.max(-maxPan, Math.min(maxPan, newTranslateX));
+    newTranslateY = Math.max(-maxPan, Math.min(maxPan, newTranslateY));
+    
     setViewState({ scale: clampedScale, translateX: newTranslateX, translateY: newTranslateY });
   }, [viewState]);
 
