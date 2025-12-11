@@ -59,11 +59,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const [boxStart, setBoxStart] = useState<ZonePoint | null>(null);
   const [currentPos, setCurrentPos] = useState<ZonePoint | null>(null);
   
-  // Zoom and pan state
+  // Zoom state (button-controlled only)
   const [viewState, setViewState] = useState<ViewState>({ scale: 1, translateX: 0, translateY: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [viewStart, setViewStart] = useState({ translateX: 0, translateY: 0 });
 
   const { normalizedPoints, viewBox, pointRadius, scale, padding, xMin, yMin, height } = useMemo(() => {
     if (points.length === 0) {
@@ -176,7 +173,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
   }, []);
 
-  // Drawing handlers (same logic as ExportCanvas)
+  // Drawing handlers (simplified - no panning via mouse)
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (drawingTool === 'select') {
       // Click to toggle individual point selection
@@ -200,15 +197,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
           onPointsSelected?.([clickedPoint.id]);
         }
       } else {
-        // Click on empty space - clear selection or select zone, or start panning
+        // Click on empty space - clear selection or select zone
         onZoneSelect?.(null);
         if (!e.ctrlKey && !e.metaKey) {
           onPointsSelected?.([]);
         }
-        // Start panning
-        setIsPanning(true);
-        setPanStart({ x: e.clientX, y: e.clientY });
-        setViewStart({ translateX: viewState.translateX, translateY: viewState.translateY });
       }
       return;
     }
@@ -222,30 +215,9 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       setBoxStart(coords);
       setCurrentPos(coords);
     }
-  }, [drawingTool, getSVGCoords, points, pointRadiusDataUnits, selectedPointIds, onPointsSelected, onZoneSelect, viewState.translateX, viewState.translateY]);
+  }, [drawingTool, getSVGCoords, points, pointRadiusDataUnits, selectedPointIds, onPointsSelected, onZoneSelect]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (isPanning) {
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      
-      const scaleX = 800 / rect.width;
-      const scaleY = 600 / rect.height;
-      const dx = (e.clientX - panStart.x) * scaleX;
-      const dy = (e.clientY - panStart.y) * scaleY;
-      
-      const maxPan = 200 * viewState.scale;
-      const newX = Math.max(-maxPan, Math.min(maxPan, viewStart.translateX + dx));
-      const newY = Math.max(-maxPan, Math.min(maxPan, viewStart.translateY + dy));
-      
-      setViewState(prev => ({
-        ...prev,
-        translateX: newX,
-        translateY: newY,
-      }));
-      return;
-    }
-
     if (!isDrawing) return;
 
     const coords = getSVGCoords(e);
@@ -255,14 +227,9 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     } else if (drawingTool === 'box') {
       setCurrentPos(coords);
     }
-  }, [isDrawing, isPanning, drawingTool, getSVGCoords, panStart, viewStart, viewState.scale]);
+  }, [isDrawing, drawingTool, getSVGCoords]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (isPanning) {
-      setIsPanning(false);
-      return;
-    }
-
     if (!isDrawing) return;
 
     const isAdditive = e.ctrlKey || e.metaKey || e.shiftKey;
@@ -295,54 +262,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setLassoPath([]);
     setBoxStart(null);
     setCurrentPos(null);
-  }, [isDrawing, isPanning, drawingTool, lassoPath, boxStart, currentPos, points, selectedPointIds, isPointInBox, onPointsSelected]);
-
-  // Zoom handler
-  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
-    const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
-
-    const zoomFactor = e.deltaY < 0 ? 1.06 : 0.94;
-    const newScale = Math.max(0.8, Math.min(4, viewState.scale * zoomFactor));
-    
-    if (newScale === viewState.scale) return;
-
-    const scaleRatio = newScale / viewState.scale;
-    let newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
-    let newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
-
-    const maxPan = 200 * newScale;
-    newTranslateX = Math.max(-maxPan, Math.min(maxPan, newTranslateX));
-    newTranslateY = Math.max(-maxPan, Math.min(maxPan, newTranslateY));
-
-    setViewState({
-      scale: newScale,
-      translateX: newTranslateX,
-      translateY: newTranslateY,
-    });
-  }, [viewState]);
-
-  // Double-click to zoom in
-  const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (drawingTool !== 'select') return;
-    
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
-    const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
-
-    const newScale = Math.min(4, viewState.scale * 1.4);
-    const scaleRatio = newScale / viewState.scale;
-    const newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
-    const newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
-
-    setViewState({ scale: newScale, translateX: newTranslateX, translateY: newTranslateY });
-  }, [viewState, drawingTool]);
+  }, [isDrawing, drawingTool, lassoPath, boxStart, currentPos, points, selectedPointIds, isPointInBox, onPointsSelected]);
 
   // Reset zoom
   const resetZoom = useCallback(() => {
@@ -414,7 +334,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
   const transformStr = `translate(${viewState.translateX}, ${viewState.translateY}) scale(${viewState.scale})`;
   const zoomPercent = Math.round(viewState.scale * 100);
-  const cursor = drawingTool === 'select' ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-crosshair';
+  const cursor = drawingTool === 'select' ? 'cursor-default' : 'cursor-crosshair';
 
   return (
     <div className="relative w-full h-full">
@@ -454,10 +374,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         </button>
       </div>
       
-      {/* Help hint */}
-      <div className="absolute bottom-2 left-2 z-10 font-mono text-xs text-muted-foreground bg-card/80 px-2 py-1 rounded">
-        Scroll: zoom • Drag: pan • Double-click: zoom in
-      </div>
 
       <svg
         ref={svgRef}
@@ -467,9 +383,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onDoubleClick={handleDoubleClick}
         onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
       >
         {/* Grid pattern - rendered behind transform group */}
         <defs>
@@ -497,7 +411,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             </clipPath>
           )}
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
+        <rect x="0" y="0" width="800" height="600" fill="url(#grid)" />
 
         {/* Axis labels - OUTSIDE transform group so they stay fixed */}
         <text
