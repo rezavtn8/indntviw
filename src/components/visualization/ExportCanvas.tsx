@@ -3,8 +3,7 @@ import { IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indenta
 import { Zone, ZonePoint, ExportSettings } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
 import { getZoneSVGPath, getZoneEllipseAttrs, getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
-
-type DrawingTool = 'select' | 'lasso' | 'ellipse' | 'rectangle';
+import { DrawingTool } from '@/components/controls/ZoneToolbar';
 
 interface ExportCanvasProps {
   points: IndentationPoint[];
@@ -16,8 +15,10 @@ interface ExportCanvasProps {
   selectedZoneId: string | null;
   settings: ExportSettings;
   drawingTool: DrawingTool;
+  selectedPointIds: number[];
   onZoneCreated: (zone: Partial<Zone>) => void;
   onZoneSelect: (zoneId: string | null) => void;
+  onPointsSelected: (pointIds: number[]) => void;
 }
 
 export interface ExportCanvasRef {
@@ -35,13 +36,15 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   selectedZoneId,
   settings,
   drawingTool,
+  selectedPointIds,
   onZoneCreated,
   onZoneSelect,
+  onPointsSelected,
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPath, setDrawingPath] = useState<ZonePoint[]>([]);
-  const [ellipseStart, setEllipseStart] = useState<ZonePoint | null>(null);
+  const [boxStart, setBoxStart] = useState<ZonePoint | null>(null);
   const [currentPos, setCurrentPos] = useState<ZonePoint | null>(null);
 
   // Canvas dimensions with proper margins for labels
@@ -200,10 +203,59 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     return config?.unit || '';
   }, [selectedProperty]);
 
-  // Drawing handlers
+  // Helper to check if point is in polygon (for lasso selection)
+  const isPointInPolygon = useCallback((point: { x: number; y: number }, polygon: ZonePoint[]): boolean => {
+    if (polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      if (((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }, []);
+
+  // Helper to check if point is in box
+  const isPointInBox = useCallback((point: { x: number; y: number }, start: ZonePoint, end: ZonePoint): boolean => {
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
+  }, []);
+
+  // Drawing handlers for point selection
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (drawingTool === 'select') {
-      onZoneSelect(null);
+      // Click to toggle individual point selection
+      const coords = getSVGCoords(e);
+      const clickedPoint = points.find(p => {
+        const dist = Math.sqrt((p.x - coords.x) ** 2 + (p.y - coords.y) ** 2);
+        return dist < pointRadius * 2 / scaleX; // Approximate click radius
+      });
+      
+      if (clickedPoint) {
+        const isCtrl = e.ctrlKey || e.metaKey;
+        if (isCtrl) {
+          // Toggle selection
+          if (selectedPointIds.includes(clickedPoint.id)) {
+            onPointsSelected(selectedPointIds.filter(id => id !== clickedPoint.id));
+          } else {
+            onPointsSelected([...selectedPointIds, clickedPoint.id]);
+          }
+        } else {
+          // Single select
+          onPointsSelected([clickedPoint.id]);
+        }
+      } else {
+        // Click on empty space - clear selection or select zone
+        onZoneSelect(null);
+        if (!e.ctrlKey && !e.metaKey) {
+          onPointsSelected([]);
+        }
+      }
       return;
     }
 
@@ -212,11 +264,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
 
     if (drawingTool === 'lasso') {
       setDrawingPath([coords]);
-    } else if (drawingTool === 'ellipse' || drawingTool === 'rectangle') {
-      setEllipseStart(coords);
+    } else if (drawingTool === 'box') {
+      setBoxStart(coords);
       setCurrentPos(coords);
     }
-  }, [drawingTool, getSVGCoords, onZoneSelect]);
+  }, [drawingTool, getSVGCoords, points, pointRadius, scaleX, selectedPointIds, onPointsSelected, onZoneSelect]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!isDrawing) return;
@@ -225,50 +277,45 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
 
     if (drawingTool === 'lasso') {
       setDrawingPath(prev => [...prev, coords]);
-    } else if (drawingTool === 'ellipse' || drawingTool === 'rectangle') {
+    } else if (drawingTool === 'box') {
       setCurrentPos(coords);
     }
   }, [isDrawing, drawingTool, getSVGCoords]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!isDrawing) return;
 
+    const isAdditive = e.ctrlKey || e.metaKey || e.shiftKey;
+
     if (drawingTool === 'lasso' && drawingPath.length >= 3) {
-      onZoneCreated({
-        type: 'freeform',
-        points: drawingPath,
-      });
-    } else if (drawingTool === 'ellipse' && ellipseStart && currentPos) {
-      const centerX = (ellipseStart.x + currentPos.x) / 2;
-      const centerY = (ellipseStart.y + currentPos.y) / 2;
-      const radiusX = Math.abs(currentPos.x - ellipseStart.x) / 2;
-      const radiusY = Math.abs(currentPos.y - ellipseStart.y) / 2;
+      // Select all points within the lasso
+      const selectedIds = points
+        .filter(p => isPointInPolygon({ x: p.x, y: p.y }, drawingPath))
+        .map(p => p.id);
       
-      if (radiusX > 0.01 && radiusY > 0.01) {
-        onZoneCreated({
-          type: 'ellipse',
-          centerX,
-          centerY,
-          radiusX,
-          radiusY,
-          rotation: 0,
-          points: [],
-        });
+      if (isAdditive) {
+        onPointsSelected([...new Set([...selectedPointIds, ...selectedIds])]);
+      } else {
+        onPointsSelected(selectedIds);
       }
-    } else if (drawingTool === 'rectangle' && ellipseStart && currentPos) {
-      if (Math.abs(currentPos.x - ellipseStart.x) > 0.01 && Math.abs(currentPos.y - ellipseStart.y) > 0.01) {
-        onZoneCreated({
-          type: 'rectangle',
-          points: [ellipseStart, currentPos],
-        });
+    } else if (drawingTool === 'box' && boxStart && currentPos) {
+      // Select all points within the box
+      const selectedIds = points
+        .filter(p => isPointInBox({ x: p.x, y: p.y }, boxStart, currentPos))
+        .map(p => p.id);
+      
+      if (isAdditive) {
+        onPointsSelected([...new Set([...selectedPointIds, ...selectedIds])]);
+      } else {
+        onPointsSelected(selectedIds);
       }
     }
 
     setIsDrawing(false);
     setDrawingPath([]);
-    setEllipseStart(null);
+    setBoxStart(null);
     setCurrentPos(null);
-  }, [isDrawing, drawingTool, drawingPath, ellipseStart, currentPos, onZoneCreated]);
+  }, [isDrawing, drawingTool, drawingPath, boxStart, currentPos, points, selectedPointIds, isPointInPolygon, isPointInBox, onPointsSelected]);
 
   // Export functionality
   useImperativeHandle(ref, () => ({
@@ -321,28 +368,14 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   };
 
   const getDrawingPreviewRect = () => {
-    if (drawingTool === 'rectangle' && ellipseStart && currentPos) {
-      const p1 = transformPoint(ellipseStart.x, ellipseStart.y);
+    if (drawingTool === 'box' && boxStart && currentPos) {
+      const p1 = transformPoint(boxStart.x, boxStart.y);
       const p2 = transformPoint(currentPos.x, currentPos.y);
       return {
         x: Math.min(p1.cx, p2.cx),
         y: Math.min(p1.cy, p2.cy),
         width: Math.abs(p2.cx - p1.cx),
         height: Math.abs(p2.cy - p1.cy),
-      };
-    }
-    return null;
-  };
-
-  const getDrawingPreviewEllipse = () => {
-    if (drawingTool === 'ellipse' && ellipseStart && currentPos) {
-      const p1 = transformPoint(ellipseStart.x, ellipseStart.y);
-      const p2 = transformPoint(currentPos.x, currentPos.y);
-      return {
-        cx: (p1.cx + p2.cx) / 2,
-        cy: (p1.cy + p2.cy) / 2,
-        rx: Math.abs(p2.cx - p1.cx) / 2,
-        ry: Math.abs(p2.cy - p1.cy) / 2,
       };
     }
     return null;
@@ -504,17 +537,21 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
 
         {/* Data points */}
         <g>
-          {normalizedPoints.map(point => (
-            <circle
-              key={point.id}
-              cx={point.cx}
-              cy={point.cy}
-              r={pointRadius}
-              fill={point.color}
-              stroke="#374151"
-              strokeWidth="0.5"
-            />
-          ))}
+          {normalizedPoints.map(point => {
+            const isSelected = selectedPointIds.includes(point.id);
+            return (
+              <circle
+                key={point.id}
+                cx={point.cx}
+                cy={point.cy}
+                r={isSelected ? pointRadius * 1.3 : pointRadius}
+                fill={point.color}
+                stroke={isSelected ? '#3b82f6' : '#374151'}
+                strokeWidth={isSelected ? 2 : 0.5}
+                style={{ cursor: 'pointer' }}
+              />
+            );
+          })}
         </g>
 
         {/* Zones */}
@@ -612,7 +649,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                 strokeDasharray="5 5"
               />
             )}
-            {drawingTool === 'rectangle' && (() => {
+            {drawingTool === 'box' && (() => {
               const rect = getDrawingPreviewRect();
               return rect && (
                 <rect
@@ -620,21 +657,6 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                   y={rect.y}
                   width={rect.width}
                   height={rect.height}
-                  fill="rgba(59, 130, 246, 0.2)"
-                  stroke="#3b82f6"
-                  strokeWidth="2"
-                  strokeDasharray="5 5"
-                />
-              );
-            })()}
-            {drawingTool === 'ellipse' && (() => {
-              const ellipse = getDrawingPreviewEllipse();
-              return ellipse && (
-                <ellipse
-                  cx={ellipse.cx}
-                  cy={ellipse.cy}
-                  rx={ellipse.rx}
-                  ry={ellipse.ry}
                   fill="rgba(59, 130, 246, 0.2)"
                   stroke="#3b82f6"
                   strokeWidth="2"
