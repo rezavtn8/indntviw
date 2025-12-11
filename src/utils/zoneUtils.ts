@@ -8,8 +8,9 @@ export function isPointInZone(point: IndentationPoint, zone: Zone): boolean {
   if (!zone.visible) return false;
 
   // For member-point-based zones, check if point ID is in memberPointIds
-  if (zone.memberPointIds.length > 0) {
-    return zone.memberPointIds.includes(point.id);
+  const memberIds = zone.memberPointIds ?? [];
+  if (memberIds.length > 0) {
+    return memberIds.includes(point.id);
   }
 
   // Legacy: freeform path-based check
