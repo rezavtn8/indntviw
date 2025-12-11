@@ -623,7 +623,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
             );
           }
 
-          const path = getZoneSVGPath(zone, transformPoint);
+          const path = getZoneSVGPath(zone, transformPoint, points, pointRadiusDataUnits);
           if (!path) return null;
 
           const centroid = getZoneCentroid(zone);

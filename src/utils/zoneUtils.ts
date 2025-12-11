@@ -160,10 +160,33 @@ export function createZoneFromSelection(
 }
 
 // Generate SVG path for a zone
+// IMPORTANT: This regenerates the smooth boundary from member points at render time
 export function getZoneSVGPath(
   zone: Zone,
-  transformPoint: (x: number, y: number) => { cx: number; cy: number }
+  transformPoint: (x: number, y: number) => { cx: number; cy: number },
+  allPoints?: IndentationPoint[],
+  pointRadius?: number
 ): string {
+  // If we have member points and allPoints, regenerate boundary from member points
+  if (zone.memberPointIds.length > 0 && allPoints && allPoints.length > 0) {
+    const memberPoints = getMemberPoints(allPoints, zone.memberPointIds);
+    if (memberPoints.length > 0) {
+      const memberCoords: ZonePoint[] = memberPoints.map(p => ({ x: p.x, y: p.y }));
+      const boundaryPoints = generateZoneBoundary(
+        memberCoords,
+        zone.boundaryPadding,
+        zone.smoothness,
+        zone.boundaryType,
+        pointRadius || 0
+      );
+      
+      if (boundaryPoints.length >= 3) {
+        return boundaryToSVGPath(boundaryPoints, transformPoint);
+      }
+    }
+  }
+
+  // Fallback: use stored zone.points
   if (zone.points.length >= 3) {
     return boundaryToSVGPath(zone.points, transformPoint);
   }
