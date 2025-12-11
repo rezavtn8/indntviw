@@ -388,11 +388,12 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   const cursor = drawingTool === 'select' ? 'default' : 'crosshair';
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-muted/30 p-4">
+    <div className="w-full h-full flex items-start justify-center bg-muted/30 p-4 overflow-auto">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
-        className="max-w-full max-h-full border border-border shadow-lg"
+        preserveAspectRatio="xMidYMin meet"
+        className="max-w-full max-h-[calc(100vh-220px)] border border-border shadow-lg"
         style={{ 
           background: settings.background === 'transparent' ? 'transparent' : 
                       settings.background === 'custom' ? settings.customBackgroundColor : 'white',
