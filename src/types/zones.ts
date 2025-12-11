@@ -58,6 +58,7 @@ export interface ExportSettings {
   showColorLegend: boolean;
   showAxisLabels: boolean;
   showTitle: boolean;
+  showBoundaryContour: boolean;
   customTitle?: string;
   // Axis settings
   axisPadding: number; // Percentage (0-20)
@@ -110,6 +111,7 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   showColorLegend: true,
   showAxisLabels: true,
   showTitle: true,
+  showBoundaryContour: false,
   axisPadding: 5,
   useAutoAxisBounds: true,
   xAxisLabel: 'x (mm)',
