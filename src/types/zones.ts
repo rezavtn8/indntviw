@@ -138,8 +138,8 @@ export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
   type: 'freeform',
   points: [],
   memberPointIds: [],
-  boundaryPadding: 0.15,      // Relative padding (15% of point cloud)
-  smoothness: 0.7,            // Smoother by default
+  boundaryPadding: 0.1,       // Very tight default (10%)
+  smoothness: 0.5,            // Moderate smoothing
   boundaryType: 'convex',
   color: DEFAULT_ZONE_COLORS[colorIndex % DEFAULT_ZONE_COLORS.length],
   borderStyle: 'solid',
