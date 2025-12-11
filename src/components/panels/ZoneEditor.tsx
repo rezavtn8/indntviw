@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ZoneEditorProps {
@@ -11,8 +12,23 @@ interface ZoneEditorProps {
   onUpdate: (zone: Zone) => void;
 }
 
+// Presets for quick boundary configuration
+const BOUNDARY_PRESETS = [
+  { name: 'Tight', padding: 0.08, smoothness: 0.5 },
+  { name: 'Normal', padding: 0.15, smoothness: 0.7 },
+  { name: 'Loose', padding: 0.25, smoothness: 0.85 },
+];
+
 export const ZoneEditor: React.FC<ZoneEditorProps> = ({ zone, onUpdate }) => {
   const memberCount = zone.memberPointIds?.length ?? 0;
+
+  const applyPreset = (preset: typeof BOUNDARY_PRESETS[0]) => {
+    onUpdate({
+      ...zone,
+      boundaryPadding: preset.padding,
+      smoothness: preset.smoothness,
+    });
+  };
 
   return (
     <div className="space-y-4 p-4 bg-card border border-border rounded-lg">
@@ -42,6 +58,21 @@ export const ZoneEditor: React.FC<ZoneEditorProps> = ({ zone, onUpdate }) => {
         <div className="space-y-3 pt-2 border-t border-border">
           <Label className="text-xs font-mono uppercase text-muted-foreground">Boundary Settings</Label>
           
+          {/* Quick Presets */}
+          <div className="flex gap-1">
+            {BOUNDARY_PRESETS.map((preset) => (
+              <Button
+                key={preset.name}
+                variant="outline"
+                size="sm"
+                className="flex-1 h-7 text-xs font-mono"
+                onClick={() => applyPreset(preset)}
+              >
+                {preset.name}
+              </Button>
+            ))}
+          </div>
+          
           {/* Boundary Type */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
@@ -65,14 +96,14 @@ export const ZoneEditor: React.FC<ZoneEditorProps> = ({ zone, onUpdate }) => {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <Label className="text-xs font-mono text-muted-foreground">Padding</Label>
-              <span className="text-xs font-mono">{(zone.boundaryPadding ?? 0.5).toFixed(1)}</span>
+              <span className="text-xs font-mono">{Math.round((zone.boundaryPadding ?? 0.15) * 100)}%</span>
             </div>
             <Slider
-              value={[zone.boundaryPadding ?? 0.5]}
+              value={[zone.boundaryPadding ?? 0.15]}
               onValueChange={([value]) => onUpdate({ ...zone, boundaryPadding: value })}
-              min={0}
-              max={5}
-              step={0.1}
+              min={0.02}
+              max={0.5}
+              step={0.01}
             />
           </div>
 
@@ -80,10 +111,10 @@ export const ZoneEditor: React.FC<ZoneEditorProps> = ({ zone, onUpdate }) => {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <Label className="text-xs font-mono text-muted-foreground">Smoothness</Label>
-              <span className="text-xs font-mono">{Math.round((zone.smoothness ?? 0.5) * 100)}%</span>
+              <span className="text-xs font-mono">{Math.round((zone.smoothness ?? 0.7) * 100)}%</span>
             </div>
             <Slider
-              value={[zone.smoothness ?? 0.5]}
+              value={[zone.smoothness ?? 0.7]}
               onValueChange={([value]) => onUpdate({ ...zone, smoothness: value })}
               min={0}
               max={1}
