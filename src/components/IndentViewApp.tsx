@@ -698,11 +698,11 @@ export const IndentViewApp: React.FC = () => {
           )}
 
           {/* Visualization Area */}
-          <div className="flex-1 relative p-4">
+          <div className="flex-1 relative p-2">
             {activeView === 'export' ? (
               <div className="flex h-full gap-4">
                 {/* Export Canvas */}
-                <div className="flex-1 h-full">
+                <div className="flex-1 h-full overflow-hidden">
                   <ExportCanvas
                     ref={exportCanvasRef}
                     points={data?.points || []}
