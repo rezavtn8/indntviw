@@ -208,6 +208,56 @@ export function generateBoundaryContour(
   return convexHull(coords);
 }
 
+// Determine polygon winding order (positive = CCW, negative = CW)
+function getPolygonArea(points: { x: number; y: number }[]): number {
+  let area = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
+  }
+  return area / 2;
+}
+
+// Catmull-Rom spline interpolation for ultra-smooth curves
+function catmullRomSmooth(
+  points: { x: number; y: number }[],
+  tension: number = 0.5,
+  segmentsPerPoint: number = 3
+): { x: number; y: number }[] {
+  const n = points.length;
+  if (n < 4) return points;
+  
+  const result: { x: number; y: number }[] = [];
+  
+  for (let i = 0; i < n; i++) {
+    const p0 = points[(i - 1 + n) % n];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const p3 = points[(i + 2) % n];
+    
+    for (let t = 0; t < segmentsPerPoint; t++) {
+      const s = t / segmentsPerPoint;
+      const s2 = s * s;
+      const s3 = s2 * s;
+      
+      const m = 1 - tension;
+      const b0 = -m * s3 + 2 * m * s2 - m * s;
+      const b1 = (2 - m) * s3 + (m - 3) * s2 + 1;
+      const b2 = (m - 2) * s3 + (3 - 2 * m) * s2 + m * s;
+      const b3 = m * s3 - m * s2;
+      
+      result.push({
+        x: b0 * p0.x + b1 * p1.x + b2 * p2.x + b3 * p3.x,
+        y: b0 * p0.y + b1 * p1.y + b2 * p2.y + b3 * p3.y,
+      });
+    }
+  }
+  
+  return result;
+}
+
 // Generate smooth SVG path from points with rounded corners around each vertex
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
@@ -223,7 +273,12 @@ export function generateSmoothBoundaryPath(
   
   if (usedPoints.length < 3) return '';
   
-  // Smooth closed polygon path
+  // Apply Catmull-Rom smoothing for perfectly smooth curves
+  if (usedPoints.length >= 4) {
+    usedPoints = catmullRomSmooth(usedPoints, 0.4, 3);
+  }
+  
+  // Build smooth path
   let path = `M ${usedPoints[0].x.toFixed(2)} ${usedPoints[0].y.toFixed(2)}`;
   for (let i = 1; i < usedPoints.length; i++) {
     path += ` L ${usedPoints[i].x.toFixed(2)} ${usedPoints[i].y.toFixed(2)}`;
@@ -233,13 +288,17 @@ export function generateSmoothBoundaryPath(
   return path;
 }
 
-// Offset a polygon outward with rounded corners (arcs around each vertex)
+// Offset a polygon outward with smooth rounded corners (arcs around each vertex)
 function offsetPolygonRounded(
   points: { x: number; y: number }[],
   offset: number
 ): { x: number; y: number }[] {
   const n = points.length;
   if (n < 3) return points;
+  
+  // Determine winding order to know which way is "outward"
+  const area = getPolygonArea(points);
+  const isCCW = area > 0;
   
   const result: { x: number; y: number }[] = [];
   
@@ -258,30 +317,40 @@ function offsetPolygonRounded(
     const angle1 = Math.atan2(v1y, v1x);
     const angle2 = Math.atan2(v2y, v2x);
     
-    // Outward normal angles - for CCW polygon, normals point right (+PI/2)
-    // For CW polygon (SVG Y-axis flipped), normals point left (-PI/2)
-    const normalAngle1 = angle1 + Math.PI / 2;
-    const normalAngle2 = angle2 + Math.PI / 2;
+    // Outward normal angles depend on winding order
+    const normalOffset = isCCW ? -Math.PI / 2 : Math.PI / 2;
+    const normalAngle1 = angle1 + normalOffset;
+    const normalAngle2 = angle2 + normalOffset;
     
     // Generate arc from normalAngle1 to normalAngle2
     let startAngle = normalAngle1;
     let endAngle = normalAngle2;
     
-    // Normalize to go the short way (CW in screen space = outward)
-    while (endAngle > startAngle + Math.PI) {
-      endAngle -= Math.PI * 2;
-    }
-    while (endAngle < startAngle - Math.PI) {
-      endAngle += Math.PI * 2;
+    // For CCW polygon, we go CW around corner (negative arc)
+    // For CW polygon, we go CCW around corner (positive arc)
+    if (isCCW) {
+      while (endAngle > startAngle) {
+        endAngle -= Math.PI * 2;
+      }
+      while (endAngle < startAngle - Math.PI * 2) {
+        endAngle += Math.PI * 2;
+      }
+    } else {
+      while (endAngle < startAngle) {
+        endAngle += Math.PI * 2;
+      }
+      while (endAngle > startAngle + Math.PI * 2) {
+        endAngle -= Math.PI * 2;
+      }
     }
     
-    // Number of arc segments
-    const arcSpan = endAngle - startAngle;
-    const numSegments = Math.max(3, Math.ceil(Math.abs(arcSpan) / (Math.PI / 8)));
+    // Very high segment count for ultra-smooth arcs
+    const arcSpan = Math.abs(endAngle - startAngle);
+    const numSegments = Math.max(6, Math.ceil(arcSpan / (Math.PI / 16)));
     
     for (let j = 0; j <= numSegments; j++) {
       const t = j / numSegments;
-      const angle = startAngle + t * arcSpan;
+      const angle = startAngle + t * (endAngle - startAngle);
       result.push({
         x: curr.x + offset * Math.cos(angle),
         y: curr.y + offset * Math.sin(angle),
