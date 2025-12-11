@@ -2,7 +2,7 @@ import React, { useMemo, useCallback, useState, useRef, forwardRef, useImperativ
 import { IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
 import { Zone, ZonePoint, ExportSettings } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
-import { getZoneSVGPath, getZoneEllipseAttrs, getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
+import { getZoneSVGPath, getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
 import { generateZoneBoundary, boundaryToSVGPath } from '@/utils/boundaryGenerator';
 import { DrawingTool } from '@/components/controls/ZoneToolbar';
 
@@ -558,68 +558,34 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           </>
         )}
 
-        {/* PHASE 3: Render Zones BEFORE points so zones are always behind */}
+        {/* Zones - rendered before data points so points appear on top (same as Heatmap2D) */}
         {settings.showZones && zones.filter(z => z.visible).map(zone => {
           const isSelected = zone.id === selectedZoneId;
-          
-          if (zone.type === 'ellipse') {
-            const attrs = getZoneEllipseAttrs(zone, transformPoint, scaleX);
-            if (!attrs) return null;
-            
-            const centroid = getZoneCentroid(zone, points);
-            const labelPos = transformPoint(centroid.x, centroid.y);
-            
-            return (
-              <g key={zone.id} onClick={() => onZoneSelect(zone.id)} style={{ cursor: 'pointer' }}>
-                <ellipse
-                  cx={attrs.cx}
-                  cy={attrs.cy}
-                  rx={attrs.rx}
-                  ry={attrs.ry}
-                  transform={attrs.transform}
-                  fill={zone.color}
-                  fillOpacity={zone.fillOpacity}
-                  stroke={isSelected ? '#000' : zone.color}
-                  strokeWidth={isSelected ? zone.borderWidth + 1 : zone.borderWidth}
-                  strokeDasharray={getZoneDashArray(zone.borderStyle)}
-                />
-                {settings.showZoneLabels && zone.showLabel && (
-                  <text
-                    x={labelPos.cx}
-                    y={labelPos.cy}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={zone.labelFontSize}
-                    fontWeight="bold"
-                    fontFamily="sans-serif"
-                    fill="#1f2937"
-                    stroke="white"
-                    strokeWidth="3"
-                    paintOrder="stroke"
-                  >
-                    {zone.name}
-                  </text>
-                )}
-              </g>
-            );
-          }
-
-          const path = getZoneSVGPath(zone, transformPoint, points, pointRadiusDataUnits);
-          if (!path) return null;
-
+          const zonePath = getZoneSVGPath(zone, transformPoint, points, pointRadiusDataUnits);
           const centroid = getZoneCentroid(zone, points);
           const labelPos = transformPoint(centroid.x, centroid.y);
+          
+          if (!zonePath) return null;
 
           return (
-            <g key={zone.id} onClick={() => onZoneSelect(zone.id)} style={{ cursor: 'pointer' }}>
+            <g key={zone.id}>
+              {/* Zone fill */}
               <path
-                d={path}
+                d={zonePath}
                 fill={zone.color}
                 fillOpacity={zone.fillOpacity}
                 stroke={isSelected ? '#000' : zone.color}
                 strokeWidth={isSelected ? zone.borderWidth + 1 : zone.borderWidth}
                 strokeDasharray={getZoneDashArray(zone.borderStyle)}
+                strokeLinejoin="round"
+                className="cursor-pointer transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onZoneSelect(isSelected ? null : zone.id);
+                }}
               />
+              
+              {/* Zone label */}
               {settings.showZoneLabels && zone.showLabel && (
                 <text
                   x={labelPos.cx}
@@ -633,9 +599,22 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                   stroke="white"
                   strokeWidth="3"
                   paintOrder="stroke"
+                  className="pointer-events-none"
                 >
                   {zone.name}
                 </text>
+              )}
+              
+              {/* Selection highlight for zones */}
+              {isSelected && (
+                <path
+                  d={zonePath}
+                  fill="none"
+                  stroke="#000"
+                  strokeWidth="2"
+                  strokeDasharray="6 3"
+                  className="pointer-events-none animate-pulse"
+                />
               )}
             </g>
           );
