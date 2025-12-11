@@ -4,7 +4,7 @@ import { Zone, ZonePoint } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
 import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 import { isPointInPolygon } from '@/utils/statisticsUtils';
-import { getZoneSVGPath, getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
+import { getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
 import { generateZoneBoundary, boundaryToSVGPath } from '@/utils/boundaryGenerator';
 import { DrawingTool } from '@/components/controls/ZoneToolbar';
 
@@ -559,10 +559,28 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             />
           )}
 
-          {/* Zones - rendered before data points so points appear on top */}
+          {/* Zones - using same smooth boundary logic as outer contour */}
           {zones.filter(z => z.visible).map((zone) => {
             const isSelected = zone.id === selectedZoneId;
-            const zonePath = getZoneSVGPath(zone, transformPoint, points, pointRadiusDataUnits);
+            
+            // Get member points for this zone
+            const memberPoints = zone.memberPointIds.length > 0
+              ? points.filter(p => zone.memberPointIds.includes(p.id))
+              : [];
+            
+            if (memberPoints.length === 0) return null;
+            
+            // Generate smooth boundary path (same logic as boundary contour)
+            const zonePath = generateSmoothBoundaryPath(
+              memberPoints.map(p => {
+                const { cx, cy } = transformPoint(p.x, p.y);
+                return { x: cx, y: cy };
+              }),
+              pointRadius * 1.1
+            );
+            
+            if (!zonePath) return null;
+            
             const centroid = getZoneCentroid(zone, points);
             const labelPos = transformPoint(centroid.x, centroid.y);
             
