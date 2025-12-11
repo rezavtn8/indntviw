@@ -1,12 +1,12 @@
 import React, { useMemo, useCallback, useState, useRef } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
-import { Zone } from '@/types/zones';
+import { Zone, ZonePoint } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
 import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 import { isPointInPolygon } from '@/utils/statisticsUtils';
-import { getZoneSVGPath, getZoneDashArray } from '@/utils/zoneUtils';
-
-export type SelectionMode = 'none' | 'lasso' | 'box';
+import { getZoneSVGPath, getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
+import { generateZoneBoundary, boundaryToSVGPath } from '@/utils/boundaryGenerator';
+import { DrawingTool } from '@/components/controls/ZoneToolbar';
 
 interface Heatmap2DProps {
   points: IndentationPoint[];
@@ -19,12 +19,12 @@ interface Heatmap2DProps {
   selectedPointIds?: number[];
   showContours?: boolean;
   showInterpolation?: boolean;
-  selectionMode?: SelectionMode;
+  drawingTool?: DrawingTool;
   zones?: Zone[];
   selectedZoneId?: string | null;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
-  onLassoSelect?: (pointIds: number[]) => void;
+  onPointsSelected?: (pointIds: number[]) => void;
   onZoneSelect?: (zoneId: string | null) => void;
 }
 
@@ -45,17 +45,19 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   selectedPointIds = [],
   showContours = false,
   showInterpolation = false,
-  selectionMode = 'none',
+  drawingTool = 'select',
   zones = [],
   selectedZoneId = null,
   onPointSelect,
   onPointHover,
-  onLassoSelect,
+  onPointsSelected,
   onZoneSelect,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [lassoPath, setLassoPath] = useState<{ x: number; y: number }[]>([]);
+  const [lassoPath, setLassoPath] = useState<ZonePoint[]>([]);
+  const [boxStart, setBoxStart] = useState<ZonePoint | null>(null);
+  const [currentPos, setCurrentPos] = useState<ZonePoint | null>(null);
   
   // Zoom and pan state
   const [viewState, setViewState] = useState<ViewState>({ scale: 1, translateX: 0, translateY: 0 });
@@ -114,6 +116,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     };
   }, [points, selectedProperty, colorScheme, minValue, maxValue, highlightedPoints, selectedPointIds]);
 
+  // Point radius in data units (for boundary generation)
+  const pointRadiusDataUnits = useMemo(() => {
+    return pointRadius / scale;
+  }, [pointRadius, scale]);
+
   // Generate boundary contour for display and clipping
   const boundaryContour = useMemo(() => {
     if (points.length < 3) return [];
@@ -129,10 +136,10 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   }, [points, selectedProperty, showInterpolation]);
 
   const handlePointClick = useCallback((point: IndentationPoint) => {
-    if (selectionMode === 'none') {
+    if (drawingTool === 'select') {
       onPointSelect(selectedPoint?.id === point.id ? null : point);
     }
-  }, [selectedPoint, onPointSelect, selectionMode]);
+  }, [selectedPoint, onPointSelect, drawingTool]);
 
   // Transform contour coordinates to SVG space
   const transformPoint = useCallback((x: number, y: number) => ({
@@ -147,49 +154,86 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   }), [padding, xMin, yMin, scale, height]);
 
   // Get SVG coordinates from mouse event (accounting for zoom/pan)
-  const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+  const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>): ZonePoint => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
     const svgWidth = 800;
     const svgHeight = 600;
     const rawX = ((e.clientX - rect.left) / rect.width) * svgWidth;
     const rawY = ((e.clientY - rect.top) / rect.height) * svgHeight;
-    // Convert to pre-transform coordinates
-    return {
-      x: (rawX - viewState.translateX) / viewState.scale,
-      y: (rawY - viewState.translateY) / viewState.scale,
-    };
-  }, [viewState]);
+    // Convert to pre-transform coordinates, then to data coords
+    const svgX = (rawX - viewState.translateX) / viewState.scale;
+    const svgY = (rawY - viewState.translateY) / viewState.scale;
+    return inverseTransform(svgX, svgY);
+  }, [viewState, inverseTransform]);
 
-  // Lasso handlers
+  // Helper to check if point is in box
+  const isPointInBox = useCallback((point: { x: number; y: number }, start: ZonePoint, end: ZonePoint): boolean => {
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
+  }, []);
+
+  // Drawing handlers (same logic as ExportCanvas)
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (selectionMode === 'lasso') {
+    if (drawingTool === 'select') {
+      // Click to toggle individual point selection
       const coords = getSVGCoords(e);
-      setIsDrawing(true);
-      setLassoPath([coords]);
-    } else if (selectionMode === 'none' && e.button === 0) {
-      // Start panning - store initial mouse position and current view state
-      setIsPanning(true);
-      setPanStart({ x: e.clientX, y: e.clientY });
-      setViewStart({ translateX: viewState.translateX, translateY: viewState.translateY });
+      const clickedPoint = points.find(p => {
+        const dist = Math.sqrt((p.x - coords.x) ** 2 + (p.y - coords.y) ** 2);
+        return dist < pointRadiusDataUnits * 2;
+      });
+      
+      if (clickedPoint) {
+        const isCtrl = e.ctrlKey || e.metaKey;
+        if (isCtrl) {
+          // Toggle selection
+          if (selectedPointIds.includes(clickedPoint.id)) {
+            onPointsSelected?.(selectedPointIds.filter(id => id !== clickedPoint.id));
+          } else {
+            onPointsSelected?.([...selectedPointIds, clickedPoint.id]);
+          }
+        } else {
+          // Single select
+          onPointsSelected?.([clickedPoint.id]);
+        }
+      } else {
+        // Click on empty space - clear selection or select zone, or start panning
+        onZoneSelect?.(null);
+        if (!e.ctrlKey && !e.metaKey) {
+          onPointsSelected?.([]);
+        }
+        // Start panning
+        setIsPanning(true);
+        setPanStart({ x: e.clientX, y: e.clientY });
+        setViewStart({ translateX: viewState.translateX, translateY: viewState.translateY });
+      }
+      return;
     }
-  }, [selectionMode, getSVGCoords, viewState.translateX, viewState.translateY]);
+
+    const coords = getSVGCoords(e);
+    setIsDrawing(true);
+
+    if (drawingTool === 'lasso') {
+      setLassoPath([coords]);
+    } else if (drawingTool === 'box') {
+      setBoxStart(coords);
+      setCurrentPos(coords);
+    }
+  }, [drawingTool, getSVGCoords, points, pointRadiusDataUnits, selectedPointIds, onPointsSelected, onZoneSelect, viewState.translateX, viewState.translateY]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (isDrawing && selectionMode === 'lasso') {
-      const coords = getSVGCoords(e);
-      setLassoPath(prev => [...prev, coords]);
-    } else if (isPanning) {
+    if (isPanning) {
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
       
-      // Convert screen delta to SVG units
       const scaleX = 800 / rect.width;
       const scaleY = 600 / rect.height;
       const dx = (e.clientX - panStart.x) * scaleX;
       const dy = (e.clientY - panStart.y) * scaleY;
       
-      // Limit panning range based on zoom level
       const maxPan = 200 * viewState.scale;
       const newX = Math.max(-maxPan, Math.min(maxPan, viewStart.translateX + dx));
       const newY = Math.max(-maxPan, Math.min(maxPan, viewStart.translateY + dy));
@@ -199,35 +243,61 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         translateX: newX,
         translateY: newY,
       }));
+      return;
     }
-  }, [isDrawing, selectionMode, getSVGCoords, isPanning, panStart, viewStart, viewState.scale]);
 
-  const handleMouseUp = useCallback(() => {
+    if (!isDrawing) return;
+
+    const coords = getSVGCoords(e);
+
+    if (drawingTool === 'lasso') {
+      setLassoPath(prev => [...prev, coords]);
+    } else if (drawingTool === 'box') {
+      setCurrentPos(coords);
+    }
+  }, [isDrawing, isPanning, drawingTool, getSVGCoords, panStart, viewStart, viewState.scale]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (isPanning) {
       setIsPanning(false);
       return;
     }
-    
-    if (!isDrawing || selectionMode !== 'lasso' || lassoPath.length < 3) {
-      setIsDrawing(false);
-      setLassoPath([]);
-      return;
+
+    if (!isDrawing) return;
+
+    const isAdditive = e.ctrlKey || e.metaKey || e.shiftKey;
+
+    if (drawingTool === 'lasso' && lassoPath.length >= 3) {
+      // Select all points within the lasso
+      const selectedIds = points
+        .filter(p => isPointInPolygon({ x: p.x, y: p.y }, lassoPath))
+        .map(p => p.id);
+      
+      if (isAdditive) {
+        onPointsSelected?.([...new Set([...selectedPointIds, ...selectedIds])]);
+      } else {
+        onPointsSelected?.(selectedIds);
+      }
+    } else if (drawingTool === 'box' && boxStart && currentPos) {
+      // Select all points within the box
+      const selectedIds = points
+        .filter(p => isPointInBox({ x: p.x, y: p.y }, boxStart, currentPos))
+        .map(p => p.id);
+      
+      if (isAdditive) {
+        onPointsSelected?.([...new Set([...selectedPointIds, ...selectedIds])]);
+      } else {
+        onPointsSelected?.(selectedIds);
+      }
     }
 
-    // Convert lasso path to data coordinates
-    const dataPath = lassoPath.map(p => inverseTransform(p.x, p.y));
-
-    // Find points inside lasso
-    const selectedIds = points
-      .filter(point => isPointInPolygon({ x: point.x, y: point.y }, dataPath))
-      .map(p => p.id);
-
-    onLassoSelect?.(selectedIds);
     setIsDrawing(false);
     setLassoPath([]);
-  }, [isDrawing, isPanning, selectionMode, lassoPath, points, inverseTransform, onLassoSelect]);
+    setBoxStart(null);
+    setCurrentPos(null);
+  }, [isDrawing, isPanning, drawingTool, lassoPath, boxStart, currentPos, points, selectedPointIds, isPointInBox, onPointsSelected]);
 
-  // Zoom handler - gentler zoom with limits
+  // Zoom handler
   const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     const rect = svgRef.current?.getBoundingClientRect();
@@ -236,7 +306,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const mouseX = ((e.clientX - rect.left) / rect.width) * 800;
     const mouseY = ((e.clientY - rect.top) / rect.height) * 600;
 
-    // Gentler zoom factor
     const zoomFactor = e.deltaY < 0 ? 1.06 : 0.94;
     const newScale = Math.max(0.8, Math.min(4, viewState.scale * zoomFactor));
     
@@ -246,7 +315,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     let newTranslateX = mouseX - (mouseX - viewState.translateX) * scaleRatio;
     let newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
 
-    // Limit panning range
     const maxPan = 200 * newScale;
     newTranslateX = Math.max(-maxPan, Math.min(maxPan, newTranslateX));
     newTranslateY = Math.max(-maxPan, Math.min(maxPan, newTranslateY));
@@ -260,7 +328,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
   // Double-click to zoom in
   const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (selectionMode !== 'none') return;
+    if (drawingTool !== 'select') return;
     
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -274,7 +342,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const newTranslateY = mouseY - (mouseY - viewState.translateY) * scaleRatio;
 
     setViewState({ scale: newScale, translateX: newTranslateX, translateY: newTranslateY });
-  }, [viewState, selectionMode]);
+  }, [viewState, drawingTool]);
 
   // Reset zoom
   const resetZoom = useCallback(() => {
@@ -297,12 +365,44 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setViewState({ scale: clampedScale, translateX: newTranslateX, translateY: newTranslateY });
   }, [viewState]);
 
-  // Generate lasso path string
-  const lassoPathString = useMemo(() => {
-    if (lassoPath.length < 2) return '';
-    return lassoPath.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
-  }, [lassoPath]);
+  // Generate selection preview boundary (same as ExportCanvas)
+  const selectionPreviewPath = useMemo(() => {
+    if (selectedPointIds.length < 1) return null;
+    
+    const selectedPoints = points.filter(p => selectedPointIds.includes(p.id));
+    if (selectedPoints.length === 0) return null;
+    
+    const memberCoords: ZonePoint[] = selectedPoints.map(p => ({ x: p.x, y: p.y }));
+    const boundaryPoints = generateZoneBoundary(memberCoords, 0.1, 0.5, 'convex', pointRadiusDataUnits);
+    
+    if (boundaryPoints.length < 3) return null;
+    
+    return boundaryToSVGPath(boundaryPoints, transformPoint);
+  }, [selectedPointIds, points, transformPoint, pointRadiusDataUnits]);
 
+  // Generate drawing preview path (lasso)
+  const getDrawingPreviewPath = useCallback(() => {
+    if (drawingTool === 'lasso' && lassoPath.length >= 2) {
+      const transformed = lassoPath.map(p => transformPoint(p.x, p.y));
+      return transformed.map((t, i) => `${i === 0 ? 'M' : 'L'} ${t.cx} ${t.cy}`).join(' ');
+    }
+    return '';
+  }, [drawingTool, lassoPath, transformPoint]);
+
+  // Generate drawing preview rect (box)
+  const getDrawingPreviewRect = useCallback(() => {
+    if (drawingTool === 'box' && boxStart && currentPos) {
+      const p1 = transformPoint(boxStart.x, boxStart.y);
+      const p2 = transformPoint(currentPos.x, currentPos.y);
+      return {
+        x: Math.min(p1.cx, p2.cx),
+        y: Math.min(p1.cy, p2.cy),
+        width: Math.abs(p2.cx - p1.cx),
+        height: Math.abs(p2.cy - p1.cy),
+      };
+    }
+    return null;
+  }, [drawingTool, boxStart, currentPos, transformPoint]);
 
   if (points.length === 0) {
     return (
@@ -314,6 +414,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
   const transformStr = `translate(${viewState.translateX}, ${viewState.translateY}) scale(${viewState.scale})`;
   const zoomPercent = Math.round(viewState.scale * 100);
+  const cursor = drawingTool === 'select' ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-crosshair';
 
   return (
     <div className="relative w-full h-full">
@@ -361,7 +462,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       <svg
         ref={svgRef}
         viewBox={viewBox}
-        className={`w-full h-full ${selectionMode === 'lasso' ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`w-full h-full ${cursor}`}
         style={{ background: 'hsl(var(--card))' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -461,7 +562,9 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
           {/* Zones - rendered before data points so points appear on top */}
           {zones.filter(z => z.visible).map((zone) => {
             const isSelected = zone.id === selectedZoneId;
-            const zonePath = getZoneSVGPath(zone, transformPoint, points, pointRadius / scale);
+            const zonePath = getZoneSVGPath(zone, transformPoint, points, pointRadiusDataUnits);
+            const centroid = getZoneCentroid(zone, points);
+            const labelPos = transformPoint(centroid.x, centroid.y);
             
             return (
               <g key={zone.id}>
@@ -470,8 +573,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                   d={zonePath}
                   fill={zone.color}
                   fillOpacity={zone.fillOpacity}
-                  stroke={zone.color}
-                  strokeWidth={isSelected ? zone.borderWidth + 2 : zone.borderWidth}
+                  stroke={isSelected ? '#000' : zone.color}
+                  strokeWidth={isSelected ? zone.borderWidth + 1 : zone.borderWidth}
                   strokeDasharray={getZoneDashArray(zone.borderStyle)}
                   strokeLinejoin="round"
                   className="cursor-pointer transition-all"
@@ -480,6 +583,26 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                     onZoneSelect?.(isSelected ? null : zone.id);
                   }}
                 />
+                
+                {/* Zone label */}
+                {zone.showLabel && (
+                  <text
+                    x={labelPos.cx}
+                    y={labelPos.cy}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={zone.labelFontSize}
+                    fontWeight="bold"
+                    fontFamily="sans-serif"
+                    fill="#1f2937"
+                    stroke="white"
+                    strokeWidth="3"
+                    paintOrder="stroke"
+                    className="pointer-events-none"
+                  >
+                    {zone.name}
+                  </text>
+                )}
                 
                 {/* Selection highlight for zones */}
                 {isSelected && (
@@ -497,75 +620,109 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
           })}
 
           {/* Data points */}
-          {normalizedPoints.map((point) => (
-            <g key={point.id}>
-              {/* Highlight ring for outliers */}
-              {point.isHighlighted && (
+          {normalizedPoints.map((point) => {
+            const isPointSelected = selectedPointIds.includes(point.id);
+            return (
+              <g key={point.id}>
+                {/* Highlight ring for outliers */}
+                {point.isHighlighted && (
+                  <circle
+                    cx={point.cx}
+                    cy={point.cy}
+                    r={pointRadius + 8}
+                    fill="none"
+                    stroke="hsl(var(--destructive))"
+                    strokeWidth="2"
+                    strokeDasharray="3 2"
+                  />
+                )}
+                {/* Selection ring for selected points */}
+                {isPointSelected && (
+                  <circle
+                    cx={point.cx}
+                    cy={point.cy}
+                    r={pointRadius * 1.3}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                  />
+                )}
                 <circle
                   cx={point.cx}
                   cy={point.cy}
-                  r={pointRadius + 8}
-                  fill="none"
-                  stroke="hsl(var(--destructive))"
-                  strokeWidth="2"
-                  strokeDasharray="3 2"
+                  r={isPointSelected ? pointRadius * 1.3 : pointRadius}
+                  fill={point.color}
+                  stroke={
+                    point.isHighlighted 
+                      ? 'hsl(var(--destructive))' 
+                      : isPointSelected
+                        ? '#3b82f6'
+                        : selectedPoint?.id === point.id 
+                          ? 'hsl(var(--foreground))' 
+                          : '#374151'
+                  }
+                  strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5}
+                  className="cursor-pointer transition-all duration-150 hover:opacity-80"
+                  onClick={() => handlePointClick(point)}
+                  onMouseEnter={() => onPointHover(point)}
+                  onMouseLeave={() => onPointHover(null)}
                 />
-              )}
-              {/* Selection ring for lasso-selected points */}
-              {point.isSelected && (
-                <circle
-                  cx={point.cx}
-                  cy={point.cy}
-                  r={pointRadius + 5}
-                  fill="none"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="2"
-                />
-              )}
-              <circle
-                cx={point.cx}
-                cy={point.cy}
-                r={pointRadius}
-                fill={point.color}
-                stroke={
-                  point.isHighlighted 
-                    ? 'hsl(var(--destructive))' 
-                    : point.isSelected
-                      ? 'hsl(var(--primary))'
-                      : selectedPoint?.id === point.id 
-                        ? 'hsl(var(--foreground))' 
-                        : 'hsl(var(--border))'
-                }
-                strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || point.isSelected ? 3 : 1}
-                className="cursor-pointer transition-all duration-150 hover:opacity-80"
-                onClick={() => handlePointClick(point)}
-                onMouseEnter={() => onPointHover(point)}
-                onMouseLeave={() => onPointHover(null)}
-              />
-              {selectedPoint?.id === point.id && (
-                <circle
-                  cx={point.cx}
-                  cy={point.cy}
-                  r={pointRadius + 6}
-                  fill="none"
-                  stroke="hsl(var(--foreground))"
-                  strokeWidth="2"
-                  strokeDasharray="4 2"
-                  className="animate-pulse"
-                />
-              )}
-            </g>
-          ))}
+                {selectedPoint?.id === point.id && (
+                  <circle
+                    cx={point.cx}
+                    cy={point.cy}
+                    r={pointRadius + 6}
+                    fill="none"
+                    stroke="hsl(var(--foreground))"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                    className="animate-pulse"
+                  />
+                )}
+              </g>
+            );
+          })}
 
-          {/* Lasso selection path */}
-          {isDrawing && lassoPathString && (
+          {/* Selection preview boundary (same as ExportCanvas) */}
+          {selectionPreviewPath && !isDrawing && (
             <path
-              d={lassoPathString}
-              fill="hsl(var(--primary) / 0.1)"
-              stroke="hsl(var(--primary))"
+              d={selectionPreviewPath}
+              fill="rgba(59, 130, 246, 0.1)"
+              stroke="#3b82f6"
               strokeWidth="2"
-              strokeDasharray="5 3"
+              strokeDasharray="8 4"
+              pointerEvents="none"
             />
+          )}
+
+          {/* Drawing preview */}
+          {isDrawing && (
+            <>
+              {drawingTool === 'lasso' && (
+                <path
+                  d={getDrawingPreviewPath()}
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="2"
+                  strokeDasharray="5 5"
+                />
+              )}
+              {drawingTool === 'box' && (() => {
+                const rect = getDrawingPreviewRect();
+                return rect && (
+                  <rect
+                    x={rect.x}
+                    y={rect.y}
+                    width={rect.width}
+                    height={rect.height}
+                    fill="rgba(59, 130, 246, 0.2)"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                    strokeDasharray="5 5"
+                  />
+                );
+              })()}
+            </>
           )}
         </g>
       </svg>

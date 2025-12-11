@@ -11,7 +11,6 @@ import { RangeControls } from '@/components/controls/RangeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 import { ExportControls } from '@/components/controls/ExportControls';
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
-import { SelectionToolbar, SelectionMode } from '@/components/controls/SelectionToolbar';
 import { ZoneToolbar, DrawingTool } from '@/components/controls/ZoneToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
@@ -52,8 +51,8 @@ export const IndentViewApp: React.FC = () => {
   const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
   
-  // Selection state
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>('none');
+  // Selection state (unified for 2D view and Export Studio)
+  const [heatmapDrawingTool, setHeatmapDrawingTool] = useState<DrawingTool>('select');
   const [selectedPointIds, setSelectedPointIds] = useState<number[]>([]);
   
   // Ref for screenshot/export
@@ -670,30 +669,22 @@ export const IndentViewApp: React.FC = () => {
             </Tabs>
           </div>
 
-          {/* Selection/Zone Toolbar - in 2D view */}
+          {/* Zone Toolbar - in 2D view (same as Export Studio) */}
           {activeView === '2d' && data && (
             <div className="px-4 py-2 border-b border-border flex items-center gap-4">
-              <SelectionToolbar
-                selectionMode={selectionMode}
-                selectedCount={selectedPointIds.length}
-                onModeChange={setSelectionMode}
+              <ZoneToolbar
+                activeTool={heatmapDrawingTool}
+                onToolChange={setHeatmapDrawingTool}
+                onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
+                onCreateZone={() => handleCreateZoneFromSelection()}
                 onClearSelection={() => setSelectedPointIds([])}
+                hasSelectedZone={!!selectedZoneId}
+                hasSelectedPoints={selectedPointIds.length > 0}
+                selectedPointCount={selectedPointIds.length}
               />
-              
-              {/* Zone creation button in 2D view */}
-              {selectedPointIds.length > 0 && (
-                <div className="flex items-center gap-2 border-l border-border pl-4">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleCreateZoneFromSelection()}
-                    className="gap-1.5"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Create Zone ({selectedPointIds.length} pts)
-                  </Button>
-                </div>
-              )}
+              <div className="text-xs font-mono text-muted-foreground">
+                {zones.length} zone{zones.length !== 1 ? 's' : ''}
+              </div>
             </div>
           )}
 
@@ -796,12 +787,12 @@ export const IndentViewApp: React.FC = () => {
                       selectedPointIds={selectedPointIds}
                       showContours={showContours}
                       showInterpolation={showInterpolation}
-                      selectionMode={selectionMode === 'lasso' ? 'lasso' : 'none'}
+                      drawingTool={heatmapDrawingTool}
                       zones={zones}
                       selectedZoneId={selectedZoneId}
                       onPointSelect={setSelectedPoint}
                       onPointHover={setHoveredPoint}
-                      onLassoSelect={handleLassoSelect}
+                      onPointsSelected={setSelectedPointIds}
                       onZoneSelect={setSelectedZoneId}
                     />
                   </div>
