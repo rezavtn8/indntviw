@@ -62,9 +62,9 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   // Zoom state (button-controlled only)
   const [viewState, setViewState] = useState<ViewState>({ scale: 1, translateX: 0, translateY: 0 });
 
-  const { normalizedPoints, viewBox, pointRadius, scale, padding, xMin, yMin, height } = useMemo(() => {
+  const { normalizedPoints, viewBox, pointRadius, scale, padding, xMin, yMin, height, offsetX, offsetY } = useMemo(() => {
     if (points.length === 0) {
-      return { normalizedPoints: [], viewBox: '0 0 100 100', pointRadius: 2, scale: 1, padding: 40, xMin: 0, yMin: 0, height: 600 };
+      return { normalizedPoints: [], viewBox: '0 0 100 100', pointRadius: 2, scale: 1, padding: 40, xMin: 0, yMin: 0, height: 600, offsetX: 40, offsetY: 40 };
     }
 
     const xValues = points.map(p => p.x);
@@ -84,12 +84,20 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     
     const scaleVal = Math.min((width - pad * 2) / xRange, (h - pad * 2) / yRange);
     
+    // Calculate the actual size the data will take
+    const dataWidth = xRange * scaleVal;
+    const dataHeight = yRange * scaleVal;
+    
+    // Center the data in the viewBox
+    const offsetX = pad + (width - pad * 2 - dataWidth) / 2;
+    const offsetY = pad + (h - pad * 2 - dataHeight) / 2;
+    
     const normalized = points.map(point => {
       const value = point.properties[selectedProperty] ?? 0;
       return {
         ...point,
-        cx: pad + (point.x - xMinVal) * scaleVal,
-        cy: h - pad - (point.y - yMinVal) * scaleVal,
+        cx: offsetX + (point.x - xMinVal) * scaleVal,
+        cy: h - offsetY - (point.y - yMinVal) * scaleVal,
         color: getColorForValue(value, minValue, maxValue, colorScheme),
         value,
         isHighlighted: highlightedPoints.includes(point.id),
@@ -110,6 +118,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       xMin: xMinVal,
       yMin: yMinVal,
       height: h,
+      offsetX,
+      offsetY,
     };
   }, [points, selectedProperty, colorScheme, minValue, maxValue, highlightedPoints, selectedPointIds]);
 
@@ -138,16 +148,16 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     }
   }, [selectedPoint, onPointSelect, drawingTool]);
 
-  // Transform contour coordinates to SVG space
+  // Transform contour coordinates to SVG space (using centered offsets)
   const transformPoint = useCallback((x: number, y: number) => ({
-    cx: padding + (x - xMin) * scale,
-    cy: height - padding - (y - yMin) * scale,
-  }), [padding, xMin, yMin, scale, height]);
+    cx: offsetX + (x - xMin) * scale,
+    cy: height - offsetY - (y - yMin) * scale,
+  }), [offsetX, offsetY, xMin, yMin, scale, height]);
 
   // Inverse transform: SVG to data coordinates
   const inverseTransform = useCallback((cx: number, cy: number) => ({
-    x: xMin + (cx - padding) / scale,
-    y: yMin + (height - padding - cy) / scale,
+    x: xMin + (cx - offsetX) / scale,
+    y: yMin + (height - offsetY - cy) / scale,
   }), [padding, xMin, yMin, scale, height]);
 
   // Get SVG coordinates from mouse event (accounting for zoom/pan)
