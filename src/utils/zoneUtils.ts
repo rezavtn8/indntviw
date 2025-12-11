@@ -83,12 +83,27 @@ export function calculateZoneStatistics(
   return { count, min, max, mean, stdDev };
 }
 
-// Calculate centroid of a zone for label placement
-export function getZoneCentroid(zone: Zone): ZonePoint {
+// PHASE 2: Calculate centroid from MEMBER POINTS (not stored zone.points)
+export function getZoneCentroid(zone: Zone, allPoints?: IndentationPoint[]): ZonePoint {
+  // Priority 1: Calculate from actual member points
+  if (zone.memberPointIds.length > 0 && allPoints && allPoints.length > 0) {
+    const memberPoints = getMemberPoints(allPoints, zone.memberPointIds);
+    if (memberPoints.length > 0) {
+      const sumX = memberPoints.reduce((sum, p) => sum + p.x, 0);
+      const sumY = memberPoints.reduce((sum, p) => sum + p.y, 0);
+      return {
+        x: sumX / memberPoints.length,
+        y: sumY / memberPoints.length,
+      };
+    }
+  }
+
+  // Priority 2: Ellipse center
   if (zone.type === 'ellipse' && zone.centerX !== undefined && zone.centerY !== undefined) {
     return { x: zone.centerX, y: zone.centerY };
   }
 
+  // Priority 3: Rectangle center
   if (zone.type === 'rectangle' && zone.points.length >= 2) {
     return {
       x: (zone.points[0].x + zone.points[1].x) / 2,
@@ -96,6 +111,7 @@ export function getZoneCentroid(zone: Zone): ZonePoint {
     };
   }
 
+  // Fallback: use stored boundary points
   if (zone.points.length === 0) {
     return { x: 0, y: 0 };
   }
