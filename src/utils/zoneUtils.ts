@@ -111,7 +111,8 @@ export function getZoneCentroid(zone: Zone): ZonePoint {
 // Update zone boundary from member points
 export function updateZoneBoundary(
   zone: Zone,
-  allPoints: IndentationPoint[]
+  allPoints: IndentationPoint[],
+  pointRadius: number = 0  // Point radius in data units
 ): Zone {
   if (zone.memberPointIds.length === 0) {
     return zone;
@@ -124,7 +125,8 @@ export function updateZoneBoundary(
     memberCoords,
     zone.boundaryPadding,
     zone.smoothness,
-    zone.boundaryType
+    zone.boundaryType,
+    pointRadius
   );
 
   return {
@@ -139,7 +141,8 @@ export function createZoneFromSelection(
   allPoints: IndentationPoint[],
   zoneId: string,
   colorIndex: number,
-  name?: string
+  name?: string,
+  pointRadius: number = 0
 ): Zone | null {
   // Validate we have points to create a zone
   if (selectedIds.length === 0) {
@@ -153,7 +156,7 @@ export function createZoneFromSelection(
     newZone.name = name;
   }
 
-  return updateZoneBoundary(newZone, allPoints);
+  return updateZoneBoundary(newZone, allPoints, pointRadius);
 }
 
 // Generate SVG path for a zone
