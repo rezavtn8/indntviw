@@ -74,6 +74,13 @@ export interface ExportSettings {
   xTickCount: number;
   yTickCount: number;
   legendTickCount: number;
+  // Custom tick values
+  useCustomXTicks: boolean;
+  useCustomYTicks: boolean;
+  useCustomLegendTicks: boolean;
+  customXTicks: string; // Comma-separated values
+  customYTicks: string;
+  customLegendTicks: string;
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -112,6 +119,12 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   xTickCount: 6,
   yTickCount: 6,
   legendTickCount: 5,
+  useCustomXTicks: false,
+  useCustomYTicks: false,
+  useCustomLegendTicks: false,
+  customXTicks: '',
+  customYTicks: '',
+  customLegendTicks: '',
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
