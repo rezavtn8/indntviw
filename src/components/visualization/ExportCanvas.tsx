@@ -3,6 +3,7 @@ import { IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indenta
 import { Zone, ZonePoint, ExportSettings } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
 import { getZoneSVGPath, getZoneEllipseAttrs, getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
+import { generateZoneBoundary, boundaryToSVGPath } from '@/utils/boundaryGenerator';
 import { DrawingTool } from '@/components/controls/ZoneToolbar';
 
 interface ExportCanvasProps {
@@ -202,6 +203,21 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     const config = PROPERTY_CONFIGS.find(c => c.key === selectedProperty);
     return config?.unit || '';
   }, [selectedProperty]);
+
+  // Generate preview boundary for selected points
+  const selectionPreviewPath = useMemo(() => {
+    if (selectedPointIds.length < 1) return null;
+    
+    const selectedPoints = points.filter(p => selectedPointIds.includes(p.id));
+    if (selectedPoints.length === 0) return null;
+    
+    const memberCoords: ZonePoint[] = selectedPoints.map(p => ({ x: p.x, y: p.y }));
+    const boundaryPoints = generateZoneBoundary(memberCoords, 0.5, 0.5, 'convex');
+    
+    if (boundaryPoints.length < 3) return null;
+    
+    return boundaryToSVGPath(boundaryPoints, transformPoint);
+  }, [selectedPointIds, points, transformPoint]);
 
   // Helper to check if point is in polygon (for lasso selection)
   const isPointInPolygon = useCallback((point: { x: number; y: number }, polygon: ZonePoint[]): boolean => {
@@ -636,6 +652,18 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
             </g>
           );
         })}
+
+        {/* Selection preview boundary */}
+        {selectionPreviewPath && !isDrawing && (
+          <path
+            d={selectionPreviewPath}
+            fill="rgba(59, 130, 246, 0.1)"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            strokeDasharray="8 4"
+            pointerEvents="none"
+          />
+        )}
 
         {/* Drawing preview */}
         {isDrawing && (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { MousePointer2, Lasso, Square, Trash2, PlusCircle } from 'lucide-react';
+import { MousePointer2, Lasso, Square, Trash2, PlusCircle, X } from 'lucide-react';
 
 export type DrawingTool = 'select' | 'lasso' | 'box';
 
@@ -10,6 +10,7 @@ interface ZoneToolbarProps {
   onToolChange: (tool: DrawingTool) => void;
   onDeleteSelected: () => void;
   onCreateZone: () => void;
+  onClearSelection: () => void;
   hasSelectedZone: boolean;
   hasSelectedPoints: boolean;
   selectedPointCount: number;
@@ -20,12 +21,13 @@ export const ZoneToolbar: React.FC<ZoneToolbarProps> = ({
   onToolChange,
   onDeleteSelected,
   onCreateZone,
+  onClearSelection,
   hasSelectedZone,
   hasSelectedPoints,
   selectedPointCount,
 }) => {
   const tools: { id: DrawingTool; icon: React.ReactNode; label: string; shortcut: string }[] = [
-    { id: 'select', icon: <MousePointer2 className="w-4 h-4" />, label: 'Select Points', shortcut: 'V' },
+    { id: 'select', icon: <MousePointer2 className="w-4 h-4" />, label: 'Click to Select', shortcut: 'V' },
     { id: 'lasso', icon: <Lasso className="w-4 h-4" />, label: 'Lasso Select', shortcut: 'L' },
     { id: 'box', icon: <Square className="w-4 h-4" />, label: 'Box Select', shortcut: 'B' },
   ];
@@ -52,27 +54,45 @@ export const ZoneToolbar: React.FC<ZoneToolbarProps> = ({
         ))}
         
         <div className="w-px h-6 bg-border mx-1" />
+
+        {/* Selection info and actions */}
+        {selectedPointCount > 0 && (
+          <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 rounded text-sm font-mono">
+            <span className="text-primary font-semibold">{selectedPointCount}</span>
+            <span className="text-muted-foreground">pts</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClearSelection}
+                  className="w-5 h-5 p-0 ml-1 hover:bg-destructive/20"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Clear Selection (Esc)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
         
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="default"
+              variant={hasSelectedPoints ? 'default' : 'outline'}
               size="sm"
               onClick={onCreateZone}
               disabled={!hasSelectedPoints}
-              className="gap-1 px-3"
+              className="gap-1.5 px-3"
             >
               <PlusCircle className="w-4 h-4" />
               Create Zone
-              {selectedPointCount > 0 && (
-                <span className="ml-1 text-xs bg-background/20 px-1.5 rounded">
-                  {selectedPointCount}
-                </span>
-              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>Create zone from selected points</p>
+            <p>{hasSelectedPoints ? `Create zone from ${selectedPointCount} selected points` : 'Select points first'}</p>
           </TooltipContent>
         </Tooltip>
         
