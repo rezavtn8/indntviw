@@ -223,25 +223,32 @@ function getAverageSpacing(points: ZonePoint[]): number {
 }
 
 // Main function: Generate smooth boundary from member points
+// pointRadius is the visual radius of each point (in data units) to wrap around
 export function generateZoneBoundary(
   memberPoints: ZonePoint[],
-  padding: number = 0.15,      // Relative padding (0-1)
-  smoothness: number = 0.7,   // Smoothness factor (0-1)
-  boundaryType: 'convex' | 'concave' = 'convex'
+  padding: number = 0.1,       // Extra padding beyond point radius (0-1)
+  smoothness: number = 0.5,    // Smoothness factor (0-1)
+  boundaryType: 'convex' | 'concave' = 'convex',
+  pointRadius: number = 0      // Visual radius of points in data units
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
   // Get average spacing between points
   const avgSpacing = getAverageSpacing(memberPoints);
+  
+  // Base padding is the point radius (to wrap around the dot's edge)
+  // Plus a small extra based on the padding parameter
+  const basePadding = pointRadius > 0 ? pointRadius : avgSpacing * 0.35;
+  const extraPadding = avgSpacing * padding * 0.3; // Small extra padding
+  const totalPadding = basePadding + extraPadding;
 
-  // Single point: small circle
+  // Single point: circle around the point
   if (memberPoints.length === 1) {
     const cx = memberPoints[0].x;
     const cy = memberPoints[0].y;
-    const r = avgSpacing * 0.35;
     return Array.from({ length: 12 }, (_, i) => ({
-      x: cx + r * Math.cos((i / 12) * Math.PI * 2),
-      y: cy + r * Math.sin((i / 12) * Math.PI * 2),
+      x: cx + totalPadding * Math.cos((i / 12) * Math.PI * 2),
+      y: cy + totalPadding * Math.sin((i / 12) * Math.PI * 2),
     }));
   }
 
@@ -249,31 +256,26 @@ export function generateZoneBoundary(
   if (memberPoints.length === 2) {
     const [p1, p2] = memberPoints;
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    const r = avgSpacing * 0.35;
     const dx = (p2.x - p1.x) / (dist || 1);
     const dy = (p2.y - p1.y) / (dist || 1);
     const nx = -dy;
     const ny = dx;
 
     const capsule: ZonePoint[] = [];
-    capsule.push({ x: p1.x + nx * r, y: p1.y + ny * r });
-    capsule.push({ x: p2.x + nx * r, y: p2.y + ny * r });
+    capsule.push({ x: p1.x + nx * totalPadding, y: p1.y + ny * totalPadding });
+    capsule.push({ x: p2.x + nx * totalPadding, y: p2.y + ny * totalPadding });
     for (let i = 0; i <= 6; i++) {
       const angle = Math.atan2(dy, dx) - Math.PI / 2 + (i / 6) * Math.PI;
-      capsule.push({ x: p2.x + r * Math.cos(angle), y: p2.y + r * Math.sin(angle) });
+      capsule.push({ x: p2.x + totalPadding * Math.cos(angle), y: p2.y + totalPadding * Math.sin(angle) });
     }
-    capsule.push({ x: p2.x - nx * r, y: p2.y - ny * r });
-    capsule.push({ x: p1.x - nx * r, y: p1.y - ny * r });
+    capsule.push({ x: p2.x - nx * totalPadding, y: p2.y - ny * totalPadding });
+    capsule.push({ x: p1.x - nx * totalPadding, y: p1.y - ny * totalPadding });
     for (let i = 0; i <= 6; i++) {
       const angle = Math.atan2(dy, dx) + Math.PI / 2 + (i / 6) * Math.PI;
-      capsule.push({ x: p1.x + r * Math.cos(angle), y: p1.y + r * Math.sin(angle) });
+      capsule.push({ x: p1.x + totalPadding * Math.cos(angle), y: p1.y + totalPadding * Math.sin(angle) });
     }
     return capsule;
   }
-
-  // Calculate tight padding based on average point spacing
-  // padding=0 means just touching the points, padding=1 means full spacing
-  const absolutePadding = avgSpacing * (0.1 + padding * 0.4); // Range: 10% to 50% of spacing
 
   // Compute hull
   let hull = boundaryType === 'concave'
@@ -282,12 +284,12 @@ export function generateZoneBoundary(
 
   if (hull.length < 3) return hull;
 
-  // Apply perpendicular padding
-  hull = expandHull(hull, absolutePadding);
+  // Apply perpendicular padding (wraps around the dot circumference)
+  hull = expandHull(hull, totalPadding);
 
   // Apply smoothing
   if (smoothness > 0 && hull.length >= 3) {
-    const tension = 1 - smoothness * 0.6; // 0.4 to 1.0 (less aggressive smoothing)
+    const tension = 1 - smoothness * 0.5; // 0.5 to 1.0
     const segments = Math.max(2, Math.round(2 + smoothness * 2)); // 2-4 segments
     hull = catmullRomSpline(hull, tension, segments);
   }

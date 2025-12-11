@@ -130,6 +130,16 @@ export const IndentViewApp: React.FC = () => {
     };
   }, [data]);
 
+  // Calculate point radius in data units (for zone boundaries)
+  const pointRadiusDataUnits = useMemo(() => {
+    if (!data || data.points.length === 0) return 0.5;
+    const xRange = dataBounds.xMax - dataBounds.xMin || 1;
+    const yRange = dataBounds.yMax - dataBounds.yMin || 1;
+    const avgDistance = Math.sqrt((xRange * yRange) / data.points.length);
+    // This matches the visual point radius calculation
+    return avgDistance * 0.35;
+  }, [data, dataBounds]);
+
   const handlePropertyChange = useCallback((property: string) => {
     setSelectedProperty(property);
     setCustomMin(null);
@@ -346,14 +356,18 @@ export const IndentViewApp: React.FC = () => {
       exportSelectedPointIds,
       data.points,
       generateZoneId(),
-      zones.length
+      zones.length,
+      undefined,
+      pointRadiusDataUnits
     );
+    
+    if (!newZone) return;
     
     setZones(prev => [...prev, newZone]);
     setSelectedZoneId(newZone.id);
     setExportSelectedPointIds([]);
     toast.success(`Created ${newZone.name} with ${exportSelectedPointIds.length} points`);
-  }, [data, exportSelectedPointIds, zones.length]);
+  }, [data, exportSelectedPointIds, zones.length, pointRadiusDataUnits]);
 
   const handleZoneCreated = useCallback((zoneData: Partial<Zone>) => {
     const newZone = {
@@ -372,9 +386,9 @@ export const IndentViewApp: React.FC = () => {
       return;
     }
     // Regenerate boundary when boundary settings change
-    const updatedZone = updateZoneBoundary(zone, data.points);
+    const updatedZone = updateZoneBoundary(zone, data.points, pointRadiusDataUnits);
     setZones(prev => prev.map(z => z.id === zone.id ? updatedZone : z));
-  }, [data]);
+  }, [data, pointRadiusDataUnits]);
 
   const handleZoneDelete = useCallback((zoneId: string) => {
     setZones(prev => prev.filter(z => z.id !== zoneId));

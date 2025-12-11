@@ -441,7 +441,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                   const { cx, cy } = transformPoint(p.x, p.y);
                   return { x: cx, y: cy };
                 }),
-                pointRadius * 0.5
+                pointRadius * 1.1  // Wrap around the full dot circumference plus small margin
               )}
               fill="none"
               stroke="hsl(var(--primary))"

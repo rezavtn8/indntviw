@@ -184,7 +184,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     });
   }, [points, selectedProperty, colorScheme, minValue, maxValue, transformPoint]);
 
-  // Point radius based on density
+  // Point radius based on density (in SVG pixels)
   const pointRadius = useMemo(() => {
     if (points.length === 0) return 5;
     const xRange = xMax - xMin || 1;
@@ -192,6 +192,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     const avgDistance = Math.sqrt((xRange * yRange) / points.length);
     return Math.max(3, Math.min(12, avgDistance * scaleX * 0.35));
   }, [points.length, xMin, xMax, yMin, yMax, scaleX]);
+
+  // Point radius in data units (for boundary generation)
+  const pointRadiusDataUnits = useMemo(() => {
+    return pointRadius / scaleX;
+  }, [pointRadius, scaleX]);
 
   // Get property label
   const propertyLabel = useMemo(() => {
@@ -212,13 +217,14 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     if (selectedPoints.length === 0) return null;
     
     const memberCoords: ZonePoint[] = selectedPoints.map(p => ({ x: p.x, y: p.y }));
-    // Use tight defaults for preview
-    const boundaryPoints = generateZoneBoundary(memberCoords, 0.1, 0.5, 'convex');
+    // Pass point radius in data units so boundary wraps around dot edges
+    const boundaryPoints = generateZoneBoundary(memberCoords, 0.1, 0.5, 'convex', pointRadiusDataUnits);
     
     if (boundaryPoints.length < 3) return null;
     
     return boundaryToSVGPath(boundaryPoints, transformPoint);
-  }, [selectedPointIds, points, transformPoint]);
+  }, [selectedPointIds, points, transformPoint, pointRadiusDataUnits]);
+
 
   // Helper to check if point is in polygon (for lasso selection)
   const isPointInPolygon = useCallback((point: { x: number; y: number }, polygon: ZonePoint[]): boolean => {
