@@ -763,9 +763,9 @@ export const IndentViewApp: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div ref={visualizationRef} className="w-full h-full">
+              <div ref={visualizationRef} className="w-full h-full flex items-start justify-center">
                 {activeView === '2d' ? (
-                  <div className="w-full h-full border-2 border-border bg-card">
+                  <div className="w-full h-full max-h-[calc(100vh-200px)] border-2 border-border bg-card">
                     <Heatmap2D
                       points={data?.points || []}
                       selectedProperty={selectedProperty}
