@@ -199,7 +199,8 @@ function convexHull(points: { x: number; y: number }[]): { x: number; y: number 
   return [...lower, ...upper];
 }
 
-// Generate boundary contour - simple convex hull around all points
+// Generate boundary contour using circle-based envelope (same as zone boundaries)
+// This guarantees ALL points are fully inside with their visual radius
 export function generateBoundaryContour(
   points: IndentationPoint[]
 ): { x: number; y: number }[] {
@@ -208,158 +209,79 @@ export function generateBoundaryContour(
   return convexHull(coords);
 }
 
-// Determine polygon winding order (positive = CCW, negative = CW)
-function getPolygonArea(points: { x: number; y: number }[]): number {
-  let area = 0;
-  const n = points.length;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    area += points[i].x * points[j].y;
-    area -= points[j].x * points[i].y;
+// Bulletproof radius calculation matching boundaryGenerator.ts
+function getMinimumSafeRadius(points: { x: number; y: number }[], pointRadius: number): number {
+  const safetyMargin = 1.2;
+  
+  if (pointRadius > 0) {
+    return pointRadius * safetyMargin;
   }
-  return area / 2;
+  
+  if (points.length < 2) return 5;
+  
+  // Find minimum distance between points
+  let minDist = Infinity;
+  const sampleSize = Math.min(points.length, 20);
+  const step = Math.max(1, Math.floor(points.length / sampleSize));
+  
+  for (let i = 0; i < points.length; i += step) {
+    for (let j = i + 1; j < points.length; j++) {
+      const dist = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+      if (dist > 0 && dist < minDist) minDist = dist;
+    }
+  }
+  
+  return minDist !== Infinity ? (minDist * 0.5 * safetyMargin) : 5;
 }
 
-// Catmull-Rom spline interpolation for ultra-smooth curves
-function catmullRomSmooth(
+// Create rounded envelope using circles around ALL points
+function createRoundedEnvelope(
   points: { x: number; y: number }[],
-  tension: number = 0.5,
-  segmentsPerPoint: number = 3
+  radius: number
 ): { x: number; y: number }[] {
-  const n = points.length;
-  if (n < 4) return points;
+  if (points.length === 0) return [];
+  if (radius <= 0) return convexHull(points);
   
-  const result: { x: number; y: number }[] = [];
+  const circlePoints: { x: number; y: number }[] = [];
+  const pointsPerCircle = 24;
   
-  for (let i = 0; i < n; i++) {
-    const p0 = points[(i - 1 + n) % n];
-    const p1 = points[i];
-    const p2 = points[(i + 1) % n];
-    const p3 = points[(i + 2) % n];
-    
-    for (let t = 0; t < segmentsPerPoint; t++) {
-      const s = t / segmentsPerPoint;
-      const s2 = s * s;
-      const s3 = s2 * s;
-      
-      const m = 1 - tension;
-      const b0 = -m * s3 + 2 * m * s2 - m * s;
-      const b1 = (2 - m) * s3 + (m - 3) * s2 + 1;
-      const b2 = (m - 2) * s3 + (3 - 2 * m) * s2 + m * s;
-      const b3 = m * s3 - m * s2;
-      
-      result.push({
-        x: b0 * p0.x + b1 * p1.x + b2 * p2.x + b3 * p3.x,
-        y: b0 * p0.y + b1 * p1.y + b2 * p2.y + b3 * p3.y,
+  for (const p of points) {
+    for (let i = 0; i < pointsPerCircle; i++) {
+      const angle = (i / pointsPerCircle) * Math.PI * 2;
+      circlePoints.push({
+        x: p.x + radius * Math.cos(angle),
+        y: p.y + radius * Math.sin(angle),
       });
     }
   }
   
-  return result;
+  return convexHull(circlePoints);
 }
 
-// Generate smooth SVG path from points with rounded corners around each vertex
+// Generate smooth SVG path using circle-based envelope (matching zone boundaries exactly)
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
   padding: number = 0
 ): string {
   if (points.length < 3) return '';
   
-  // Use rounded offset that wraps around each point's circumference
-  let usedPoints = points;
-  if (padding > 0) {
-    usedPoints = offsetPolygonRounded(points, padding);
-  }
+  // Use the same circle-based envelope approach as zones
+  const radius = getMinimumSafeRadius(points, padding);
+  const envelope = createRoundedEnvelope(points, radius);
   
-  if (usedPoints.length < 3) return '';
-  
-  // Apply Catmull-Rom smoothing for perfectly smooth curves
-  if (usedPoints.length >= 4) {
-    usedPoints = catmullRomSmooth(usedPoints, 0.4, 3);
-  }
+  if (envelope.length < 3) return '';
   
   // Build smooth path
-  let path = `M ${usedPoints[0].x.toFixed(2)} ${usedPoints[0].y.toFixed(2)}`;
-  for (let i = 1; i < usedPoints.length; i++) {
-    path += ` L ${usedPoints[i].x.toFixed(2)} ${usedPoints[i].y.toFixed(2)}`;
+  let path = `M ${envelope[0].x.toFixed(2)} ${envelope[0].y.toFixed(2)}`;
+  for (let i = 1; i < envelope.length; i++) {
+    path += ` L ${envelope[i].x.toFixed(2)} ${envelope[i].y.toFixed(2)}`;
   }
   path += ' Z';
   
   return path;
 }
 
-// Offset a polygon outward with smooth rounded corners (arcs around each vertex)
-function offsetPolygonRounded(
-  points: { x: number; y: number }[],
-  offset: number
-): { x: number; y: number }[] {
-  const n = points.length;
-  if (n < 3) return points;
-  
-  // Determine winding order to know which way is "outward"
-  const area = getPolygonArea(points);
-  const isCCW = area > 0;
-  
-  const result: { x: number; y: number }[] = [];
-  
-  for (let i = 0; i < n; i++) {
-    const curr = points[i];
-    const prev = points[(i - 1 + n) % n];
-    const next = points[(i + 1) % n];
-    
-    // Edge vectors
-    const v1x = curr.x - prev.x;
-    const v1y = curr.y - prev.y;
-    const v2x = next.x - curr.x;
-    const v2y = next.y - curr.y;
-    
-    // Calculate angles of edges
-    const angle1 = Math.atan2(v1y, v1x);
-    const angle2 = Math.atan2(v2y, v2x);
-    
-    // Outward normal angles depend on winding order
-    const normalOffset = isCCW ? -Math.PI / 2 : Math.PI / 2;
-    const normalAngle1 = angle1 + normalOffset;
-    const normalAngle2 = angle2 + normalOffset;
-    
-    // Generate arc from normalAngle1 to normalAngle2
-    let startAngle = normalAngle1;
-    let endAngle = normalAngle2;
-    
-    // For CCW polygon, we go CW around corner (negative arc)
-    // For CW polygon, we go CCW around corner (positive arc)
-    if (isCCW) {
-      while (endAngle > startAngle) {
-        endAngle -= Math.PI * 2;
-      }
-      while (endAngle < startAngle - Math.PI * 2) {
-        endAngle += Math.PI * 2;
-      }
-    } else {
-      while (endAngle < startAngle) {
-        endAngle += Math.PI * 2;
-      }
-      while (endAngle > startAngle + Math.PI * 2) {
-        endAngle -= Math.PI * 2;
-      }
-    }
-    
-    // Very high segment count for ultra-smooth arcs
-    const arcSpan = Math.abs(endAngle - startAngle);
-    const numSegments = Math.max(6, Math.ceil(arcSpan / (Math.PI / 16)));
-    
-    for (let j = 0; j <= numSegments; j++) {
-      const t = j / numSegments;
-      const angle = startAngle + t * (endAngle - startAngle);
-      result.push({
-        x: curr.x + offset * Math.cos(angle),
-        y: curr.y + offset * Math.sin(angle),
-      });
-    }
-  }
-  
-  return result;
-}
+// (Old offsetPolygonRounded function removed - now using circle-based envelope approach)
 
 // Check if a point is inside a polygon using ray casting
 function isPointInPolygon(x: number, y: number, polygon: { x: number; y: number }[]): boolean {
