@@ -18,6 +18,7 @@ import { PointEditor } from '@/components/panels/PointEditor';
 import { OutlierDetector } from '@/components/panels/OutlierDetector';
 import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatisticsPanel';
 import { ZonePanel } from '@/components/panels/ZonePanel';
+import { ZoneComparisonPanel } from '@/components/panels/ZoneComparisonPanel';
 import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
@@ -59,9 +60,10 @@ export const IndentViewApp: React.FC = () => {
   const visualizationRef = useRef<HTMLDivElement>(null);
   const exportCanvasRef = useRef<ExportCanvasRef>(null);
   
-  // Export Studio state
+  // Zone state (shared between 2D view and Export Studio)
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [comparedZoneIds, setComparedZoneIds] = useState<string[]>([]);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>('select');
   const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [isExporting, setIsExporting] = useState(false);
@@ -348,12 +350,14 @@ export const IndentViewApp: React.FC = () => {
     return data.points !== originalData.points;
   }, [data, originalData]);
 
-  // Zone management handlers
-  const handleCreateZoneFromSelection = useCallback(() => {
-    if (!data || exportSelectedPointIds.length === 0) return;
+  // Zone management handlers - works for both 2D view and Export Studio
+  const handleCreateZoneFromSelection = useCallback((pointIds?: number[]) => {
+    if (!data) return;
+    const ids = pointIds || (activeView === 'export' ? exportSelectedPointIds : selectedPointIds);
+    if (ids.length === 0) return;
     
     const newZone = createZoneFromSelection(
-      exportSelectedPointIds,
+      ids,
       data.points,
       generateZoneId(),
       zones.length,
@@ -365,9 +369,30 @@ export const IndentViewApp: React.FC = () => {
     
     setZones(prev => [...prev, newZone]);
     setSelectedZoneId(newZone.id);
-    setExportSelectedPointIds([]);
-    toast.success(`Created ${newZone.name} with ${exportSelectedPointIds.length} points`);
-  }, [data, exportSelectedPointIds, zones.length, pointRadiusDataUnits]);
+    
+    // Clear selection in whichever view is active
+    if (activeView === 'export') {
+      setExportSelectedPointIds([]);
+    } else {
+      setSelectedPointIds([]);
+    }
+    
+    toast.success(`Created ${newZone.name} with ${ids.length} points`);
+  }, [data, exportSelectedPointIds, selectedPointIds, zones.length, pointRadiusDataUnits, activeView]);
+
+  // Toggle zone comparison
+  const handleToggleCompare = useCallback((zoneId: string) => {
+    setComparedZoneIds(prev => {
+      if (prev.includes(zoneId)) {
+        return prev.filter(id => id !== zoneId);
+      }
+      // Maximum 2 zones for comparison
+      if (prev.length >= 2) {
+        return [prev[1], zoneId];
+      }
+      return [...prev, zoneId];
+    });
+  }, []);
 
   const handleZoneCreated = useCallback((zoneData: Partial<Zone>) => {
     const newZone = {
@@ -585,6 +610,40 @@ export const IndentViewApp: React.FC = () => {
                 selectedPoints={selectedPoints}
                 selectedProperty={selectedProperty}
               />
+
+              {/* Zone Panel for 2D View */}
+              {activeView === '2d' && zones.length > 0 && (
+                <div className="bg-card border-2 border-border rounded-lg">
+                  <h3 className="font-mono text-sm font-semibold uppercase tracking-wider px-4 py-3 border-b border-border">
+                    Zones ({zones.length})
+                  </h3>
+                  <ZonePanel
+                    zones={zones}
+                    selectedZoneId={selectedZoneId}
+                    points={data.points}
+                    selectedProperty={selectedProperty}
+                    onSelectZone={setSelectedZoneId}
+                    onUpdateZone={handleZoneUpdate}
+                    onDeleteZone={handleZoneDelete}
+                  />
+                </div>
+              )}
+
+              {/* Zone Comparison Panel for 2D View */}
+              {activeView === '2d' && zones.length > 0 && (
+                <div className="bg-card border-2 border-border rounded-lg p-4">
+                  <h3 className="font-mono text-sm font-semibold uppercase tracking-wider mb-4">
+                    Zone Comparison
+                  </h3>
+                  <ZoneComparisonPanel
+                    zones={zones}
+                    points={data.points}
+                    selectedProperty={selectedProperty}
+                    comparedZoneIds={comparedZoneIds}
+                    onToggleCompare={handleToggleCompare}
+                  />
+                </div>
+              )}
             </>
           )}
         </aside>
@@ -611,15 +670,30 @@ export const IndentViewApp: React.FC = () => {
             </Tabs>
           </div>
 
-          {/* Selection Toolbar - only in 2D view */}
+          {/* Selection/Zone Toolbar - in 2D view */}
           {activeView === '2d' && data && (
-            <div className="px-4 py-2 border-b border-border">
+            <div className="px-4 py-2 border-b border-border flex items-center gap-4">
               <SelectionToolbar
                 selectionMode={selectionMode}
                 selectedCount={selectedPointIds.length}
                 onModeChange={setSelectionMode}
                 onClearSelection={() => setSelectedPointIds([])}
               />
+              
+              {/* Zone creation button in 2D view */}
+              {selectedPointIds.length > 0 && (
+                <div className="flex items-center gap-2 border-l border-border pl-4">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleCreateZoneFromSelection()}
+                    className="gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Zone ({selectedPointIds.length} pts)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -722,10 +796,13 @@ export const IndentViewApp: React.FC = () => {
                       selectedPointIds={selectedPointIds}
                       showContours={showContours}
                       showInterpolation={showInterpolation}
-                      selectionMode={selectionMode}
+                      selectionMode={selectionMode === 'lasso' ? 'lasso' : 'none'}
+                      zones={zones}
+                      selectedZoneId={selectedZoneId}
                       onPointSelect={setSelectedPoint}
                       onPointHover={setHoveredPoint}
                       onLassoSelect={handleLassoSelect}
+                      onZoneSelect={setSelectedZoneId}
                     />
                   </div>
                 ) : (

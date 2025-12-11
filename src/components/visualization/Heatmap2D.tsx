@@ -1,10 +1,12 @@
 import React, { useMemo, useCallback, useState, useRef } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
+import { Zone } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
 import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 import { isPointInPolygon } from '@/utils/statisticsUtils';
+import { getZoneSVGPath, getZoneDashArray } from '@/utils/zoneUtils';
 
-export type SelectionMode = 'none' | 'lasso';
+export type SelectionMode = 'none' | 'lasso' | 'box';
 
 interface Heatmap2DProps {
   points: IndentationPoint[];
@@ -18,9 +20,12 @@ interface Heatmap2DProps {
   showContours?: boolean;
   showInterpolation?: boolean;
   selectionMode?: SelectionMode;
+  zones?: Zone[];
+  selectedZoneId?: string | null;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
   onLassoSelect?: (pointIds: number[]) => void;
+  onZoneSelect?: (zoneId: string | null) => void;
 }
 
 interface ViewState {
@@ -41,9 +46,12 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   showContours = false,
   showInterpolation = false,
   selectionMode = 'none',
+  zones = [],
+  selectedZoneId = null,
   onPointSelect,
   onPointHover,
   onLassoSelect,
+  onZoneSelect,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -441,7 +449,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                   const { cx, cy } = transformPoint(p.x, p.y);
                   return { x: cx, y: cy };
                 }),
-                pointRadius * 1.1  // Wrap around the full dot circumference plus small margin
+                pointRadius * 1.1
               )}
               fill="none"
               stroke="hsl(var(--primary))"
@@ -449,6 +457,44 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
               strokeLinejoin="round"
             />
           )}
+
+          {/* Zones - rendered before data points so points appear on top */}
+          {zones.filter(z => z.visible).map((zone) => {
+            const isSelected = zone.id === selectedZoneId;
+            const zonePath = getZoneSVGPath(zone, transformPoint, points, pointRadius / scale);
+            
+            return (
+              <g key={zone.id}>
+                {/* Zone fill */}
+                <path
+                  d={zonePath}
+                  fill={zone.color}
+                  fillOpacity={zone.fillOpacity}
+                  stroke={zone.color}
+                  strokeWidth={isSelected ? zone.borderWidth + 2 : zone.borderWidth}
+                  strokeDasharray={getZoneDashArray(zone.borderStyle)}
+                  strokeLinejoin="round"
+                  className="cursor-pointer transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onZoneSelect?.(isSelected ? null : zone.id);
+                  }}
+                />
+                
+                {/* Selection highlight for zones */}
+                {isSelected && (
+                  <path
+                    d={zonePath}
+                    fill="none"
+                    stroke="hsl(var(--foreground))"
+                    strokeWidth="2"
+                    strokeDasharray="6 3"
+                    className="pointer-events-none animate-pulse"
+                  />
+                )}
+              </g>
+            );
+          })}
 
           {/* Data points */}
           {normalizedPoints.map((point) => (
