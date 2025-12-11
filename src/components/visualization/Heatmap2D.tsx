@@ -347,7 +347,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const cursor = drawingTool === 'select' ? 'cursor-default' : 'cursor-crosshair';
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full overflow-hidden">
       {/* Enhanced zoom controls */}
       <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-card/90 border border-border rounded p-1">
         <button
@@ -388,8 +388,9 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       <svg
         ref={svgRef}
         viewBox={viewBox}
+        preserveAspectRatio="xMidYMid meet"
         className={`w-full h-full ${cursor}`}
-        style={{ background: 'hsl(var(--card))' }}
+        style={{ background: 'hsl(var(--card))', display: 'block' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
