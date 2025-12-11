@@ -558,26 +558,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           </>
         )}
 
-        {/* Data points */}
-        <g>
-          {normalizedPoints.map(point => {
-            const isSelected = selectedPointIds.includes(point.id);
-            return (
-              <circle
-                key={point.id}
-                cx={point.cx}
-                cy={point.cy}
-                r={isSelected ? pointRadius * 1.3 : pointRadius}
-                fill={point.color}
-                stroke={isSelected ? '#3b82f6' : '#374151'}
-                strokeWidth={isSelected ? 2 : 0.5}
-                style={{ cursor: 'pointer' }}
-              />
-            );
-          })}
-        </g>
-
-        {/* Zones */}
+        {/* PHASE 3: Render Zones BEFORE points so zones are always behind */}
         {settings.showZones && zones.filter(z => z.visible).map(zone => {
           const isSelected = zone.id === selectedZoneId;
           
@@ -585,7 +566,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
             const attrs = getZoneEllipseAttrs(zone, transformPoint, scaleX);
             if (!attrs) return null;
             
-            const centroid = getZoneCentroid(zone);
+            const centroid = getZoneCentroid(zone, points);
             const labelPos = transformPoint(centroid.x, centroid.y);
             
             return (
@@ -626,7 +607,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           const path = getZoneSVGPath(zone, transformPoint, points, pointRadiusDataUnits);
           if (!path) return null;
 
-          const centroid = getZoneCentroid(zone);
+          const centroid = getZoneCentroid(zone, points);
           const labelPos = transformPoint(centroid.x, centroid.y);
 
           return (
@@ -659,6 +640,25 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
             </g>
           );
         })}
+
+        {/* Data points - rendered AFTER zones so they appear on top */}
+        <g>
+          {normalizedPoints.map(point => {
+            const isSelected = selectedPointIds.includes(point.id);
+            return (
+              <circle
+                key={point.id}
+                cx={point.cx}
+                cy={point.cy}
+                r={isSelected ? pointRadius * 1.3 : pointRadius}
+                fill={point.color}
+                stroke={isSelected ? '#3b82f6' : '#374151'}
+                strokeWidth={isSelected ? 2 : 0.5}
+                style={{ cursor: 'pointer' }}
+              />
+            );
+          })}
+        </g>
 
         {/* Selection preview boundary */}
         {selectionPreviewPath && !isDrawing && (

@@ -33,43 +33,48 @@ export function computeConvexHull(points: ZonePoint[]): ZonePoint[] {
   return [...lower, ...upper];
 }
 
-// Calculate average nearest neighbor distance
-function getAverageSpacing(points: ZonePoint[]): number {
-  if (points.length < 2) return 0.5;
+// PHASE 1: Bulletproof radius calculation
+// pointRadius is the VISUAL radius of points - we MUST exceed this
+function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): number {
+  // The boundary must be at least pointRadius away from each point center
+  // Add 20% safety margin to guarantee no point ever touches the edge
+  const safetyMargin = 1.2;
   
-  const sampleSize = Math.min(points.length, 30);
-  const step = Math.max(1, Math.floor(points.length / sampleSize));
+  if (pointRadius > 0) {
+    return pointRadius * safetyMargin;
+  }
   
-  let totalMinDist = 0;
-  let count = 0;
+  // Fallback: estimate based on point spacing if no radius given
+  if (memberPoints.length < 2) return 0.5;
   
-  for (let i = 0; i < points.length; i += step) {
-    const p = points[i];
-    let minDist = Infinity;
-    for (const other of points) {
-      if (p === other) continue;
-      const dist = Math.hypot(p.x - other.x, p.y - other.y);
-      if (dist < minDist && dist > 0) minDist = dist;
-    }
-    if (minDist !== Infinity) {
-      totalMinDist += minDist;
-      count++;
+  // Find minimum distance between any two points
+  let minDist = Infinity;
+  const sampleSize = Math.min(memberPoints.length, 20);
+  const step = Math.max(1, Math.floor(memberPoints.length / sampleSize));
+  
+  for (let i = 0; i < memberPoints.length; i += step) {
+    for (let j = i + 1; j < memberPoints.length; j++) {
+      const dist = Math.hypot(memberPoints[i].x - memberPoints[j].x, memberPoints[i].y - memberPoints[j].y);
+      if (dist > 0 && dist < minDist) minDist = dist;
     }
   }
   
-  return count > 0 ? totalMinDist / count : 0.5;
+  // Use half the minimum spacing as radius estimate, with safety margin
+  return minDist !== Infinity ? (minDist * 0.5 * safetyMargin) : 0.5;
 }
 
-// FOOLPROOF approach: Generate circles around each hull point, 
-// then compute convex hull of all circle points - guarantees all points inside
-function createRoundedEnvelope(hullPoints: ZonePoint[], radius: number): ZonePoint[] {
-  if (hullPoints.length < 3 || radius <= 0) return hullPoints;
+// FOOLPROOF approach: Generate circles around EVERY member point (not just hull)
+// This guarantees ALL points are fully inside with their visual radius
+function createRoundedEnvelope(memberPoints: ZonePoint[], radius: number): ZonePoint[] {
+  if (memberPoints.length === 0) return [];
+  if (radius <= 0) return computeConvexHull(memberPoints);
   
   const circlePoints: ZonePoint[] = [];
-  const pointsPerCircle = 16; // Points around each hull vertex
+  const pointsPerCircle = 24; // More points = smoother boundary
   
-  // Generate circle points around each hull vertex
-  for (const p of hullPoints) {
+  // Generate circle points around EVERY member point
+  // This ensures every single point is fully enclosed
+  for (const p of memberPoints) {
     for (let i = 0; i < pointsPerCircle; i++) {
       const angle = (i / pointsPerCircle) * Math.PI * 2;
       circlePoints.push({
@@ -79,7 +84,7 @@ function createRoundedEnvelope(hullPoints: ZonePoint[], radius: number): ZonePoi
     }
   }
   
-  // Compute convex hull of all circle points - this is the outer envelope
+  // Convex hull of all circle points = guaranteed envelope
   return computeConvexHull(circlePoints);
 }
 
@@ -93,9 +98,8 @@ export function generateZoneBoundary(
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
-  // Calculate base radius for the envelope
-  const avgSpacing = getAverageSpacing(memberPoints);
-  const baseRadius = pointRadius > 0 ? pointRadius : avgSpacing * 0.4;
+  // PHASE 1: Calculate bulletproof radius
+  const baseRadius = getMinimumSafeRadius(memberPoints, pointRadius);
   const extraPadding = baseRadius * padding;
   const totalRadius = baseRadius + extraPadding;
 
@@ -103,7 +107,7 @@ export function generateZoneBoundary(
   if (memberPoints.length === 1) {
     const cx = memberPoints[0].x;
     const cy = memberPoints[0].y;
-    const numPoints = 24;
+    const numPoints = 32;
     return Array.from({ length: numPoints }, (_, i) => ({
       x: cx + totalRadius * Math.cos((i / numPoints) * Math.PI * 2),
       y: cy + totalRadius * Math.sin((i / numPoints) * Math.PI * 2),
@@ -118,9 +122,9 @@ export function generateZoneBoundary(
     const dy = (p2.y - p1.y) / (dist || 1);
     
     const capsule: ZonePoint[] = [];
-    const arcSegs = 12;
+    const arcSegs = 16;
     
-    // Arc around p1 (from -perpendicular around the back to +perpendicular)
+    // Arc around p1
     const baseAngle1 = Math.atan2(dy, dx) + Math.PI;
     for (let i = 0; i <= arcSegs; i++) {
       const angle = baseAngle1 - Math.PI / 2 + (i / arcSegs) * Math.PI;
@@ -130,7 +134,7 @@ export function generateZoneBoundary(
       });
     }
     
-    // Arc around p2 (from -perpendicular around the front to +perpendicular)
+    // Arc around p2
     const baseAngle2 = Math.atan2(dy, dx);
     for (let i = 0; i <= arcSegs; i++) {
       const angle = baseAngle2 - Math.PI / 2 + (i / arcSegs) * Math.PI;
@@ -143,16 +147,9 @@ export function generateZoneBoundary(
     return capsule;
   }
 
-  // 3+ points: convex hull with rounded envelope
-  const hull = computeConvexHull(memberPoints);
-  
-  if (hull.length < 3) {
-    // Fallback for degenerate cases
-    return hull;
-  }
-
-  // Create smooth rounded envelope around the hull
-  return createRoundedEnvelope(hull, totalRadius);
+  // 3+ points: Create envelope around ALL member points (not just hull)
+  // This guarantees every single point is fully inside
+  return createRoundedEnvelope(memberPoints, totalRadius);
 }
 
 // Generate SVG path from boundary points
