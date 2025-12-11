@@ -58,6 +58,18 @@ export interface ExportSettings {
   axisPadding: number; // Percentage (0-20)
   useAutoAxisBounds: boolean;
   customAxisBounds?: AxisBounds;
+  // Labels customization
+  xAxisLabel: string;
+  yAxisLabel: string;
+  legendLabel: string;
+  // Number formatting
+  axisDecimals: number;
+  legendDecimals: number;
+  // Font sizes
+  titleFontSize: number;
+  axisLabelFontSize: number;
+  tickFontSize: number;
+  legendFontSize: number;
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -84,6 +96,15 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   showTitle: true,
   axisPadding: 5,
   useAutoAxisBounds: true,
+  xAxisLabel: 'x (mm)',
+  yAxisLabel: 'y (mm)',
+  legendLabel: '',
+  axisDecimals: 1,
+  legendDecimals: 1,
+  titleFontSize: 18,
+  axisLabelFontSize: 14,
+  tickFontSize: 12,
+  legendFontSize: 12,
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
