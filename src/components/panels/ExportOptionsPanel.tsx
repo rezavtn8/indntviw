@@ -613,6 +613,14 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
               disabled={!settings.showZones}
             />
           </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Boundary Contour</Label>
+            <Switch
+              checked={settings.showBoundaryContour}
+              onCheckedChange={(checked) => onSettingsChange({ ...settings, showBoundaryContour: checked })}
+            />
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
