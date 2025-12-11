@@ -70,6 +70,10 @@ export interface ExportSettings {
   axisLabelFontSize: number;
   tickFontSize: number;
   legendFontSize: number;
+  // Tick settings
+  xTickCount: number;
+  yTickCount: number;
+  legendTickCount: number;
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -105,6 +109,9 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   axisLabelFontSize: 14,
   tickFontSize: 12,
   legendFontSize: 12,
+  xTickCount: 6,
+  yTickCount: 6,
+  legendTickCount: 5,
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({

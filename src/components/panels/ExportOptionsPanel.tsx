@@ -243,8 +243,63 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
           <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4">
-          {/* Decimal Places */}
+          {/* Tick Counts */}
           <div className="space-y-3">
+            <Label className="text-xs text-muted-foreground">Tick Divisions</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">X Axis</Label>
+                <Select
+                  value={settings.xTickCount.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, xTickCount: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
+                      <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Y Axis</Label>
+                <Select
+                  value={settings.yTickCount.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, yTickCount: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
+                      <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Legend</Label>
+                <Select
+                  value={settings.legendTickCount.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, legendTickCount: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2, 3, 4, 5, 6, 8, 10].map(n => (
+                      <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Decimal Places */}
+          <div className="space-y-3 pt-2 border-t border-border/50">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Axis Tick Decimals</Label>
