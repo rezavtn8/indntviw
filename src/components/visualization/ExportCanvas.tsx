@@ -212,7 +212,8 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     if (selectedPoints.length === 0) return null;
     
     const memberCoords: ZonePoint[] = selectedPoints.map(p => ({ x: p.x, y: p.y }));
-    const boundaryPoints = generateZoneBoundary(memberCoords, 0.5, 0.5, 'convex');
+    // Use same defaults as createDefaultZone for consistent preview
+    const boundaryPoints = generateZoneBoundary(memberCoords, 0.15, 0.7, 'convex');
     
     if (boundaryPoints.length < 3) return null;
     

@@ -1,4 +1,4 @@
-import { Zone, ZonePoint, ZoneStatistics } from '@/types/zones';
+import { Zone, ZonePoint, ZoneStatistics, createDefaultZone } from '@/types/zones';
 import { IndentationPoint } from '@/types/indentation';
 import { isPointInPolygon } from './statisticsUtils';
 import { generateZoneBoundary, boundaryToSVGPath } from './boundaryGenerator';
@@ -140,11 +140,15 @@ export function createZoneFromSelection(
   zoneId: string,
   colorIndex: number,
   name?: string
-): Zone {
-  const { createDefaultZone } = require('@/types/zones');
+): Zone | null {
+  // Validate we have points to create a zone
+  if (selectedIds.length === 0) {
+    return null;
+  }
+
   const newZone = createDefaultZone(zoneId, colorIndex);
-  
   newZone.memberPointIds = [...selectedIds];
+  
   if (name) {
     newZone.name = name;
   }
