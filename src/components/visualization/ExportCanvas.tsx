@@ -51,31 +51,53 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
 
-  // Calculate data bounds and scales with padding for breathing room
-  const { xMin, xMax, yMin, yMax, scaleX, scaleY } = useMemo(() => {
+  // Calculate raw data bounds (without padding)
+  const rawDataBounds = useMemo(() => {
     if (points.length === 0) {
-      return { xMin: 0, xMax: 100, yMin: 0, yMax: 100, scaleX: 1, scaleY: 1 };
+      return { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
     }
 
     const xValues = points.map(p => p.x);
     const yValues = points.map(p => p.y);
-    const xMinVal = Math.min(...xValues);
-    const xMaxVal = Math.max(...xValues);
-    const yMinVal = Math.min(...yValues);
-    const yMaxVal = Math.max(...yValues);
     
-    const xRange = xMaxVal - xMinVal || 1;
-    const yRange = yMaxVal - yMinVal || 1;
+    return {
+      xMin: Math.min(...xValues),
+      xMax: Math.max(...xValues),
+      yMin: Math.min(...yValues),
+      yMax: Math.max(...yValues),
+    };
+  }, [points]);
+
+  // Calculate final bounds with padding or custom values
+  const { xMin, xMax, yMin, yMax, scaleX, scaleY } = useMemo(() => {
+    // Use custom bounds if set, otherwise use raw data bounds with padding
+    if (!settings.useAutoAxisBounds && settings.customAxisBounds) {
+      const bounds = settings.customAxisBounds;
+      const xRange = bounds.xMax - bounds.xMin || 1;
+      const yRange = bounds.yMax - bounds.yMin || 1;
+      
+      return {
+        xMin: bounds.xMin,
+        xMax: bounds.xMax,
+        yMin: bounds.yMin,
+        yMax: bounds.yMax,
+        scaleX: plotWidth / xRange,
+        scaleY: plotHeight / yRange,
+      };
+    }
     
-    // Add 5% padding on each side for breathing room
-    const paddingFactor = 0.05;
+    // Auto bounds with configurable padding
+    const xRange = rawDataBounds.xMax - rawDataBounds.xMin || 1;
+    const yRange = rawDataBounds.yMax - rawDataBounds.yMin || 1;
+    
+    const paddingFactor = settings.axisPadding / 100;
     const xPadding = xRange * paddingFactor;
     const yPadding = yRange * paddingFactor;
     
-    const paddedXMin = xMinVal - xPadding;
-    const paddedXMax = xMaxVal + xPadding;
-    const paddedYMin = yMinVal - yPadding;
-    const paddedYMax = yMaxVal + yPadding;
+    const paddedXMin = rawDataBounds.xMin - xPadding;
+    const paddedXMax = rawDataBounds.xMax + xPadding;
+    const paddedYMin = rawDataBounds.yMin - yPadding;
+    const paddedYMax = rawDataBounds.yMax + yPadding;
     
     const paddedXRange = paddedXMax - paddedXMin;
     const paddedYRange = paddedYMax - paddedYMin;
@@ -88,7 +110,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
       scaleX: plotWidth / paddedXRange,
       scaleY: plotHeight / paddedYRange,
     };
-  }, [points, plotWidth, plotHeight]);
+  }, [rawDataBounds, settings.useAutoAxisBounds, settings.customAxisBounds, settings.axisPadding, plotWidth, plotHeight]);
 
   // Transform data coordinates to SVG coordinates
   const transformPoint = useCallback((x: number, y: number) => ({

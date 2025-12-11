@@ -1,18 +1,21 @@
 import React from 'react';
-import { ExportSettings } from '@/types/zones';
+import { ExportSettings, AxisBounds } from '@/types/zones';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Download, FileImage, FileCode, FileText } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Download, FileImage, FileCode, FileText, ChevronDown, Settings2, Maximize2 } from 'lucide-react';
 
 interface ExportOptionsPanelProps {
   settings: ExportSettings;
   onSettingsChange: (settings: ExportSettings) => void;
   onExport: () => void;
   isExporting: boolean;
+  dataBounds?: AxisBounds;
 }
 
 const DPI_PRESETS = [
@@ -34,6 +37,7 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
   onSettingsChange,
   onExport,
   isExporting,
+  dataBounds,
 }) => {
   const handleSizePreset = (preset: string) => {
     const size = SIZE_PRESETS.find(s => s.value === preset);
@@ -45,6 +49,39 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
   const currentSizePreset = SIZE_PRESETS.find(
     s => s.width === settings.width && s.height === settings.height
   )?.value || 'custom';
+
+  const handleAxisBoundsChange = (key: keyof AxisBounds, value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+    
+    const currentBounds = settings.customAxisBounds || dataBounds || { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
+    onSettingsChange({
+      ...settings,
+      customAxisBounds: {
+        ...currentBounds,
+        [key]: numValue,
+      },
+    });
+  };
+
+  const handleAutoAxisToggle = (auto: boolean) => {
+    if (auto) {
+      onSettingsChange({
+        ...settings,
+        useAutoAxisBounds: true,
+        customAxisBounds: undefined,
+      });
+    } else {
+      // When switching to manual, initialize with current auto-calculated bounds
+      onSettingsChange({
+        ...settings,
+        useAutoAxisBounds: false,
+        customAxisBounds: dataBounds || { xMin: 0, xMax: 100, yMin: 0, yMax: 100 },
+      });
+    }
+  };
+
+  const currentAxisBounds = settings.customAxisBounds || dataBounds || { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
 
   return (
     <div className="space-y-6">
@@ -130,6 +167,104 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
         </div>
       )}
 
+      {/* Axis Settings Collapsible */}
+      <Collapsible defaultOpen className="space-y-3">
+        <CollapsibleTrigger className="flex items-center justify-between w-full group">
+          <div className="flex items-center gap-2">
+            <Maximize2 className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-xs font-mono uppercase text-muted-foreground cursor-pointer">Axis Settings</Label>
+          </div>
+          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          {/* Axis Padding */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Axis Padding</Label>
+              <span className="text-xs font-mono text-muted-foreground">{settings.axisPadding}%</span>
+            </div>
+            <Slider
+              value={[settings.axisPadding]}
+              onValueChange={([value]) => onSettingsChange({ ...settings, axisPadding: value })}
+              min={0}
+              max={20}
+              step={1}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">Adds breathing room around data points</p>
+          </div>
+
+          {/* Auto/Manual Axis Bounds */}
+          <div className="space-y-3 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Auto Axis Bounds</Label>
+              <Switch
+                checked={settings.useAutoAxisBounds}
+                onCheckedChange={handleAutoAxisToggle}
+              />
+            </div>
+            
+            {!settings.useAutoAxisBounds && (
+              <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+                {/* X Axis */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-mono text-muted-foreground">X Axis (mm)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Min</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={currentAxisBounds.xMin.toFixed(2)}
+                        onChange={(e) => handleAxisBoundsChange('xMin', e.target.value)}
+                        className="font-mono text-sm h-8"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Max</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={currentAxisBounds.xMax.toFixed(2)}
+                        onChange={(e) => handleAxisBoundsChange('xMax', e.target.value)}
+                        className="font-mono text-sm h-8"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Y Axis */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-mono text-muted-foreground">Y Axis (mm)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Min</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={currentAxisBounds.yMin.toFixed(2)}
+                        onChange={(e) => handleAxisBoundsChange('yMin', e.target.value)}
+                        className="font-mono text-sm h-8"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Max</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={currentAxisBounds.yMax.toFixed(2)}
+                        onChange={(e) => handleAxisBoundsChange('yMax', e.target.value)}
+                        className="font-mono text-sm h-8"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
       {/* Background */}
       <div className="space-y-3">
         <Label className="text-xs font-mono uppercase text-muted-foreground">Background</Label>
@@ -171,10 +306,15 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
       </div>
 
       {/* Include Options */}
-      <div className="space-y-3 pt-2 border-t border-border">
-        <Label className="text-xs font-mono uppercase text-muted-foreground">Include</Label>
-        
-        <div className="space-y-2">
+      <Collapsible defaultOpen className="space-y-3">
+        <CollapsibleTrigger className="flex items-center justify-between w-full group">
+          <div className="flex items-center gap-2">
+            <Settings2 className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-xs font-mono uppercase text-muted-foreground cursor-pointer">Display Options</Label>
+          </div>
+          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-sm">Axis Labels</Label>
             <Switch
@@ -207,8 +347,8 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
               disabled={!settings.showZones}
             />
           </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Export Button */}
       <Button
