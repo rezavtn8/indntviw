@@ -433,6 +433,7 @@ export const IndentViewApp: React.FC = () => {
         case 'v': setDrawingTool('select'); break;
         case 'l': setDrawingTool('lasso'); break;
         case 'b': setDrawingTool('box'); break;
+        case 'escape': setExportSelectedPointIds([]); break;
         case 'delete':
         case 'backspace':
           if (selectedZoneId) handleZoneDelete(selectedZoneId);
@@ -616,6 +617,7 @@ export const IndentViewApp: React.FC = () => {
                 onToolChange={setDrawingTool}
                 onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
                 onCreateZone={handleCreateZoneFromSelection}
+                onClearSelection={() => setExportSelectedPointIds([])}
                 hasSelectedZone={!!selectedZoneId}
                 hasSelectedPoints={exportSelectedPointIds.length > 0}
                 selectedPointCount={exportSelectedPointIds.length}
