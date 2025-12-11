@@ -208,20 +208,22 @@ export function generateBoundaryContour(
   return convexHull(coords);
 }
 
-// Generate smooth SVG path from points using perpendicular offset
+// Generate smooth SVG path from points with rounded corners around each vertex
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
   padding: number = 0
 ): string {
   if (points.length < 3) return '';
   
-  // Use perpendicular offset instead of centroid-based expansion
+  // Use rounded offset that wraps around each point's circumference
   let usedPoints = points;
   if (padding > 0) {
-    usedPoints = offsetPolygon(points, padding);
+    usedPoints = offsetPolygonRounded(points, padding);
   }
   
-  // Simple closed polygon path
+  if (usedPoints.length < 3) return '';
+  
+  // Smooth closed polygon path
   let path = `M ${usedPoints[0].x.toFixed(2)} ${usedPoints[0].y.toFixed(2)}`;
   for (let i = 1; i < usedPoints.length; i++) {
     path += ` L ${usedPoints[i].x.toFixed(2)} ${usedPoints[i].y.toFixed(2)}`;
@@ -231,15 +233,18 @@ export function generateSmoothBoundaryPath(
   return path;
 }
 
-// Offset a polygon outward by a fixed distance using perpendicular offset
-function offsetPolygon(
+// Offset a polygon outward with rounded corners (arcs around each vertex)
+function offsetPolygonRounded(
   points: { x: number; y: number }[],
   offset: number
 ): { x: number; y: number }[] {
   const n = points.length;
   if (n < 3) return points;
   
-  return points.map((curr, i) => {
+  const result: { x: number; y: number }[] = [];
+  
+  for (let i = 0; i < n; i++) {
+    const curr = points[i];
     const prev = points[(i - 1 + n) % n];
     const next = points[(i + 1) % n];
     
@@ -249,37 +254,42 @@ function offsetPolygon(
     const v2x = next.x - curr.x;
     const v2y = next.y - curr.y;
     
-    const len1 = Math.hypot(v1x, v1y) || 1;
-    const len2 = Math.hypot(v2x, v2y) || 1;
+    // Calculate angles of edges
+    const angle1 = Math.atan2(v1y, v1x);
+    const angle2 = Math.atan2(v2y, v2x);
     
-    // Outward normals (perpendicular)
-    const n1x = -v1y / len1;
-    const n1y = v1x / len1;
-    const n2x = -v2y / len2;
-    const n2y = v2x / len2;
+    // Outward normal angles - for CCW polygon, normals point right (+PI/2)
+    // For CW polygon (SVG Y-axis flipped), normals point left (-PI/2)
+    const normalAngle1 = angle1 + Math.PI / 2;
+    const normalAngle2 = angle2 + Math.PI / 2;
     
-    // Average normal
-    let nx = (n1x + n2x) / 2;
-    let ny = (n1y + n2y) / 2;
-    const nlen = Math.hypot(nx, ny);
+    // Generate arc from normalAngle1 to normalAngle2
+    let startAngle = normalAngle1;
+    let endAngle = normalAngle2;
     
-    if (nlen < 0.001) {
-      nx = n1x;
-      ny = n1y;
-    } else {
-      nx /= nlen;
-      ny /= nlen;
+    // Normalize to go the short way (CW in screen space = outward)
+    while (endAngle > startAngle + Math.PI) {
+      endAngle -= Math.PI * 2;
+    }
+    while (endAngle < startAngle - Math.PI) {
+      endAngle += Math.PI * 2;
     }
     
-    // Miter limit
-    const dot = n1x * n2x + n1y * n2y;
-    const miterScale = Math.min(2, 1 / Math.max(0.3, Math.sqrt((1 + dot) / 2)));
+    // Number of arc segments
+    const arcSpan = endAngle - startAngle;
+    const numSegments = Math.max(3, Math.ceil(Math.abs(arcSpan) / (Math.PI / 8)));
     
-    return {
-      x: curr.x + nx * offset * miterScale,
-      y: curr.y + ny * offset * miterScale,
-    };
-  });
+    for (let j = 0; j <= numSegments; j++) {
+      const t = j / numSegments;
+      const angle = startAngle + t * arcSpan;
+      result.push({
+        x: curr.x + offset * Math.cos(angle),
+        y: curr.y + offset * Math.sin(angle),
+      });
+    }
+  }
+  
+  return result;
 }
 
 // Check if a point is inside a polygon using ray casting

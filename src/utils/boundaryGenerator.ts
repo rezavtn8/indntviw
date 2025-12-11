@@ -87,61 +87,64 @@ export function computeConcaveHull(points: ZonePoint[], k: number = 3): ZonePoin
   return result;
 }
 
-// Calculate perpendicular offset for polygon vertex
-function offsetVertex(
-  prev: ZonePoint,
-  curr: ZonePoint,
-  next: ZonePoint,
-  offset: number
-): ZonePoint {
-  const v1x = curr.x - prev.x;
-  const v1y = curr.y - prev.y;
-  const v2x = next.x - curr.x;
-  const v2y = next.y - curr.y;
-
-  const len1 = Math.hypot(v1x, v1y) || 1;
-  const len2 = Math.hypot(v2x, v2y) || 1;
-
-  // Outward normals (perpendicular, pointing outward for CCW polygon)
-  const n1x = -v1y / len1;
-  const n1y = v1x / len1;
-  const n2x = -v2y / len2;
-  const n2y = v2x / len2;
-
-  // Average normal
-  let nx = (n1x + n2x) / 2;
-  let ny = (n1y + n2y) / 2;
-  const nlen = Math.hypot(nx, ny);
-  
-  if (nlen < 0.001) {
-    // Edges are parallel, use first normal
-    nx = n1x;
-    ny = n1y;
-  } else {
-    nx /= nlen;
-    ny /= nlen;
-  }
-
-  // Miter limit to prevent spikes at sharp corners
-  const dot = n1x * n2x + n1y * n2y;
-  const miterScale = Math.min(2, 1 / Math.max(0.3, Math.sqrt((1 + dot) / 2)));
-
-  return {
-    x: curr.x + nx * offset * miterScale,
-    y: curr.y + ny * offset * miterScale,
-  };
-}
-
-// Expand hull using perpendicular offset (not centroid-based)
-export function expandHull(points: ZonePoint[], padding: number): ZonePoint[] {
+// Create rounded offset around a hull by adding arc segments around each vertex
+export function expandHullWithRoundedCorners(points: ZonePoint[], padding: number): ZonePoint[] {
   if (points.length < 3 || padding <= 0) return points;
 
   const n = points.length;
-  return points.map((curr, i) => {
+  const result: ZonePoint[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const curr = points[i];
     const prev = points[(i - 1 + n) % n];
     const next = points[(i + 1) % n];
-    return offsetVertex(prev, curr, next, padding);
-  });
+
+    // Calculate edge vectors
+    const v1x = curr.x - prev.x;
+    const v1y = curr.y - prev.y;
+    const v2x = next.x - curr.x;
+    const v2y = next.y - curr.y;
+
+    // Calculate angles of incoming and outgoing edges
+    const angle1 = Math.atan2(v1y, v1x);
+    const angle2 = Math.atan2(v2y, v2x);
+
+    // Outward normal angles (perpendicular, pointing outward for CCW)
+    const normalAngle1 = angle1 - Math.PI / 2;
+    const normalAngle2 = angle2 - Math.PI / 2;
+
+    // Generate arc from normalAngle1 to normalAngle2 (going CCW around the vertex)
+    let startAngle = normalAngle1;
+    let endAngle = normalAngle2;
+
+    // Ensure we go the short way around (CCW)
+    while (endAngle < startAngle) {
+      endAngle += Math.PI * 2;
+    }
+    if (endAngle - startAngle > Math.PI * 2) {
+      endAngle -= Math.PI * 2;
+    }
+
+    // Number of segments for the arc (more for sharper corners)
+    const arcSpan = endAngle - startAngle;
+    const numSegments = Math.max(2, Math.ceil(Math.abs(arcSpan) / (Math.PI / 6)));
+
+    for (let j = 0; j <= numSegments; j++) {
+      const t = j / numSegments;
+      const angle = startAngle + t * arcSpan;
+      result.push({
+        x: curr.x + padding * Math.cos(angle),
+        y: curr.y + padding * Math.sin(angle),
+      });
+    }
+  }
+
+  return result;
+}
+
+// Expand hull using perpendicular offset (legacy, kept for compatibility)
+export function expandHull(points: ZonePoint[], padding: number): ZonePoint[] {
+  return expandHullWithRoundedCorners(points, padding);
 }
 
 // Catmull-Rom spline for smooth curves
