@@ -243,59 +243,112 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
           <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4">
-          {/* Tick Counts */}
-          <div className="space-y-3">
-            <Label className="text-xs text-muted-foreground">Tick Divisions</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">X Axis</Label>
-                <Select
-                  value={settings.xTickCount.toString()}
-                  onValueChange={(v) => onSettingsChange({ ...settings, xTickCount: parseInt(v) })}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
-                      <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Y Axis</Label>
-                <Select
-                  value={settings.yTickCount.toString()}
-                  onValueChange={(v) => onSettingsChange({ ...settings, yTickCount: parseInt(v) })}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
-                      <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Legend</Label>
-                <Select
-                  value={settings.legendTickCount.toString()}
-                  onValueChange={(v) => onSettingsChange({ ...settings, legendTickCount: parseInt(v) })}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[2, 3, 4, 5, 6, 8, 10].map(n => (
-                      <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {/* X Axis Ticks */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">X Axis Ticks</Label>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Custom</Label>
+                <Switch
+                  checked={settings.useCustomXTicks}
+                  onCheckedChange={(checked) => onSettingsChange({ ...settings, useCustomXTicks: checked })}
+                />
               </div>
             </div>
+            {settings.useCustomXTicks ? (
+              <Input
+                value={settings.customXTicks}
+                onChange={(e) => onSettingsChange({ ...settings, customXTicks: e.target.value })}
+                placeholder="e.g., 0, 5, 10, 15, 20"
+                className="font-mono text-xs h-8"
+              />
+            ) : (
+              <Select
+                value={settings.xTickCount.toString()}
+                onValueChange={(v) => onSettingsChange({ ...settings, xTickCount: parseInt(v) })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
+                    <SelectItem key={n} value={n.toString()}>{n} divisions</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Y Axis Ticks */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Y Axis Ticks</Label>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Custom</Label>
+                <Switch
+                  checked={settings.useCustomYTicks}
+                  onCheckedChange={(checked) => onSettingsChange({ ...settings, useCustomYTicks: checked })}
+                />
+              </div>
+            </div>
+            {settings.useCustomYTicks ? (
+              <Input
+                value={settings.customYTicks}
+                onChange={(e) => onSettingsChange({ ...settings, customYTicks: e.target.value })}
+                placeholder="e.g., 0, 5, 10, 15, 20"
+                className="font-mono text-xs h-8"
+              />
+            ) : (
+              <Select
+                value={settings.yTickCount.toString()}
+                onValueChange={(v) => onSettingsChange({ ...settings, yTickCount: parseInt(v) })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
+                    <SelectItem key={n} value={n.toString()}>{n} divisions</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Legend Ticks */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Legend Ticks</Label>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Custom</Label>
+                <Switch
+                  checked={settings.useCustomLegendTicks}
+                  onCheckedChange={(checked) => onSettingsChange({ ...settings, useCustomLegendTicks: checked })}
+                />
+              </div>
+            </div>
+            {settings.useCustomLegendTicks ? (
+              <Input
+                value={settings.customLegendTicks}
+                onChange={(e) => onSettingsChange({ ...settings, customLegendTicks: e.target.value })}
+                placeholder="e.g., 0, 0.5, 1, 1.5, 2"
+                className="font-mono text-xs h-8"
+              />
+            ) : (
+              <Select
+                value={settings.legendTickCount.toString()}
+                onValueChange={(v) => onSettingsChange({ ...settings, legendTickCount: parseInt(v) })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6, 8, 10].map(n => (
+                    <SelectItem key={n} value={n.toString()}>{n} divisions</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Decimal Places */}

@@ -133,6 +133,15 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     return inverseTransform(svgX, svgY);
   }, [width, height, inverseTransform]);
 
+  // Parse custom tick values
+  const parseCustomTicks = (tickString: string): number[] => {
+    return tickString
+      .split(',')
+      .map(s => parseFloat(s.trim()))
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+  };
+
   // Generate axis ticks
   const { xTicks, yTicks } = useMemo(() => {
     const generateTicks = (min: number, max: number, count: number = 5) => {
@@ -145,11 +154,16 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
       return ticks;
     };
 
-    return {
-      xTicks: generateTicks(xMin, xMax, settings.xTickCount),
-      yTicks: generateTicks(yMin, yMax, settings.yTickCount),
-    };
-  }, [xMin, xMax, yMin, yMax, settings.xTickCount, settings.yTickCount]);
+    const xTicks = settings.useCustomXTicks && settings.customXTicks
+      ? parseCustomTicks(settings.customXTicks)
+      : generateTicks(xMin, xMax, settings.xTickCount);
+
+    const yTicks = settings.useCustomYTicks && settings.customYTicks
+      ? parseCustomTicks(settings.customYTicks)
+      : generateTicks(yMin, yMax, settings.yTickCount);
+
+    return { xTicks, yTicks };
+  }, [xMin, xMax, yMin, yMax, settings.xTickCount, settings.yTickCount, settings.useCustomXTicks, settings.useCustomYTicks, settings.customXTicks, settings.customYTicks]);
 
   // Normalized points for rendering
   const normalizedPoints = useMemo(() => {
@@ -643,24 +657,31 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
               stroke="#374151"
               strokeWidth="1"
             />
-            {Array.from({ length: settings.legendTickCount + 1 }, (_, i) => i / settings.legendTickCount).map((t, i) => {
-              const value = minValue + (maxValue - minValue) * t;
-              const y = plotHeight * (1 - t);
-              return (
-                <g key={i}>
-                  <line x1={20} y1={y} x2={25} y2={y} stroke="#374151" strokeWidth="1" />
-                  <text
-                    x={28}
-                    y={y + 4}
-                    fontSize={settings.legendFontSize}
-                    fontFamily="sans-serif"
-                    fill="#4b5563"
-                  >
-                    {value.toFixed(settings.legendDecimals)}
-                  </text>
-                </g>
-              );
-            })}
+            {(() => {
+              const legendTicks = settings.useCustomLegendTicks && settings.customLegendTicks
+                ? parseCustomTicks(settings.customLegendTicks)
+                : Array.from({ length: settings.legendTickCount + 1 }, (_, i) => 
+                    minValue + (maxValue - minValue) * (i / settings.legendTickCount)
+                  );
+              return legendTicks.map((value, i) => {
+                const t = (value - minValue) / (maxValue - minValue);
+                const y = plotHeight * (1 - Math.max(0, Math.min(1, t)));
+                return (
+                  <g key={i}>
+                    <line x1={20} y1={y} x2={25} y2={y} stroke="#374151" strokeWidth="1" />
+                    <text
+                      x={28}
+                      y={y + 4}
+                      fontSize={settings.legendFontSize}
+                      fontFamily="sans-serif"
+                      fill="#4b5563"
+                    >
+                      {value.toFixed(settings.legendDecimals)}
+                    </text>
+                  </g>
+                );
+              });
+            })()}
             <text
               x={10}
               y={-8}
