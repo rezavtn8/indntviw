@@ -146,10 +146,10 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     };
 
     return {
-      xTicks: generateTicks(xMin, xMax, 6),
-      yTicks: generateTicks(yMin, yMax, 6),
+      xTicks: generateTicks(xMin, xMax, settings.xTickCount),
+      yTicks: generateTicks(yMin, yMax, settings.yTickCount),
     };
-  }, [xMin, xMax, yMin, yMax]);
+  }, [xMin, xMax, yMin, yMax, settings.xTickCount, settings.yTickCount]);
 
   // Normalized points for rendering
   const normalizedPoints = useMemo(() => {
@@ -643,7 +643,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
               stroke="#374151"
               strokeWidth="1"
             />
-            {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+            {Array.from({ length: settings.legendTickCount + 1 }, (_, i) => i / settings.legendTickCount).map((t, i) => {
               const value = minValue + (maxValue - minValue) * t;
               const y = plotHeight * (1 - t);
               return (
