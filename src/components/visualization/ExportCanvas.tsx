@@ -51,7 +51,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
 
-  // Calculate data bounds and scales
+  // Calculate data bounds and scales with padding for breathing room
   const { xMin, xMax, yMin, yMax, scaleX, scaleY } = useMemo(() => {
     if (points.length === 0) {
       return { xMin: 0, xMax: 100, yMin: 0, yMax: 100, scaleX: 1, scaleY: 1 };
@@ -67,13 +67,26 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     const xRange = xMaxVal - xMinVal || 1;
     const yRange = yMaxVal - yMinVal || 1;
     
+    // Add 5% padding on each side for breathing room
+    const paddingFactor = 0.05;
+    const xPadding = xRange * paddingFactor;
+    const yPadding = yRange * paddingFactor;
+    
+    const paddedXMin = xMinVal - xPadding;
+    const paddedXMax = xMaxVal + xPadding;
+    const paddedYMin = yMinVal - yPadding;
+    const paddedYMax = yMaxVal + yPadding;
+    
+    const paddedXRange = paddedXMax - paddedXMin;
+    const paddedYRange = paddedYMax - paddedYMin;
+    
     return {
-      xMin: xMinVal,
-      xMax: xMaxVal,
-      yMin: yMinVal,
-      yMax: yMaxVal,
-      scaleX: plotWidth / xRange,
-      scaleY: plotHeight / yRange,
+      xMin: paddedXMin,
+      xMax: paddedXMax,
+      yMin: paddedYMin,
+      yMax: paddedYMax,
+      scaleX: plotWidth / paddedXRange,
+      scaleY: plotHeight / paddedYRange,
     };
   }, [points, plotWidth, plotHeight]);
 
