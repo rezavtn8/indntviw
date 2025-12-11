@@ -60,66 +60,27 @@ function getAverageSpacing(points: ZonePoint[]): number {
   return count > 0 ? totalMinDist / count : 0.5;
 }
 
-// Generate a smooth rounded boundary by creating circles around each hull vertex
-// and computing their outer tangent envelope
+// FOOLPROOF approach: Generate circles around each hull point, 
+// then compute convex hull of all circle points - guarantees all points inside
 function createRoundedEnvelope(hullPoints: ZonePoint[], radius: number): ZonePoint[] {
   if (hullPoints.length < 3 || radius <= 0) return hullPoints;
   
-  const n = hullPoints.length;
-  const result: ZonePoint[] = [];
-  const arcSegments = 16; // Segments per arc for smoothness
+  const circlePoints: ZonePoint[] = [];
+  const pointsPerCircle = 16; // Points around each hull vertex
   
-  for (let i = 0; i < n; i++) {
-    const curr = hullPoints[i];
-    const prev = hullPoints[(i - 1 + n) % n];
-    const next = hullPoints[(i + 1) % n];
-    
-    // Direction from prev to curr
-    const d1x = curr.x - prev.x;
-    const d1y = curr.y - prev.y;
-    const len1 = Math.hypot(d1x, d1y);
-    
-    // Direction from curr to next
-    const d2x = next.x - curr.x;
-    const d2y = next.y - curr.y;
-    const len2 = Math.hypot(d2x, d2y);
-    
-    if (len1 === 0 || len2 === 0) continue;
-    
-    // Outward normals (perpendicular, pointing outside the hull)
-    // For CCW hull, outward is to the right of direction
-    const n1x = d1y / len1;
-    const n1y = -d1x / len1;
-    const n2x = d2y / len2;
-    const n2y = -d2x / len2;
-    
-    // Angles of the outward normals
-    const angle1 = Math.atan2(n1y, n1x);
-    const angle2 = Math.atan2(n2y, n2x);
-    
-    // Generate arc from angle1 to angle2 going the short way around
-    let startAngle = angle1;
-    let endAngle = angle2;
-    
-    // Normalize angles - we want to go in the direction that covers the outside
-    let diff = endAngle - startAngle;
-    while (diff > Math.PI) diff -= 2 * Math.PI;
-    while (diff < -Math.PI) diff += 2 * Math.PI;
-    
-    // If diff is negative, we're going clockwise (correct for convex corners)
-    const numSegs = Math.max(4, Math.ceil(Math.abs(diff) / (Math.PI / arcSegments)));
-    
-    for (let j = 0; j <= numSegs; j++) {
-      const t = j / numSegs;
-      const angle = startAngle + t * diff;
-      result.push({
-        x: curr.x + radius * Math.cos(angle),
-        y: curr.y + radius * Math.sin(angle),
+  // Generate circle points around each hull vertex
+  for (const p of hullPoints) {
+    for (let i = 0; i < pointsPerCircle; i++) {
+      const angle = (i / pointsPerCircle) * Math.PI * 2;
+      circlePoints.push({
+        x: p.x + radius * Math.cos(angle),
+        y: p.y + radius * Math.sin(angle),
       });
     }
   }
   
-  return result;
+  // Compute convex hull of all circle points - this is the outer envelope
+  return computeConvexHull(circlePoints);
 }
 
 // Main function: Generate smooth boundary from member points
