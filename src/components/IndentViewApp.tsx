@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Heatmap2D } from '@/components/visualization/Heatmap2D';
 import { Scene3D } from '@/components/visualization/Scene3D';
+import { ExportCanvas, ExportCanvasRef } from '@/components/visualization/ExportCanvas';
 import { ColorLegend } from '@/components/visualization/ColorLegend';
 import { PropertySelector } from '@/components/controls/PropertySelector';
 import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
@@ -11,15 +12,22 @@ import { FileUploader } from '@/components/controls/FileUploader';
 import { ExportControls } from '@/components/controls/ExportControls';
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
 import { SelectionToolbar, SelectionMode } from '@/components/controls/SelectionToolbar';
+import { ZoneToolbar, DrawingTool } from '@/components/controls/ZoneToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
 import { OutlierDetector } from '@/components/panels/OutlierDetector';
 import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatisticsPanel';
+import { ZonePanel } from '@/components/panels/ZonePanel';
+import { ZoneEditor } from '@/components/panels/ZoneEditor';
+import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
+import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS, createDefaultZone } from '@/types/zones';
+import { generateZoneId } from '@/utils/zoneUtils';
 import { parseTabSeparatedData } from '@/utils/dataParser';
-import { Grid2X2, Box, Edit3, Plus, Undo2 } from 'lucide-react';
+import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
 
 export const IndentViewApp: React.FC = () => {
   const [data, setData] = useState<IndentationData | null>(null);
@@ -31,7 +39,7 @@ export const IndentViewApp: React.FC = () => {
   const [hoveredPoint, setHoveredPoint] = useState<IndentationPoint | null>(null);
   const [customMin, setCustomMin] = useState<number | null>(null);
   const [customMax, setCustomMax] = useState<number | null>(null);
-  const [activeView, setActiveView] = useState<'2d' | '3d'>('2d');
+  const [activeView, setActiveView] = useState<'2d' | '3d' | 'export'>('2d');
   
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -49,6 +57,14 @@ export const IndentViewApp: React.FC = () => {
   
   // Ref for screenshot/export
   const visualizationRef = useRef<HTMLDivElement>(null);
+  const exportCanvasRef = useRef<ExportCanvasRef>(null);
+  
+  // Export Studio state
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [drawingTool, setDrawingTool] = useState<DrawingTool>('select');
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Load sample data on mount
   useEffect(() => {
@@ -306,6 +322,91 @@ export const IndentViewApp: React.FC = () => {
     return data.points !== originalData.points;
   }, [data, originalData]);
 
+  // Zone management handlers
+  const handleZoneCreated = useCallback((zoneData: Partial<Zone>) => {
+    const newZone = {
+      ...createDefaultZone(generateZoneId(), zones.length),
+      ...zoneData,
+    };
+    setZones(prev => [...prev, newZone as Zone]);
+    setSelectedZoneId(newZone.id);
+    setDrawingTool('select');
+    toast.success(`Created ${newZone.name}`);
+  }, [zones.length]);
+
+  const handleZoneUpdate = useCallback((zone: Zone) => {
+    setZones(prev => prev.map(z => z.id === zone.id ? zone : z));
+  }, []);
+
+  const handleZoneDelete = useCallback((zoneId: string) => {
+    setZones(prev => prev.filter(z => z.id !== zoneId));
+    if (selectedZoneId === zoneId) {
+      setSelectedZoneId(null);
+    }
+    toast.success('Zone deleted');
+  }, [selectedZoneId]);
+
+  const selectedZone = useMemo(() => 
+    zones.find(z => z.id === selectedZoneId) || null, 
+    [zones, selectedZoneId]
+  );
+
+  // Export handler
+  const handleExport = useCallback(async () => {
+    if (!exportCanvasRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      if (exportSettings.format === 'pdf') {
+        const dataUrl = await exportCanvasRef.current.exportToDataURL('png', exportSettings.dpi);
+        const pdf = new jsPDF({
+          orientation: exportSettings.width > exportSettings.height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [exportSettings.width, exportSettings.height],
+        });
+        pdf.addImage(dataUrl, 'PNG', 0, 0, exportSettings.width, exportSettings.height);
+        pdf.save(`${selectedProperty}_export.pdf`);
+      } else {
+        const dataUrl = await exportCanvasRef.current.exportToDataURL(
+          exportSettings.format === 'svg' ? 'svg' : 'png',
+          exportSettings.dpi
+        );
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `${selectedProperty}_export.${exportSettings.format}`;
+        a.click();
+      }
+      toast.success(`Exported as ${exportSettings.format.toUpperCase()}`);
+    } catch (error) {
+      toast.error('Export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [exportSettings, selectedProperty]);
+
+  // Keyboard shortcuts for Export Studio
+  useEffect(() => {
+    if (activeView !== 'export') return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'v': setDrawingTool('select'); break;
+        case 'l': setDrawingTool('lasso'); break;
+        case 'e': setDrawingTool('ellipse'); break;
+        case 'r': setDrawingTool('rectangle'); break;
+        case 'delete':
+        case 'backspace':
+          if (selectedZoneId) handleZoneDelete(selectedZoneId);
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeView, selectedZoneId, handleZoneDelete]);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -440,7 +541,7 @@ export const IndentViewApp: React.FC = () => {
         <main className="flex-1 flex flex-col">
           {/* View Tabs */}
           <div className="border-b-2 border-border bg-card px-4 py-2">
-            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as '2d' | '3d')}>
+            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as '2d' | '3d' | 'export')}>
               <TabsList className="bg-secondary">
                 <TabsTrigger value="2d" className="font-mono text-sm gap-2">
                   <Grid2X2 className="w-4 h-4" />
@@ -449,6 +550,10 @@ export const IndentViewApp: React.FC = () => {
                 <TabsTrigger value="3d" className="font-mono text-sm gap-2">
                   <Box className="w-4 h-4" />
                   3D View
+                </TabsTrigger>
+                <TabsTrigger value="export" className="font-mono text-sm gap-2">
+                  <FileOutput className="w-4 h-4" />
+                  Export Studio
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -466,42 +571,119 @@ export const IndentViewApp: React.FC = () => {
             </div>
           )}
 
+          {/* Zone Toolbar - only in Export Studio */}
+          {activeView === 'export' && data && (
+            <div className="px-4 py-2 border-b border-border flex items-center gap-4">
+              <ZoneToolbar
+                activeTool={drawingTool}
+                onToolChange={setDrawingTool}
+                onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
+                hasSelectedZone={!!selectedZoneId}
+              />
+              <div className="text-xs font-mono text-muted-foreground">
+                {zones.length} zone{zones.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )}
+
           {/* Visualization Area */}
           <div className="flex-1 relative p-4">
-            <div ref={visualizationRef} className="w-full h-full">
-              {activeView === '2d' ? (
-                <div className="w-full h-full border-2 border-border bg-card">
-                  <Heatmap2D
+            {activeView === 'export' ? (
+              <div className="flex h-full gap-4">
+                {/* Export Canvas */}
+                <div className="flex-1 h-full">
+                  <ExportCanvas
+                    ref={exportCanvasRef}
                     points={data?.points || []}
                     selectedProperty={selectedProperty}
                     colorScheme={colorScheme}
                     minValue={currentMin}
                     maxValue={currentMax}
-                    selectedPoint={selectedPoint}
-                    highlightedPoints={highlightedOutliers}
-                    selectedPointIds={selectedPointIds}
-                    showContours={showContours}
-                    showInterpolation={showInterpolation}
-                    selectionMode={selectionMode}
-                    onPointSelect={setSelectedPoint}
-                    onPointHover={setHoveredPoint}
-                    onLassoSelect={handleLassoSelect}
+                    zones={zones}
+                    selectedZoneId={selectedZoneId}
+                    settings={exportSettings}
+                    drawingTool={drawingTool}
+                    onZoneCreated={handleZoneCreated}
+                    onZoneSelect={setSelectedZoneId}
                   />
                 </div>
-              ) : (
-              <div className="w-full h-full border-2 border-border bg-card">
-                  <Scene3D
-                    points={data?.points || []}
-                    selectedProperty={selectedProperty}
-                    colorScheme={colorScheme}
-                    minValue={currentMin}
-                    maxValue={currentMax}
-                    selectedPoint={selectedPoint}
-                    onPointSelect={setSelectedPoint}
-                  />
+                
+                {/* Export Studio Sidebar */}
+                <div className="w-80 space-y-4 overflow-y-auto">
+                  {/* Zone Panel */}
+                  <div className="bg-card border-2 border-border rounded-lg">
+                    <h3 className="font-mono text-sm font-semibold uppercase tracking-wider px-4 py-3 border-b border-border">
+                      Zones
+                    </h3>
+                    <ZonePanel
+                      zones={zones}
+                      selectedZoneId={selectedZoneId}
+                      points={data?.points || []}
+                      selectedProperty={selectedProperty}
+                      onSelectZone={setSelectedZoneId}
+                      onUpdateZone={handleZoneUpdate}
+                      onDeleteZone={handleZoneDelete}
+                    />
+                  </div>
+
+                  {/* Zone Editor */}
+                  {selectedZone && (
+                    <ZoneEditor
+                      zone={selectedZone}
+                      onUpdate={handleZoneUpdate}
+                    />
+                  )}
+
+                  {/* Export Options */}
+                  <div className="bg-card border-2 border-border rounded-lg p-4">
+                    <h3 className="font-mono text-sm font-semibold uppercase tracking-wider mb-4">
+                      Export Options
+                    </h3>
+                    <ExportOptionsPanel
+                      settings={exportSettings}
+                      onSettingsChange={setExportSettings}
+                      onExport={handleExport}
+                      isExporting={isExporting}
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div ref={visualizationRef} className="w-full h-full">
+                {activeView === '2d' ? (
+                  <div className="w-full h-full border-2 border-border bg-card">
+                    <Heatmap2D
+                      points={data?.points || []}
+                      selectedProperty={selectedProperty}
+                      colorScheme={colorScheme}
+                      minValue={currentMin}
+                      maxValue={currentMax}
+                      selectedPoint={selectedPoint}
+                      highlightedPoints={highlightedOutliers}
+                      selectedPointIds={selectedPointIds}
+                      showContours={showContours}
+                      showInterpolation={showInterpolation}
+                      selectionMode={selectionMode}
+                      onPointSelect={setSelectedPoint}
+                      onPointHover={setHoveredPoint}
+                      onLassoSelect={handleLassoSelect}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-full border-2 border-border bg-card">
+                    <Scene3D
+                      points={data?.points || []}
+                      selectedProperty={selectedProperty}
+                      colorScheme={colorScheme}
+                      minValue={currentMin}
+                      maxValue={currentMax}
+                      selectedPoint={selectedPoint}
+                      onPointSelect={setSelectedPoint}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
