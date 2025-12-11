@@ -23,7 +23,7 @@ import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
 import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS, createDefaultZone } from '@/types/zones';
-import { generateZoneId } from '@/utils/zoneUtils';
+import { generateZoneId, updateZoneBoundary, createZoneFromSelection } from '@/utils/zoneUtils';
 import { parseTabSeparatedData } from '@/utils/dataParser';
 import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
@@ -65,6 +65,7 @@ export const IndentViewApp: React.FC = () => {
   const [drawingTool, setDrawingTool] = useState<DrawingTool>('select');
   const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportSelectedPointIds, setExportSelectedPointIds] = useState<number[]>([]);
 
   // Load sample data on mount
   useEffect(() => {
@@ -338,6 +339,22 @@ export const IndentViewApp: React.FC = () => {
   }, [data, originalData]);
 
   // Zone management handlers
+  const handleCreateZoneFromSelection = useCallback(() => {
+    if (!data || exportSelectedPointIds.length === 0) return;
+    
+    const newZone = createZoneFromSelection(
+      exportSelectedPointIds,
+      data.points,
+      generateZoneId(),
+      zones.length
+    );
+    
+    setZones(prev => [...prev, newZone]);
+    setSelectedZoneId(newZone.id);
+    setExportSelectedPointIds([]);
+    toast.success(`Created ${newZone.name} with ${exportSelectedPointIds.length} points`);
+  }, [data, exportSelectedPointIds, zones.length]);
+
   const handleZoneCreated = useCallback((zoneData: Partial<Zone>) => {
     const newZone = {
       ...createDefaultZone(generateZoneId(), zones.length),
@@ -350,8 +367,14 @@ export const IndentViewApp: React.FC = () => {
   }, [zones.length]);
 
   const handleZoneUpdate = useCallback((zone: Zone) => {
-    setZones(prev => prev.map(z => z.id === zone.id ? zone : z));
-  }, []);
+    if (!data) {
+      setZones(prev => prev.map(z => z.id === zone.id ? zone : z));
+      return;
+    }
+    // Regenerate boundary when boundary settings change
+    const updatedZone = updateZoneBoundary(zone, data.points);
+    setZones(prev => prev.map(z => z.id === zone.id ? updatedZone : z));
+  }, [data]);
 
   const handleZoneDelete = useCallback((zoneId: string) => {
     setZones(prev => prev.filter(z => z.id !== zoneId));
@@ -409,8 +432,7 @@ export const IndentViewApp: React.FC = () => {
       switch (e.key.toLowerCase()) {
         case 'v': setDrawingTool('select'); break;
         case 'l': setDrawingTool('lasso'); break;
-        case 'e': setDrawingTool('ellipse'); break;
-        case 'r': setDrawingTool('rectangle'); break;
+        case 'b': setDrawingTool('box'); break;
         case 'delete':
         case 'backspace':
           if (selectedZoneId) handleZoneDelete(selectedZoneId);
@@ -593,7 +615,10 @@ export const IndentViewApp: React.FC = () => {
                 activeTool={drawingTool}
                 onToolChange={setDrawingTool}
                 onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
+                onCreateZone={handleCreateZoneFromSelection}
                 hasSelectedZone={!!selectedZoneId}
+                hasSelectedPoints={exportSelectedPointIds.length > 0}
+                selectedPointCount={exportSelectedPointIds.length}
               />
               <div className="text-xs font-mono text-muted-foreground">
                 {zones.length} zone{zones.length !== 1 ? 's' : ''}
@@ -618,8 +643,10 @@ export const IndentViewApp: React.FC = () => {
                     selectedZoneId={selectedZoneId}
                     settings={exportSettings}
                     drawingTool={drawingTool}
+                    selectedPointIds={exportSelectedPointIds}
                     onZoneCreated={handleZoneCreated}
                     onZoneSelect={setSelectedZoneId}
+                    onPointsSelected={setExportSelectedPointIds}
                   />
                 </div>
                 

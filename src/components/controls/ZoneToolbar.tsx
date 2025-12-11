@@ -1,28 +1,33 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { MousePointer2, Lasso, Circle, Square, Trash2 } from 'lucide-react';
+import { MousePointer2, Lasso, Square, Trash2, PlusCircle } from 'lucide-react';
 
-export type DrawingTool = 'select' | 'lasso' | 'ellipse' | 'rectangle';
+export type DrawingTool = 'select' | 'lasso' | 'box';
 
 interface ZoneToolbarProps {
   activeTool: DrawingTool;
   onToolChange: (tool: DrawingTool) => void;
   onDeleteSelected: () => void;
+  onCreateZone: () => void;
   hasSelectedZone: boolean;
+  hasSelectedPoints: boolean;
+  selectedPointCount: number;
 }
 
 export const ZoneToolbar: React.FC<ZoneToolbarProps> = ({
   activeTool,
   onToolChange,
   onDeleteSelected,
+  onCreateZone,
   hasSelectedZone,
+  hasSelectedPoints,
+  selectedPointCount,
 }) => {
   const tools: { id: DrawingTool; icon: React.ReactNode; label: string; shortcut: string }[] = [
-    { id: 'select', icon: <MousePointer2 className="w-4 h-4" />, label: 'Select', shortcut: 'V' },
-    { id: 'lasso', icon: <Lasso className="w-4 h-4" />, label: 'Freeform', shortcut: 'L' },
-    { id: 'ellipse', icon: <Circle className="w-4 h-4" />, label: 'Ellipse', shortcut: 'E' },
-    { id: 'rectangle', icon: <Square className="w-4 h-4" />, label: 'Rectangle', shortcut: 'R' },
+    { id: 'select', icon: <MousePointer2 className="w-4 h-4" />, label: 'Select Points', shortcut: 'V' },
+    { id: 'lasso', icon: <Lasso className="w-4 h-4" />, label: 'Lasso Select', shortcut: 'L' },
+    { id: 'box', icon: <Square className="w-4 h-4" />, label: 'Box Select', shortcut: 'B' },
   ];
 
   return (
@@ -45,6 +50,31 @@ export const ZoneToolbar: React.FC<ZoneToolbarProps> = ({
             </TooltipContent>
           </Tooltip>
         ))}
+        
+        <div className="w-px h-6 bg-border mx-1" />
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onCreateZone}
+              disabled={!hasSelectedPoints}
+              className="gap-1 px-3"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Create Zone
+              {selectedPointCount > 0 && (
+                <span className="ml-1 text-xs bg-background/20 px-1.5 rounded">
+                  {selectedPointCount}
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Create zone from selected points</p>
+          </TooltipContent>
+        </Tooltip>
         
         <div className="w-px h-6 bg-border mx-1" />
         

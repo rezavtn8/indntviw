@@ -12,6 +12,8 @@ interface ZoneEditorProps {
 }
 
 export const ZoneEditor: React.FC<ZoneEditorProps> = ({ zone, onUpdate }) => {
+  const memberCount = zone.memberPointIds?.length ?? 0;
+
   return (
     <div className="space-y-4 p-4 bg-card border border-border rounded-lg">
       <h4 className="font-mono text-sm font-semibold uppercase tracking-wider">
@@ -27,6 +29,69 @@ export const ZoneEditor: React.FC<ZoneEditorProps> = ({ zone, onUpdate }) => {
           className="font-mono"
         />
       </div>
+
+      {/* Member Points Info */}
+      {memberCount > 0 && (
+        <div className="text-xs font-mono text-muted-foreground bg-secondary/50 px-3 py-2 rounded">
+          {memberCount} member point{memberCount !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {/* Boundary Settings */}
+      {memberCount > 0 && (
+        <div className="space-y-3 pt-2 border-t border-border">
+          <Label className="text-xs font-mono uppercase text-muted-foreground">Boundary Settings</Label>
+          
+          {/* Boundary Type */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-xs font-mono text-muted-foreground">Type</Label>
+            </div>
+            <Select
+              value={zone.boundaryType ?? 'convex'}
+              onValueChange={(value: 'convex' | 'concave') => onUpdate({ ...zone, boundaryType: value })}
+            >
+              <SelectTrigger className="font-mono">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="convex">Convex Hull</SelectItem>
+                <SelectItem value="concave">Concave Hull</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Padding */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-xs font-mono text-muted-foreground">Padding</Label>
+              <span className="text-xs font-mono">{(zone.boundaryPadding ?? 0.5).toFixed(1)}</span>
+            </div>
+            <Slider
+              value={[zone.boundaryPadding ?? 0.5]}
+              onValueChange={([value]) => onUpdate({ ...zone, boundaryPadding: value })}
+              min={0}
+              max={5}
+              step={0.1}
+            />
+          </div>
+
+          {/* Smoothness */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-xs font-mono text-muted-foreground">Smoothness</Label>
+              <span className="text-xs font-mono">{Math.round((zone.smoothness ?? 0.5) * 100)}%</span>
+            </div>
+            <Slider
+              value={[zone.smoothness ?? 0.5]}
+              onValueChange={([value]) => onUpdate({ ...zone, smoothness: value })}
+              min={0}
+              max={1}
+              step={0.05}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Color */}
       <div className="space-y-2">
