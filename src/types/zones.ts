@@ -9,8 +9,13 @@ export interface Zone {
   id: string;
   name: string;
   type: ZoneShape;
-  points: ZonePoint[]; // For freeform paths
-  // For ellipse/rectangle
+  points: ZonePoint[]; // Auto-generated boundary points
+  // Member points (primary definition for point-based zones)
+  memberPointIds: number[]; // IDs of data points belonging to this zone
+  boundaryPadding: number; // Padding around points (in data units)
+  smoothness: number; // 0-1 for curve smoothness
+  boundaryType: 'convex' | 'concave';
+  // For ellipse/rectangle (legacy support)
   centerX?: number;
   centerY?: number;
   radiusX?: number;
@@ -132,6 +137,10 @@ export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
   name: `Zone ${colorIndex + 1}`,
   type: 'freeform',
   points: [],
+  memberPointIds: [],
+  boundaryPadding: 0.5,
+  smoothness: 0.5,
+  boundaryType: 'convex',
   color: DEFAULT_ZONE_COLORS[colorIndex % DEFAULT_ZONE_COLORS.length],
   borderStyle: 'solid',
   borderWidth: 2,

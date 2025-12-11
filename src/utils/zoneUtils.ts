@@ -1,11 +1,18 @@
 import { Zone, ZonePoint, ZoneStatistics } from '@/types/zones';
 import { IndentationPoint } from '@/types/indentation';
 import { isPointInPolygon } from './statisticsUtils';
+import { generateZoneBoundary, boundaryToSVGPath } from './boundaryGenerator';
 
 // Check if a data point is inside a zone
 export function isPointInZone(point: IndentationPoint, zone: Zone): boolean {
   if (!zone.visible) return false;
 
+  // For member-point-based zones, check if point ID is in memberPointIds
+  if (zone.memberPointIds.length > 0) {
+    return zone.memberPointIds.includes(point.id);
+  }
+
+  // Legacy: freeform path-based check
   if (zone.type === 'freeform' && zone.points.length >= 3) {
     return isPointInPolygon({ x: point.x, y: point.y }, zone.points);
   }
@@ -43,6 +50,11 @@ export function isPointInZone(point: IndentationPoint, zone: Zone): boolean {
 // Get all points inside a zone
 export function getPointsInZone(points: IndentationPoint[], zone: Zone): IndentationPoint[] {
   return points.filter(p => isPointInZone(p, zone));
+}
+
+// Get member points from IDs
+export function getMemberPoints(allPoints: IndentationPoint[], memberIds: number[]): IndentationPoint[] {
+  return allPoints.filter(p => memberIds.includes(p.id));
 }
 
 // Calculate statistics for points in a zone
@@ -95,16 +107,57 @@ export function getZoneCentroid(zone: Zone): ZonePoint {
   };
 }
 
+// Update zone boundary from member points
+export function updateZoneBoundary(
+  zone: Zone,
+  allPoints: IndentationPoint[]
+): Zone {
+  if (zone.memberPointIds.length === 0) {
+    return zone;
+  }
+
+  const memberPoints = getMemberPoints(allPoints, zone.memberPointIds);
+  const memberCoords: ZonePoint[] = memberPoints.map(p => ({ x: p.x, y: p.y }));
+
+  const boundaryPoints = generateZoneBoundary(
+    memberCoords,
+    zone.boundaryPadding,
+    zone.smoothness,
+    zone.boundaryType
+  );
+
+  return {
+    ...zone,
+    points: boundaryPoints,
+  };
+}
+
+// Create zone from selected point IDs
+export function createZoneFromSelection(
+  selectedIds: number[],
+  allPoints: IndentationPoint[],
+  zoneId: string,
+  colorIndex: number,
+  name?: string
+): Zone {
+  const { createDefaultZone } = require('@/types/zones');
+  const newZone = createDefaultZone(zoneId, colorIndex);
+  
+  newZone.memberPointIds = [...selectedIds];
+  if (name) {
+    newZone.name = name;
+  }
+
+  return updateZoneBoundary(newZone, allPoints);
+}
+
 // Generate SVG path for a zone
 export function getZoneSVGPath(
   zone: Zone,
   transformPoint: (x: number, y: number) => { cx: number; cy: number }
 ): string {
-  if (zone.type === 'freeform' && zone.points.length >= 3) {
-    const transformed = zone.points.map(p => transformPoint(p.x, p.y));
-    return transformed
-      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.cx} ${p.cy}`)
-      .join(' ') + ' Z';
+  if (zone.points.length >= 3) {
+    return boundaryToSVGPath(zone.points, transformPoint);
   }
 
   if (zone.type === 'rectangle' && zone.points.length >= 2) {
@@ -156,4 +209,26 @@ export function getZoneDashArray(style: Zone['borderStyle']): string {
 // Generate unique zone ID
 export function generateZoneId(): string {
   return `zone_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Add points to zone's member list
+export function addPointsToZone(
+  zone: Zone,
+  pointIds: number[],
+  allPoints: IndentationPoint[]
+): Zone {
+  const newMemberIds = [...new Set([...zone.memberPointIds, ...pointIds])];
+  const updatedZone = { ...zone, memberPointIds: newMemberIds };
+  return updateZoneBoundary(updatedZone, allPoints);
+}
+
+// Remove points from zone's member list
+export function removePointsFromZone(
+  zone: Zone,
+  pointIds: number[],
+  allPoints: IndentationPoint[]
+): Zone {
+  const newMemberIds = zone.memberPointIds.filter(id => !pointIds.includes(id));
+  const updatedZone = { ...zone, memberPointIds: newMemberIds };
+  return updateZoneBoundary(updatedZone, allPoints);
 }
