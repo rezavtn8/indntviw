@@ -740,7 +740,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
             </>
           )}
 
-          {/* Boundary contour line (optional) */}
+          {/* Boundary contour line (optional) - matches 2D Heatmap style */}
           {settings.showBoundaryContour && boundaryContour.length >= 3 && (
             <path
               d={generateSmoothBoundaryPath(
@@ -751,10 +751,9 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                 pointRadius * 1.1
               )}
               fill="none"
-              stroke="#3b82f6"
+              stroke="hsl(var(--primary))"
               strokeWidth="2.5"
               strokeLinejoin="round"
-              opacity="0.8"
             />
           )}
 
