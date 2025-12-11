@@ -208,37 +208,78 @@ export function generateBoundaryContour(
   return convexHull(coords);
 }
 
-// Generate smooth SVG path from points
+// Generate smooth SVG path from points using perpendicular offset
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
   padding: number = 0
 ): string {
   if (points.length < 3) return '';
   
-  // Add padding by expanding points outward from centroid
+  // Use perpendicular offset instead of centroid-based expansion
   let usedPoints = points;
   if (padding > 0) {
-    const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-    const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-    
-    usedPoints = points.map(p => {
-      const dx = p.x - cx;
-      const dy = p.y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist === 0) return p;
-      const scale = (dist + padding) / dist;
-      return { x: cx + dx * scale, y: cy + dy * scale };
-    });
+    usedPoints = offsetPolygon(points, padding);
   }
   
   // Simple closed polygon path
-  let path = `M ${usedPoints[0].x} ${usedPoints[0].y}`;
+  let path = `M ${usedPoints[0].x.toFixed(2)} ${usedPoints[0].y.toFixed(2)}`;
   for (let i = 1; i < usedPoints.length; i++) {
-    path += ` L ${usedPoints[i].x} ${usedPoints[i].y}`;
+    path += ` L ${usedPoints[i].x.toFixed(2)} ${usedPoints[i].y.toFixed(2)}`;
   }
   path += ' Z';
   
   return path;
+}
+
+// Offset a polygon outward by a fixed distance using perpendicular offset
+function offsetPolygon(
+  points: { x: number; y: number }[],
+  offset: number
+): { x: number; y: number }[] {
+  const n = points.length;
+  if (n < 3) return points;
+  
+  return points.map((curr, i) => {
+    const prev = points[(i - 1 + n) % n];
+    const next = points[(i + 1) % n];
+    
+    // Edge vectors
+    const v1x = curr.x - prev.x;
+    const v1y = curr.y - prev.y;
+    const v2x = next.x - curr.x;
+    const v2y = next.y - curr.y;
+    
+    const len1 = Math.hypot(v1x, v1y) || 1;
+    const len2 = Math.hypot(v2x, v2y) || 1;
+    
+    // Outward normals (perpendicular)
+    const n1x = -v1y / len1;
+    const n1y = v1x / len1;
+    const n2x = -v2y / len2;
+    const n2y = v2x / len2;
+    
+    // Average normal
+    let nx = (n1x + n2x) / 2;
+    let ny = (n1y + n2y) / 2;
+    const nlen = Math.hypot(nx, ny);
+    
+    if (nlen < 0.001) {
+      nx = n1x;
+      ny = n1y;
+    } else {
+      nx /= nlen;
+      ny /= nlen;
+    }
+    
+    // Miter limit
+    const dot = n1x * n2x + n1y * n2y;
+    const miterScale = Math.min(2, 1 / Math.max(0.3, Math.sqrt((1 + dot) / 2)));
+    
+    return {
+      x: curr.x + nx * offset * miterScale,
+      y: curr.y + ny * offset * miterScale,
+    };
+  });
 }
 
 // Check if a point is inside a polygon using ray casting

@@ -196,17 +196,22 @@ function getBoundingBox(points: ZonePoint[]): { width: number; height: number; d
 
 // Calculate average nearest neighbor distance
 function getAverageSpacing(points: ZonePoint[]): number {
-  if (points.length < 2) return 1;
+  if (points.length < 2) return 0.5;
+  
+  // Sample for performance on large datasets
+  const sampleSize = Math.min(points.length, 50);
+  const step = Math.max(1, Math.floor(points.length / sampleSize));
   
   let totalMinDist = 0;
   let count = 0;
   
-  for (const p of points) {
+  for (let i = 0; i < points.length; i += step) {
+    const p = points[i];
     let minDist = Infinity;
     for (const other of points) {
       if (p === other) continue;
       const dist = Math.hypot(p.x - other.x, p.y - other.y);
-      if (dist < minDist) minDist = dist;
+      if (dist < minDist && dist > 0) minDist = dist;
     }
     if (minDist !== Infinity) {
       totalMinDist += minDist;
@@ -214,23 +219,26 @@ function getAverageSpacing(points: ZonePoint[]): number {
     }
   }
   
-  return count > 0 ? totalMinDist / count : 1;
+  return count > 0 ? totalMinDist / count : 0.5;
 }
 
 // Main function: Generate smooth boundary from member points
 export function generateZoneBoundary(
   memberPoints: ZonePoint[],
-  padding: number = 0.15,      // Relative padding (0-1, percentage of point cloud size)
+  padding: number = 0.15,      // Relative padding (0-1)
   smoothness: number = 0.7,   // Smoothness factor (0-1)
   boundaryType: 'convex' | 'concave' = 'convex'
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
-  // Single point: small circle
+  // Get average spacing between points - this is key for proper padding
+  const avgSpacing = getAverageSpacing(memberPoints);
+
+  // Single point: small circle based on typical spacing
   if (memberPoints.length === 1) {
     const cx = memberPoints[0].x;
     const cy = memberPoints[0].y;
-    const r = 0.3;
+    const r = avgSpacing * 0.4;
     return Array.from({ length: 12 }, (_, i) => ({
       x: cx + r * Math.cos((i / 12) * Math.PI * 2),
       y: cy + r * Math.sin((i / 12) * Math.PI * 2),
@@ -241,7 +249,7 @@ export function generateZoneBoundary(
   if (memberPoints.length === 2) {
     const [p1, p2] = memberPoints;
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    const r = Math.max(dist * 0.15, 0.2);
+    const r = avgSpacing * 0.4;
     const dx = (p2.x - p1.x) / (dist || 1);
     const dy = (p2.y - p1.y) / (dist || 1);
     const nx = -dy;
@@ -263,15 +271,9 @@ export function generateZoneBoundary(
     return capsule;
   }
 
-  // Calculate adaptive padding based on point cloud size
-  const bbox = getBoundingBox(memberPoints);
-  const avgSpacing = getAverageSpacing(memberPoints);
-  
-  // Padding is relative to diagonal, with minimum based on point spacing
-  const absolutePadding = Math.max(
-    bbox.diagonal * padding * 0.15,  // Percentage of diagonal
-    avgSpacing * 0.25                // At least 25% of average spacing
-  );
+  // Calculate padding based on average point spacing (NOT bounding box)
+  // This ensures consistent visual padding regardless of zone size
+  const absolutePadding = avgSpacing * (0.3 + padding * 0.7); // Range: 0.3 to 1.0 of spacing
 
   // Compute hull
   let hull = boundaryType === 'concave'
@@ -285,8 +287,8 @@ export function generateZoneBoundary(
 
   // Apply smoothing
   if (smoothness > 0 && hull.length >= 3) {
-    const tension = 1 - smoothness * 0.8; // 0.2 to 1.0
-    const segments = Math.max(3, Math.round(4 + smoothness * 2)); // 3-6 segments
+    const tension = 1 - smoothness * 0.7; // 0.3 to 1.0
+    const segments = Math.max(2, Math.round(3 + smoothness * 3)); // 2-6 segments
     hull = catmullRomSpline(hull, tension, segments);
   }
 
@@ -307,7 +309,6 @@ export function boundaryToSVGPath(
       })
     : points;
 
-  // Use smooth curves for better rendering
   let path = `M ${transformed[0].x.toFixed(2)} ${transformed[0].y.toFixed(2)}`;
   
   for (let i = 1; i < transformed.length; i++) {
