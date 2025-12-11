@@ -130,8 +130,24 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>): ZonePoint => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
-    const svgX = ((e.clientX - rect.left) / rect.width) * width;
-    const svgY = ((e.clientY - rect.top) / rect.height) * height;
+    
+    // Account for preserveAspectRatio scaling
+    const viewBoxWidth = width;
+    const viewBoxHeight = height;
+    const renderedWidth = rect.width;
+    const renderedHeight = rect.height;
+    
+    // Calculate the actual scale and offset due to preserveAspectRatio="xMidYMin meet"
+    const scaleRatio = Math.min(renderedWidth / viewBoxWidth, renderedHeight / viewBoxHeight);
+    const scaledWidth = viewBoxWidth * scaleRatio;
+    const scaledHeight = viewBoxHeight * scaleRatio;
+    const offsetX = (renderedWidth - scaledWidth) / 2; // xMid centers horizontally
+    const offsetY = 0; // yMin aligns to top
+    
+    // Convert mouse position to viewBox coordinates
+    const svgX = ((e.clientX - rect.left - offsetX) / scaleRatio);
+    const svgY = ((e.clientY - rect.top - offsetY) / scaleRatio);
+    
     return inverseTransform(svgX, svgY);
   }, [width, height, inverseTransform]);
 
