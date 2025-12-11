@@ -231,14 +231,14 @@ export function generateZoneBoundary(
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
-  // Get average spacing between points - this is key for proper padding
+  // Get average spacing between points
   const avgSpacing = getAverageSpacing(memberPoints);
 
-  // Single point: small circle based on typical spacing
+  // Single point: small circle
   if (memberPoints.length === 1) {
     const cx = memberPoints[0].x;
     const cy = memberPoints[0].y;
-    const r = avgSpacing * 0.4;
+    const r = avgSpacing * 0.35;
     return Array.from({ length: 12 }, (_, i) => ({
       x: cx + r * Math.cos((i / 12) * Math.PI * 2),
       y: cy + r * Math.sin((i / 12) * Math.PI * 2),
@@ -249,7 +249,7 @@ export function generateZoneBoundary(
   if (memberPoints.length === 2) {
     const [p1, p2] = memberPoints;
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    const r = avgSpacing * 0.4;
+    const r = avgSpacing * 0.35;
     const dx = (p2.x - p1.x) / (dist || 1);
     const dy = (p2.y - p1.y) / (dist || 1);
     const nx = -dy;
@@ -271,9 +271,9 @@ export function generateZoneBoundary(
     return capsule;
   }
 
-  // Calculate padding based on average point spacing (NOT bounding box)
-  // This ensures consistent visual padding regardless of zone size
-  const absolutePadding = avgSpacing * (0.3 + padding * 0.7); // Range: 0.3 to 1.0 of spacing
+  // Calculate tight padding based on average point spacing
+  // padding=0 means just touching the points, padding=1 means full spacing
+  const absolutePadding = avgSpacing * (0.1 + padding * 0.4); // Range: 10% to 50% of spacing
 
   // Compute hull
   let hull = boundaryType === 'concave'
@@ -287,8 +287,8 @@ export function generateZoneBoundary(
 
   // Apply smoothing
   if (smoothness > 0 && hull.length >= 3) {
-    const tension = 1 - smoothness * 0.7; // 0.3 to 1.0
-    const segments = Math.max(2, Math.round(3 + smoothness * 3)); // 2-6 segments
+    const tension = 1 - smoothness * 0.6; // 0.4 to 1.0 (less aggressive smoothing)
+    const segments = Math.max(2, Math.round(2 + smoothness * 2)); // 2-4 segments
     hull = catmullRomSpline(hull, tension, segments);
   }
 
