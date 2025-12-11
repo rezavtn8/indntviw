@@ -17,7 +17,6 @@ interface ExportCanvasProps {
   settings: ExportSettings;
   drawingTool: DrawingTool;
   selectedPointIds: number[];
-  onZoneCreated: (zone: Partial<Zone>) => void;
   onZoneSelect: (zoneId: string | null) => void;
   onPointsSelected: (pointIds: number[]) => void;
 }
@@ -38,7 +37,6 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   settings,
   drawingTool,
   selectedPointIds,
-  onZoneCreated,
   onZoneSelect,
   onPointsSelected,
 }, ref) => {

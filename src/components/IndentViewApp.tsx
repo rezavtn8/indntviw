@@ -22,7 +22,7 @@ import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
-import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS, createDefaultZone } from '@/types/zones';
+import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS } from '@/types/zones';
 import { generateZoneId, updateZoneBoundary, createZoneFromSelection } from '@/utils/zoneUtils';
 import { parseTabSeparatedData } from '@/utils/dataParser';
 import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput } from 'lucide-react';
@@ -393,16 +393,6 @@ export const IndentViewApp: React.FC = () => {
     });
   }, []);
 
-  const handleZoneCreated = useCallback((zoneData: Partial<Zone>) => {
-    const newZone = {
-      ...createDefaultZone(generateZoneId(), zones.length),
-      ...zoneData,
-    };
-    setZones(prev => [...prev, newZone as Zone]);
-    setSelectedZoneId(newZone.id);
-    setDrawingTool('select');
-    toast.success(`Created ${newZone.name}`);
-  }, [zones.length]);
 
   const handleZoneUpdate = useCallback((zone: Zone) => {
     if (!data) {
@@ -725,7 +715,7 @@ export const IndentViewApp: React.FC = () => {
                     settings={exportSettings}
                     drawingTool={drawingTool}
                     selectedPointIds={exportSelectedPointIds}
-                    onZoneCreated={handleZoneCreated}
+                    
                     onZoneSelect={setSelectedZoneId}
                     onPointsSelected={setExportSelectedPointIds}
                   />
