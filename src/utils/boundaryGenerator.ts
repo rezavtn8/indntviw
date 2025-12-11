@@ -87,11 +87,28 @@ export function computeConcaveHull(points: ZonePoint[], k: number = 3): ZonePoin
   return result;
 }
 
+// Determine polygon winding order (positive = CCW, negative = CW)
+function getPolygonArea(points: ZonePoint[]): number {
+  let area = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
+  }
+  return area / 2;
+}
+
 // Create rounded offset around a hull by adding arc segments around each vertex
 export function expandHullWithRoundedCorners(points: ZonePoint[], padding: number): ZonePoint[] {
   if (points.length < 3 || padding <= 0) return points;
 
   const n = points.length;
+  
+  // Determine winding order to know which way is "outward"
+  const area = getPolygonArea(points);
+  const isCCW = area > 0;
+  
   const result: ZonePoint[] = [];
 
   for (let i = 0; i < n; i++) {
@@ -99,39 +116,50 @@ export function expandHullWithRoundedCorners(points: ZonePoint[], padding: numbe
     const prev = points[(i - 1 + n) % n];
     const next = points[(i + 1) % n];
 
-    // Calculate edge vectors
+    // Edge vectors
     const v1x = curr.x - prev.x;
     const v1y = curr.y - prev.y;
     const v2x = next.x - curr.x;
     const v2y = next.y - curr.y;
 
-    // Calculate angles of incoming and outgoing edges
+    // Calculate angles of edges
     const angle1 = Math.atan2(v1y, v1x);
     const angle2 = Math.atan2(v2y, v2x);
 
-    // Outward normal angles (perpendicular, pointing outward for CCW)
-    const normalAngle1 = angle1 - Math.PI / 2;
-    const normalAngle2 = angle2 - Math.PI / 2;
+    // Outward normal angles depend on winding order
+    const normalOffset = isCCW ? -Math.PI / 2 : Math.PI / 2;
+    const normalAngle1 = angle1 + normalOffset;
+    const normalAngle2 = angle2 + normalOffset;
 
-    // Generate arc from normalAngle1 to normalAngle2 (going CCW around the vertex)
+    // Generate arc from normalAngle1 to normalAngle2
     let startAngle = normalAngle1;
     let endAngle = normalAngle2;
 
-    // Ensure we go the short way around (CCW)
-    while (endAngle < startAngle) {
-      endAngle += Math.PI * 2;
-    }
-    if (endAngle - startAngle > Math.PI * 2) {
-      endAngle -= Math.PI * 2;
+    // For CCW polygon, we go CW around corner (negative arc)
+    // For CW polygon, we go CCW around corner (positive arc)
+    if (isCCW) {
+      while (endAngle > startAngle) {
+        endAngle -= Math.PI * 2;
+      }
+      while (endAngle < startAngle - Math.PI * 2) {
+        endAngle += Math.PI * 2;
+      }
+    } else {
+      while (endAngle < startAngle) {
+        endAngle += Math.PI * 2;
+      }
+      while (endAngle > startAngle + Math.PI * 2) {
+        endAngle -= Math.PI * 2;
+      }
     }
 
-    // Number of segments for the arc (more for sharper corners)
-    const arcSpan = endAngle - startAngle;
-    const numSegments = Math.max(2, Math.ceil(Math.abs(arcSpan) / (Math.PI / 6)));
+    // Very high segment count for ultra-smooth arcs
+    const arcSpan = Math.abs(endAngle - startAngle);
+    const numSegments = Math.max(6, Math.ceil(arcSpan / (Math.PI / 16)));
 
     for (let j = 0; j <= numSegments; j++) {
       const t = j / numSegments;
-      const angle = startAngle + t * arcSpan;
+      const angle = startAngle + t * (endAngle - startAngle);
       result.push({
         x: curr.x + padding * Math.cos(angle),
         y: curr.y + padding * Math.sin(angle),
@@ -290,10 +318,10 @@ export function generateZoneBoundary(
   // Apply perpendicular padding (wraps around the dot circumference)
   hull = expandHull(hull, totalPadding);
 
-  // Apply smoothing
-  if (smoothness > 0 && hull.length >= 3) {
-    const tension = 1 - smoothness * 0.5; // 0.5 to 1.0
-    const segments = Math.max(2, Math.round(2 + smoothness * 2)); // 2-4 segments
+  // Apply smoothing with improved parameters for ultra-smooth curves
+  if (smoothness > 0 && hull.length >= 4) {
+    const tension = 0.4; // Tighter tension for smoother curves
+    const segments = 3;  // More segments per point
     hull = catmullRomSpline(hull, tension, segments);
   }
 
