@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Download, FileImage, FileCode, FileText, ChevronDown, Settings2, Maximize2 } from 'lucide-react';
+import { Download, FileImage, FileCode, FileText, ChevronDown, Settings2, Maximize2, Type, Hash } from 'lucide-react';
 
 interface ExportOptionsPanelProps {
   settings: ExportSettings;
@@ -72,7 +72,6 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
         customAxisBounds: undefined,
       });
     } else {
-      // When switching to manual, initialize with current auto-calculated bounds
       onSettingsChange({
         ...settings,
         useAutoAxisBounds: false,
@@ -167,12 +166,194 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
         </div>
       )}
 
-      {/* Axis Settings Collapsible */}
+      {/* Labels & Text Collapsible */}
       <Collapsible defaultOpen className="space-y-3">
         <CollapsibleTrigger className="flex items-center justify-between w-full group">
           <div className="flex items-center gap-2">
+            <Type className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-xs font-mono uppercase text-muted-foreground cursor-pointer">Labels & Text</Label>
+          </div>
+          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          {/* Title */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Show Title</Label>
+              <Switch
+                checked={settings.showTitle}
+                onCheckedChange={(checked) => onSettingsChange({ ...settings, showTitle: checked })}
+              />
+            </div>
+            {settings.showTitle && (
+              <Input
+                placeholder="Auto-generated title"
+                value={settings.customTitle || ''}
+                onChange={(e) => onSettingsChange({ ...settings, customTitle: e.target.value })}
+                className="font-mono text-sm"
+              />
+            )}
+          </div>
+
+          {/* Axis Labels */}
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <Label className="text-xs text-muted-foreground">Axis Labels</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">X Axis</Label>
+                <Input
+                  value={settings.xAxisLabel}
+                  onChange={(e) => onSettingsChange({ ...settings, xAxisLabel: e.target.value })}
+                  className="font-mono text-sm h-8"
+                  placeholder="x (mm)"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Y Axis</Label>
+                <Input
+                  value={settings.yAxisLabel}
+                  onChange={(e) => onSettingsChange({ ...settings, yAxisLabel: e.target.value })}
+                  className="font-mono text-sm h-8"
+                  placeholder="y (mm)"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Legend Label */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Legend Label (optional)</Label>
+            <Input
+              value={settings.legendLabel}
+              onChange={(e) => onSettingsChange({ ...settings, legendLabel: e.target.value })}
+              className="font-mono text-sm h-8"
+              placeholder="Auto from property"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Number Formatting Collapsible */}
+      <Collapsible className="space-y-3">
+        <CollapsibleTrigger className="flex items-center justify-between w-full group">
+          <div className="flex items-center gap-2">
+            <Hash className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-xs font-mono uppercase text-muted-foreground cursor-pointer">Number Formatting</Label>
+          </div>
+          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          {/* Decimal Places */}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Axis Tick Decimals</Label>
+                <span className="text-xs font-mono text-muted-foreground">{settings.axisDecimals}</span>
+              </div>
+              <Slider
+                value={[settings.axisDecimals]}
+                onValueChange={([value]) => onSettingsChange({ ...settings, axisDecimals: value })}
+                min={0}
+                max={4}
+                step={1}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Legend Decimals</Label>
+                <span className="text-xs font-mono text-muted-foreground">{settings.legendDecimals}</span>
+              </div>
+              <Slider
+                value={[settings.legendDecimals]}
+                onValueChange={([value]) => onSettingsChange({ ...settings, legendDecimals: value })}
+                min={0}
+                max={4}
+                step={1}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* Font Sizes */}
+          <div className="space-y-3 pt-2 border-t border-border/50">
+            <Label className="text-xs text-muted-foreground">Font Sizes</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Title</Label>
+                <Select
+                  value={settings.titleFontSize.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, titleFontSize: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[12, 14, 16, 18, 20, 24, 28].map(size => (
+                      <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Axis Labels</Label>
+                <Select
+                  value={settings.axisLabelFontSize.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, axisLabelFontSize: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 12, 14, 16, 18].map(size => (
+                      <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Tick Numbers</Label>
+                <Select
+                  value={settings.tickFontSize.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, tickFontSize: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[8, 10, 12, 14, 16].map(size => (
+                      <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Legend</Label>
+                <Select
+                  value={settings.legendFontSize.toString()}
+                  onValueChange={(v) => onSettingsChange({ ...settings, legendFontSize: parseInt(v) })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[8, 10, 12, 14, 16].map(size => (
+                      <SelectItem key={size} value={size.toString()}>{size}px</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Axis Settings Collapsible */}
+      <Collapsible className="space-y-3">
+        <CollapsibleTrigger className="flex items-center justify-between w-full group">
+          <div className="flex items-center gap-2">
             <Maximize2 className="w-4 h-4 text-muted-foreground" />
-            <Label className="text-xs font-mono uppercase text-muted-foreground cursor-pointer">Axis Settings</Label>
+            <Label className="text-xs font-mono uppercase text-muted-foreground cursor-pointer">Axis Bounds</Label>
           </div>
           <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
@@ -191,7 +372,6 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
               step={1}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">Adds breathing room around data points</p>
           </div>
 
           {/* Auto/Manual Axis Bounds */}
@@ -206,9 +386,8 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
             
             {!settings.useAutoAxisBounds && (
               <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
-                {/* X Axis */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-mono text-muted-foreground">X Axis (mm)</Label>
+                  <Label className="text-xs font-mono text-muted-foreground">X Axis</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Min</Label>
@@ -232,10 +411,8 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
                     </div>
                   </div>
                 </div>
-
-                {/* Y Axis */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-mono text-muted-foreground">Y Axis (mm)</Label>
+                  <Label className="text-xs font-mono text-muted-foreground">Y Axis</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Min</Label>
@@ -286,27 +463,8 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
         </RadioGroup>
       </div>
 
-      {/* Title */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-mono uppercase text-muted-foreground">Custom Title</Label>
-          <Switch
-            checked={settings.showTitle}
-            onCheckedChange={(checked) => onSettingsChange({ ...settings, showTitle: checked })}
-          />
-        </div>
-        {settings.showTitle && (
-          <Input
-            placeholder="Auto-generated title"
-            value={settings.customTitle || ''}
-            onChange={(e) => onSettingsChange({ ...settings, customTitle: e.target.value })}
-            className="font-mono text-sm"
-          />
-        )}
-      </div>
-
-      {/* Include Options */}
-      <Collapsible defaultOpen className="space-y-3">
+      {/* Display Options */}
+      <Collapsible className="space-y-3">
         <CollapsibleTrigger className="flex items-center justify-between w-full group">
           <div className="flex items-center gap-2">
             <Settings2 className="w-4 h-4 text-muted-foreground" />

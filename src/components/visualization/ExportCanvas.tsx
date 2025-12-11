@@ -369,7 +369,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
             x={margin.left + plotWidth / 2}
             y={30}
             textAnchor="middle"
-            fontSize="18"
+            fontSize={settings.titleFontSize}
             fontWeight="bold"
             fontFamily="sans-serif"
             fill="#1f2937"
@@ -416,11 +416,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                     x={cx}
                     y={margin.top + plotHeight + 20}
                     textAnchor="middle"
-                    fontSize="12"
+                    fontSize={settings.tickFontSize}
                     fontFamily="sans-serif"
                     fill="#4b5563"
                   >
-                    {tick.toFixed(1)}
+                    {tick.toFixed(settings.axisDecimals)}
                   </text>
                 </g>
               );
@@ -429,11 +429,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
               x={margin.left + plotWidth / 2}
               y={height - 15}
               textAnchor="middle"
-              fontSize="14"
+              fontSize={settings.axisLabelFontSize}
               fontFamily="sans-serif"
               fill="#1f2937"
             >
-              x (mm)
+              {settings.xAxisLabel}
             </text>
           </>
         )}
@@ -465,11 +465,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                     x={margin.left - 10}
                     y={cy + 4}
                     textAnchor="end"
-                    fontSize="12"
+                    fontSize={settings.tickFontSize}
                     fontFamily="sans-serif"
                     fill="#4b5563"
                   >
-                    {tick.toFixed(1)}
+                    {tick.toFixed(settings.axisDecimals)}
                   </text>
                 </g>
               );
@@ -478,12 +478,12 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
               x={20}
               y={margin.top + plotHeight / 2}
               textAnchor="middle"
-              fontSize="14"
+              fontSize={settings.axisLabelFontSize}
               fontFamily="sans-serif"
               fill="#1f2937"
               transform={`rotate(-90 20 ${margin.top + plotHeight / 2})`}
             >
-              y (mm)
+              {settings.yAxisLabel}
             </text>
           </>
         )}
@@ -652,11 +652,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                   <text
                     x={28}
                     y={y + 4}
-                    fontSize="10"
+                    fontSize={settings.legendFontSize}
                     fontFamily="sans-serif"
                     fill="#4b5563"
                   >
-                    {value.toFixed(1)}
+                    {value.toFixed(settings.legendDecimals)}
                   </text>
                 </g>
               );
@@ -665,11 +665,11 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
               x={10}
               y={-8}
               textAnchor="middle"
-              fontSize="11"
+              fontSize={settings.legendFontSize}
               fontFamily="sans-serif"
               fill="#1f2937"
             >
-              {propertyUnit}
+              {settings.legendLabel || propertyUnit}
             </text>
           </g>
         )}
