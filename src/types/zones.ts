@@ -34,6 +34,13 @@ export interface ZoneStatistics {
   stdDev: number;
 }
 
+export interface AxisBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
 export interface ExportSettings {
   format: 'png' | 'svg' | 'pdf';
   dpi: number;
@@ -47,6 +54,10 @@ export interface ExportSettings {
   showAxisLabels: boolean;
   showTitle: boolean;
   customTitle?: string;
+  // Axis settings
+  axisPadding: number; // Percentage (0-20)
+  useAutoAxisBounds: boolean;
+  customAxisBounds?: AxisBounds;
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -71,6 +82,8 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   showColorLegend: true,
   showAxisLabels: true,
   showTitle: true,
+  axisPadding: 5,
+  useAutoAxisBounds: true,
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({

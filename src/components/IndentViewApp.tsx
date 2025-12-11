@@ -114,6 +114,21 @@ export const IndentViewApp: React.FC = () => {
     };
   }, [data, selectedProperty, customMin, customMax]);
 
+  // Calculate spatial data bounds for axis settings
+  const dataBounds = useMemo(() => {
+    if (!data || data.points.length === 0) {
+      return { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
+    }
+    const xValues = data.points.map(p => p.x);
+    const yValues = data.points.map(p => p.y);
+    return {
+      xMin: Math.min(...xValues),
+      xMax: Math.max(...xValues),
+      yMin: Math.min(...yValues),
+      yMax: Math.max(...yValues),
+    };
+  }, [data]);
+
   const handlePropertyChange = useCallback((property: string) => {
     setSelectedProperty(property);
     setCustomMin(null);
@@ -644,6 +659,7 @@ export const IndentViewApp: React.FC = () => {
                       onSettingsChange={setExportSettings}
                       onExport={handleExport}
                       isExporting={isExporting}
+                      dataBounds={dataBounds}
                     />
                   </div>
                 </div>
