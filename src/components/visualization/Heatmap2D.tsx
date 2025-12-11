@@ -388,7 +388,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
       <svg
         ref={svgRef}
         viewBox={viewBox}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="xMidYMid slice"
         className={`w-full h-full ${cursor}`}
         style={{ background: 'hsl(var(--card))', display: 'block' }}
         onMouseDown={handleMouseDown}
