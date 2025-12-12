@@ -87,6 +87,9 @@ export interface ExportSettings {
   customXTicks: string; // Comma-separated values
   customYTicks: string;
   customLegendTicks: string;
+  // Zone label options
+  zoneLabelPosition: 'center' | 'outside';
+  zoneLabelColor: 'zone' | 'black';
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -132,6 +135,8 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   customXTicks: '',
   customYTicks: '',
   customLegendTicks: '',
+  zoneLabelPosition: 'center',
+  zoneLabelColor: 'zone',
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
