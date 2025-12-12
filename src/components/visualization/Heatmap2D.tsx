@@ -142,11 +142,16 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return [];
   }, [points, selectedProperty, showInterpolation]);
 
-  const handlePointClick = useCallback((point: IndentationPoint) => {
-    if (drawingTool === 'select') {
-      onPointSelect(selectedPoint?.id === point.id ? null : point);
+  const handlePointClick = useCallback((e: React.MouseEvent, point: IndentationPoint) => {
+    // Only open point details in select mode without modifier keys (pure view mode)
+    if (drawingTool === 'select' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      // Don't open details if we're in selection mode with selected points
+      if (selectedPointIds.length === 0) {
+        onPointSelect(selectedPoint?.id === point.id ? null : point);
+      }
     }
-  }, [selectedPoint, onPointSelect, drawingTool]);
+    e.stopPropagation();
+  }, [selectedPoint, onPointSelect, drawingTool, selectedPointIds]);
 
   // Transform contour coordinates to SVG space (using centered offsets)
   const transformPoint = useCallback((x: number, y: number) => ({
@@ -606,7 +611,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                   }
                   strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5}
                   className="cursor-pointer transition-all duration-150 hover:opacity-80"
-                  onClick={() => handlePointClick(point)}
+                  onClick={(e) => handlePointClick(e, point)}
                   onMouseEnter={() => onPointHover(point)}
                   onMouseLeave={() => onPointHover(null)}
                 />
