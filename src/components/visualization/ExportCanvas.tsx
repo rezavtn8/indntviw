@@ -657,7 +657,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
         </g>
 
         {/* Zone labels - rendered ON TOP of points */}
-        {settings.showZones && settings.showZoneLabels && zones.filter(z => z.visible && z.showLabel).map(zone => {
+        {settings.showZones && settings.showZoneLabels && zones.filter(z => z.visible && z.showLabel).map((zone, zoneIndex) => {
           const memberPoints = zone.memberPointIds.length > 0
             ? points.filter(p => zone.memberPointIds.includes(p.id))
             : [];
@@ -666,25 +666,66 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           
           const centroid = getZoneCentroid(zone, points);
           const labelPos = transformPoint(centroid.x, centroid.y);
+          
+          // Calculate bounding box of member points for outside positioning
+          const xCoords = memberPoints.map(p => transformPoint(p.x, p.y).cx);
+          const yCoords = memberPoints.map(p => transformPoint(p.x, p.y).cy);
+          const minX = Math.min(...xCoords);
+          const maxX = Math.max(...xCoords);
+          const minY = Math.min(...yCoords);
+          const maxY = Math.max(...yCoords);
+          
+          // Determine label position based on setting
+          let finalX = labelPos.cx;
+          let finalY = labelPos.cy;
+          let textAnchor: 'start' | 'middle' | 'end' = 'middle';
+          
+          if (settings.zoneLabelPosition === 'outside') {
+            // Position label to the right of the zone, stacked vertically by zone index
+            const legendX = margin.left + plotWidth + 10;
+            const baseY = margin.top + 20;
+            const spacing = 24;
+            
+            finalX = legendX;
+            finalY = baseY + zoneIndex * spacing;
+            textAnchor = 'start';
+          }
+          
+          // Determine label color
+          const labelColor = settings.zoneLabelColor === 'zone' ? zone.color : '#1f2937';
 
           return (
-            <text
-              key={`zone-label-${zone.id}`}
-              x={labelPos.cx}
-              y={labelPos.cy}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize={zone.labelFontSize}
-              fontWeight="bold"
-              fontFamily="sans-serif"
-              fill="#1f2937"
-              stroke="white"
-              strokeWidth="3"
-              paintOrder="stroke"
-              className="pointer-events-none"
-            >
-              {zone.name}
-            </text>
+            <g key={`zone-label-${zone.id}`}>
+              {/* Connector line for outside labels */}
+              {settings.zoneLabelPosition === 'outside' && (
+                <line
+                  x1={maxX + pointRadius}
+                  y1={(minY + maxY) / 2}
+                  x2={finalX - 5}
+                  y2={finalY}
+                  stroke={zone.color}
+                  strokeWidth="1.5"
+                  strokeOpacity="0.6"
+                  strokeDasharray="4 2"
+                />
+              )}
+              <text
+                x={finalX}
+                y={finalY}
+                textAnchor={textAnchor}
+                dominantBaseline="middle"
+                fontSize={zone.labelFontSize}
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                fill={labelColor}
+                stroke="white"
+                strokeWidth="3"
+                paintOrder="stroke"
+                className="pointer-events-none"
+              >
+                {zone.name}
+              </text>
+            </g>
           );
         })}
         {/* Selection preview boundary */}

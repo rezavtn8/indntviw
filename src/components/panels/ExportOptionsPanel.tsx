@@ -614,6 +614,51 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
             />
           </div>
 
+          {/* Zone Label Options - only show when zone labels are enabled */}
+          {settings.showZones && settings.showZoneLabels && (
+            <div className="pl-4 space-y-3 border-l-2 border-border/50">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Label Position</Label>
+                <RadioGroup
+                  value={settings.zoneLabelPosition}
+                  onValueChange={(value: 'center' | 'outside') =>
+                    onSettingsChange({ ...settings, zoneLabelPosition: value })
+                  }
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="center" id="label-pos-center" />
+                    <Label htmlFor="label-pos-center" className="text-sm cursor-pointer">Center</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="outside" id="label-pos-outside" />
+                    <Label htmlFor="label-pos-outside" className="text-sm cursor-pointer">Outside</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Label Color</Label>
+                <RadioGroup
+                  value={settings.zoneLabelColor}
+                  onValueChange={(value: 'zone' | 'black') =>
+                    onSettingsChange({ ...settings, zoneLabelColor: value })
+                  }
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="zone" id="label-color-zone" />
+                    <Label htmlFor="label-color-zone" className="text-sm cursor-pointer">Match Zone</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="black" id="label-color-black" />
+                    <Label htmlFor="label-color-black" className="text-sm cursor-pointer">Black</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <Label className="text-sm">Boundary Contour</Label>
             <Switch
