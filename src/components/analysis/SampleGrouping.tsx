@@ -123,10 +123,37 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({
                   <X className="w-3 h-3" />
                 </Button>
               </div>
+              {/* Ungrouped samples to add to this group */}
+              {ungroupedSessions.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {ungroupedSessions.map(session => {
+                    const idx = sessions.findIndex(s => s.id === session.id);
+                    return (
+                      <Badge
+                        key={session.id}
+                        variant="outline"
+                        className="cursor-pointer text-xs gap-1 opacity-50 hover:opacity-100 hover:bg-muted"
+                        onClick={() => toggleSessionInGroup(group.id, session.id)}
+                      >
+                        <Plus className="w-2 h-2" />
+                        <div
+                          className="w-2 h-2 rounded"
+                          style={{ backgroundColor: getSampleColor(idx) }}
+                        />
+                        {session.fileName.replace(/\.[^/.]+$/, '')}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex flex-wrap gap-1">
-                {group.sessionIds.length === 0 ? (
+                {group.sessionIds.length === 0 && ungroupedSessions.length === 0 ? (
                   <span className="text-xs text-muted-foreground italic">
-                    Click samples below to add
+                    No samples available
+                  </span>
+                ) : group.sessionIds.length === 0 ? (
+                  <span className="text-xs text-muted-foreground italic">
+                    Click samples above to add
                   </span>
                 ) : (
                   group.sessionIds.map(sid => {
@@ -156,40 +183,6 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({
         </div>
       </ScrollArea>
 
-      {/* Ungrouped samples */}
-      {ungroupedSessions.length > 0 && groups.length > 0 && (
-        <div className="space-y-2">
-          <span className="font-mono text-xs uppercase text-muted-foreground">
-            Ungrouped Samples
-          </span>
-          <div className="flex flex-wrap gap-1">
-            {ungroupedSessions.map(session => {
-              const idx = sessions.findIndex(s => s.id === session.id);
-              return (
-                <Badge
-                  key={session.id}
-                  variant="outline"
-                  className="cursor-pointer text-xs gap-1 hover:bg-muted"
-                  onClick={() => {
-                    if (groups.length > 0) {
-                      toggleSessionInGroup(groups[0].id, session.id);
-                    }
-                  }}
-                >
-                  <div
-                    className="w-2 h-2 rounded"
-                    style={{ backgroundColor: getSampleColor(idx) }}
-                  />
-                  {session.fileName.replace(/\.[^/.]+$/, '')}
-                </Badge>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Click to add to first group, or drag to specific groups
-          </p>
-        </div>
-      )}
     </div>
   );
 };
