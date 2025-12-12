@@ -1,0 +1,260 @@
+import React, { useMemo, useState } from 'react';
+import { Zone } from '@/types/zones';
+import { IndentationPoint, PROPERTY_CONFIGS } from '@/types/indentation';
+import { getPointsInZone } from '@/utils/zoneUtils';
+import { calculateDescriptiveStats, getPropertyValues } from '@/utils/advancedStatistics';
+import { DescriptiveStats } from '@/components/analysis/DescriptiveStats';
+import { BoxViolinPlots } from '@/components/analysis/BoxViolinPlots';
+import { StatisticalTests } from '@/components/analysis/StatisticalTests';
+import { DistributionPlots } from '@/components/analysis/DistributionPlots';
+import { CorrelationAnalysis } from '@/components/analysis/CorrelationAnalysis';
+import { AnalysisExport } from '@/components/analysis/AnalysisExport';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BarChart3, TrendingUp, Layers, GitCompare, Download } from 'lucide-react';
+
+interface AnalysisPanelProps {
+  zones: Zone[];
+  points: IndentationPoint[];
+  selectedProperty: string;
+  propertyNames: string[];
+  onPropertyChange: (property: string) => void;
+}
+
+export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
+  zones,
+  points,
+  selectedProperty,
+  propertyNames,
+  onPropertyChange,
+}) => {
+  const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>([]);
+  const [includeAllData, setIncludeAllData] = useState(true);
+  const [showViolin, setShowViolin] = useState(false);
+  const [showJitter, setShowJitter] = useState(true);
+
+  const getPropertyLabel = (key: string): string => {
+    const config = PROPERTY_CONFIGS.find(c => c.key === key);
+    return config?.label || key;
+  };
+
+  // Prepare analysis data
+  const analysisData = useMemo(() => {
+    const result: { name: string; color: string; values: number[]; stats: ReturnType<typeof calculateDescriptiveStats> }[] = [];
+
+    // Add "All Data" if enabled
+    if (includeAllData) {
+      const values = getPropertyValues(points, selectedProperty);
+      result.push({
+        name: 'All Data',
+        color: 'hsl(var(--muted-foreground))',
+        values,
+        stats: calculateDescriptiveStats(values),
+      });
+    }
+
+    // Add selected zones
+    zones
+      .filter(z => selectedZoneIds.includes(z.id))
+      .forEach(zone => {
+        const zonePoints = getPointsInZone(points, zone);
+        const values = getPropertyValues(zonePoints, selectedProperty);
+        result.push({
+          name: zone.name,
+          color: zone.color,
+          values,
+          stats: calculateDescriptiveStats(values),
+        });
+      });
+
+    return result;
+  }, [points, zones, selectedZoneIds, selectedProperty, includeAllData]);
+
+  const toggleZone = (zoneId: string) => {
+    setSelectedZoneIds(prev =>
+      prev.includes(zoneId)
+        ? prev.filter(id => id !== zoneId)
+        : [...prev, zoneId]
+    );
+  };
+
+  const selectAllZones = () => {
+    setSelectedZoneIds(zones.map(z => z.id));
+  };
+
+  const clearZones = () => {
+    setSelectedZoneIds([]);
+  };
+
+  return (
+    <div className="h-full flex">
+      {/* Left Sidebar - Zone Selection */}
+      <div className="w-64 border-r-2 border-border bg-card p-4 flex flex-col">
+        <h3 className="font-mono text-sm font-bold uppercase tracking-wider mb-4">
+          Analysis Controls
+        </h3>
+
+        {/* Property Selector */}
+        <div className="mb-4">
+          <Label className="font-mono text-xs uppercase text-muted-foreground mb-2 block">
+            Property
+          </Label>
+          <Select value={selectedProperty} onValueChange={onPropertyChange}>
+            <SelectTrigger className="font-mono text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {propertyNames.map(prop => (
+                <SelectItem key={prop} value={prop} className="font-mono text-sm">
+                  {getPropertyLabel(prop)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* All Data Toggle */}
+        <div className="flex items-center justify-between mb-4 p-2 bg-muted/30 rounded">
+          <Label className="font-mono text-sm cursor-pointer">All Data</Label>
+          <Switch checked={includeAllData} onCheckedChange={setIncludeAllData} />
+        </div>
+
+        {/* Zone Selection */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-2">
+            <Label className="font-mono text-xs uppercase text-muted-foreground">
+              Zones ({zones.length})
+            </Label>
+            <div className="flex gap-2">
+              <button onClick={selectAllZones} className="text-xs text-primary hover:underline font-mono">
+                All
+              </button>
+              <button onClick={clearZones} className="text-xs text-muted-foreground hover:underline font-mono">
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="space-y-1 pr-2">
+              {zones.length === 0 ? (
+                <p className="text-xs text-muted-foreground font-mono p-2">
+                  No zones created yet. Use the 2D view to create zones.
+                </p>
+              ) : (
+                zones.map(zone => (
+                  <label
+                    key={zone.id}
+                    className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                      selectedZoneIds.includes(zone.id) ? 'bg-primary/10' : 'hover:bg-muted/50'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={selectedZoneIds.includes(zone.id)}
+                      onCheckedChange={() => toggleZone(zone.id)}
+                    />
+                    <div
+                      className="w-3 h-3 rounded"
+                      style={{ backgroundColor: zone.color }}
+                    />
+                    <span className="font-mono text-sm flex-1 truncate">{zone.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Plot Options */}
+        <div className="mt-4 pt-4 border-t border-border space-y-3">
+          <Label className="font-mono text-xs uppercase text-muted-foreground block">
+            Plot Options
+          </Label>
+          <div className="flex items-center justify-between">
+            <Label className="font-mono text-xs cursor-pointer">Show Violin</Label>
+            <Switch checked={showViolin} onCheckedChange={setShowViolin} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
+            <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <Tabs defaultValue="descriptive" className="h-full flex flex-col">
+          <div className="border-b-2 border-border bg-card px-4 py-2">
+            <TabsList className="bg-secondary">
+              <TabsTrigger value="descriptive" className="font-mono text-sm gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Descriptive
+              </TabsTrigger>
+              <TabsTrigger value="distribution" className="font-mono text-sm gap-2">
+                <Layers className="w-4 h-4" />
+                Distribution
+              </TabsTrigger>
+              <TabsTrigger value="comparison" className="font-mono text-sm gap-2">
+                <GitCompare className="w-4 h-4" />
+                Comparison
+              </TabsTrigger>
+              <TabsTrigger value="correlation" className="font-mono text-sm gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Correlation
+              </TabsTrigger>
+              <TabsTrigger value="export" className="font-mono text-sm gap-2">
+                <Download className="w-4 h-4" />
+                Export
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-4">
+              {analysisData.length === 0 ? (
+                <div className="flex items-center justify-center h-64">
+                  <p className="text-muted-foreground font-mono text-sm">
+                    Select zones or enable "All Data" to view analysis.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <TabsContent value="descriptive" className="mt-0 space-y-4">
+                    <DescriptiveStats stats={analysisData} selectedProperty={selectedProperty} />
+                    <BoxViolinPlots
+                      data={analysisData}
+                      selectedProperty={selectedProperty}
+                      showViolin={showViolin}
+                      showJitter={showJitter}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="distribution" className="mt-0 space-y-4">
+                    <DistributionPlots data={analysisData} selectedProperty={selectedProperty} />
+                  </TabsContent>
+
+                  <TabsContent value="comparison" className="mt-0 space-y-4">
+                    <StatisticalTests data={analysisData} selectedProperty={selectedProperty} />
+                  </TabsContent>
+
+                  <TabsContent value="correlation" className="mt-0 space-y-4">
+                    <CorrelationAnalysis points={points} properties={propertyNames} />
+                  </TabsContent>
+
+                  <TabsContent value="export" className="mt-0 space-y-4">
+                    <AnalysisExport data={analysisData} selectedProperty={selectedProperty} />
+                    <DescriptiveStats stats={analysisData} selectedProperty={selectedProperty} />
+                  </TabsContent>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        </Tabs>
+      </div>
+    </div>
+  );
+};

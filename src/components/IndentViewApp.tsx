@@ -17,9 +17,9 @@ import { PointEditor } from '@/components/panels/PointEditor';
 import { OutlierDetector } from '@/components/panels/OutlierDetector';
 import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatisticsPanel';
 import { ZonePanel } from '@/components/panels/ZonePanel';
-import { ZoneComparisonPanel } from '@/components/panels/ZoneComparisonPanel';
 import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
+import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { FileTabs } from '@/components/FileTabs';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
@@ -27,7 +27,7 @@ import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS } from '@/types/zones';
 import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
 import { generateZoneId, updateZoneBoundary, createZoneFromSelection } from '@/utils/zoneUtils';
 import { parseTabSeparatedData } from '@/utils/dataParser';
-import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput } from 'lucide-react';
+import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
@@ -39,7 +39,7 @@ export const IndentViewApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<IndentationPoint | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<IndentationPoint | null>(null);
-  const [activeView, setActiveView] = useState<'2d' | '3d' | 'export'>('2d');
+  const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
   
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -668,8 +668,9 @@ export const IndentViewApp: React.FC = () => {
                   />
                 </div>
               )}
-
-              {/* Zone Comparison Panel for 2D View */}
+            </>
+          )}
+        </aside>
               {activeView === '2d' && zones.length > 0 && (
                 <div className="bg-card border-2 border-border rounded-lg p-4">
                   <h3 className="font-mono text-sm font-semibold uppercase tracking-wider mb-4">
@@ -692,7 +693,7 @@ export const IndentViewApp: React.FC = () => {
         <main className="flex-1 flex flex-col">
           {/* View Tabs */}
           <div className="border-b-2 border-border bg-card px-4 py-2">
-            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as '2d' | '3d' | 'export')}>
+            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as '2d' | '3d' | 'analysis' | 'export')}>
               <TabsList className="bg-secondary">
                 <TabsTrigger value="2d" className="font-mono text-sm gap-2">
                   <Grid2X2 className="w-4 h-4" />
@@ -701,6 +702,10 @@ export const IndentViewApp: React.FC = () => {
                 <TabsTrigger value="3d" className="font-mono text-sm gap-2">
                   <Box className="w-4 h-4" />
                   3D View
+                </TabsTrigger>
+                <TabsTrigger value="analysis" className="font-mono text-sm gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Analysis
                 </TabsTrigger>
                 <TabsTrigger value="export" className="font-mono text-sm gap-2">
                   <FileOutput className="w-4 h-4" />
@@ -750,7 +755,17 @@ export const IndentViewApp: React.FC = () => {
 
           {/* Visualization Area */}
           <div className="flex-1 relative p-2">
-            {activeView === 'export' ? (
+            {activeView === 'analysis' ? (
+              <div className="h-full border-2 border-border bg-card overflow-hidden">
+                <AnalysisPanel
+                  zones={zones}
+                  points={data?.points || []}
+                  selectedProperty={selectedProperty}
+                  propertyNames={data?.propertyNames || []}
+                  onPropertyChange={handlePropertyChange}
+                />
+              </div>
+            ) : activeView === 'export' ? (
               <div className="flex h-full gap-4">
                 {/* Export Canvas */}
                 <div className="flex-1 h-full overflow-hidden">
