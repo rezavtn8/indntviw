@@ -573,7 +573,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           />
         )}
 
-        {/* Zones - using same smooth boundary logic as outer contour */}
+        {/* Zone fills ONLY - rendered behind points */}
         {settings.showZones && zones.filter(z => z.visible).map(zone => {
           const isSelected = zone.id === selectedZoneId;
           
@@ -594,12 +594,9 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           );
           
           if (!zonePath) return null;
-          
-          const centroid = getZoneCentroid(zone, points);
-          const labelPos = transformPoint(centroid.x, centroid.y);
 
           return (
-            <g key={zone.id}>
+            <g key={`zone-fill-${zone.id}`}>
               <path
                 d={zonePath}
                 fill={zone.color}
@@ -614,25 +611,6 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                   onZoneSelect?.(isSelected ? null : zone.id);
                 }}
               />
-              
-              {settings.showZoneLabels && zone.showLabel && (
-                <text
-                  x={labelPos.cx}
-                  y={labelPos.cy}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={zone.labelFontSize}
-                  fontWeight="bold"
-                  fontFamily="sans-serif"
-                  fill="#1f2937"
-                  stroke="white"
-                  strokeWidth="3"
-                  paintOrder="stroke"
-                  className="pointer-events-none"
-                >
-                  {zone.name}
-                </text>
-              )}
               
               {isSelected && (
                 <path
@@ -678,6 +656,37 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           })}
         </g>
 
+        {/* Zone labels - rendered ON TOP of points */}
+        {settings.showZones && settings.showZoneLabels && zones.filter(z => z.visible && z.showLabel).map(zone => {
+          const memberPoints = zone.memberPointIds.length > 0
+            ? points.filter(p => zone.memberPointIds.includes(p.id))
+            : [];
+          
+          if (memberPoints.length === 0) return null;
+          
+          const centroid = getZoneCentroid(zone, points);
+          const labelPos = transformPoint(centroid.x, centroid.y);
+
+          return (
+            <text
+              key={`zone-label-${zone.id}`}
+              x={labelPos.cx}
+              y={labelPos.cy}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={zone.labelFontSize}
+              fontWeight="bold"
+              fontFamily="sans-serif"
+              fill="#1f2937"
+              stroke="white"
+              strokeWidth="3"
+              paintOrder="stroke"
+              className="pointer-events-none"
+            >
+              {zone.name}
+            </text>
+          );
+        })}
         {/* Selection preview boundary */}
         {selectionPreviewPath && !isDrawing && (
           <path
