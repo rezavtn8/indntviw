@@ -88,7 +88,7 @@ export interface ExportSettings {
   customYTicks: string;
   customLegendTicks: string;
   // Zone label options
-  zoneLabelPosition: 'center' | 'outside';
+  zoneLabelPosition: 'center' | 'edge' | 'legend';
   zoneLabelColor: 'zone' | 'black';
 }
 

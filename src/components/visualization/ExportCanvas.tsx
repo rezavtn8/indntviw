@@ -51,10 +51,10 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   // Canvas dimensions with proper margins for labels
   // Increase right margin when zone labels are positioned outside
   const visibleZonesCount = zones.filter(z => z.visible && z.showLabel).length;
-  const outsideLabelsSpace = settings.zoneLabelPosition === 'outside' && settings.showZoneLabels && settings.showZones
+  const legendLabelsSpace = settings.zoneLabelPosition === 'legend' && settings.showZoneLabels && settings.showZones
     ? Math.max(80, visibleZonesCount * 22 + 30) 
     : 0;
-  const margin = { top: 60, right: 100 + outsideLabelsSpace, bottom: 60, left: 70 };
+  const margin = { top: 60, right: 100 + legendLabelsSpace, bottom: 60, left: 70 };
   const width = settings.width;
   const height = settings.height;
   const plotWidth = width - margin.left - margin.right;
@@ -665,7 +665,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
         {settings.showZones && settings.showZoneLabels && (() => {
           const visibleLabeledZones = zones.filter(z => z.visible && z.showLabel);
           
-          if (settings.zoneLabelPosition === 'outside') {
+          if (settings.zoneLabelPosition === 'legend') {
             // Render a clean legend to the right of the plot
             const legendX = margin.left + plotWidth + 15;
             const baseY = margin.top + 20;
@@ -715,6 +715,45 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
                 })}
               </g>
             );
+          } else if (settings.zoneLabelPosition === 'edge') {
+            // Render labels just outside each zone's boundary
+            return visibleLabeledZones.map((zone) => {
+              const memberPoints = zone.memberPointIds.length > 0
+                ? points.filter(p => zone.memberPointIds.includes(p.id))
+                : [];
+              
+              if (memberPoints.length === 0) return null;
+              
+              // Find the topmost point of the zone and place label just above it
+              const memberCoords = memberPoints.map(p => ({ x: p.x, y: p.y }));
+              const topPoint = memberCoords.reduce((top, p) => p.y > top.y ? p : top, memberCoords[0]);
+              const centerX = memberCoords.reduce((sum, p) => sum + p.x, 0) / memberCoords.length;
+              
+              // Position label above the top of the zone
+              const labelPos = transformPoint(centerX, topPoint.y + pointRadiusDataUnits * 2);
+              const labelColor = settings.zoneLabelColor === 'zone' ? zone.color : '#1f2937';
+              
+              return (
+                <g key={`zone-label-${zone.id}`}>
+                  <text
+                    x={labelPos.cx}
+                    y={labelPos.cy - 8}
+                    textAnchor="middle"
+                    dominantBaseline="auto"
+                    fontSize={zone.labelFontSize}
+                    fontWeight="600"
+                    fontFamily="sans-serif"
+                    fill={labelColor}
+                    stroke="white"
+                    strokeWidth="2.5"
+                    paintOrder="stroke"
+                    className="pointer-events-none"
+                  >
+                    {zone.name}
+                  </text>
+                </g>
+              );
+            });
           } else {
             // Render labels at zone centroid (center position)
             return visibleLabeledZones.map((zone) => {
