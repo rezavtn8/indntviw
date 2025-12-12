@@ -685,7 +685,7 @@ export const IndentViewApp: React.FC = () => {
                 activeTool={drawingTool}
                 onToolChange={setDrawingTool}
                 onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
-                onCreateZone={handleCreateZoneFromSelection}
+                onCreateZone={() => handleCreateZoneFromSelection(exportSelectedPointIds)}
                 onClearSelection={() => setExportSelectedPointIds([])}
                 hasSelectedZone={!!selectedZoneId}
                 hasSelectedPoints={exportSelectedPointIds.length > 0}
