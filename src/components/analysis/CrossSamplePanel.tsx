@@ -3,15 +3,19 @@ import { FileSession } from '@/types/fileSession';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { calculateDescriptiveStats, getPropertyValues } from '@/utils/advancedStatistics';
 import { SampleSelector, getSampleColor } from './SampleSelector';
+import { SampleGrouping, SampleGroup } from './SampleGrouping';
 import { CrossSampleStats } from './CrossSampleStats';
 import { CrossSamplePlots } from './CrossSamplePlots';
 import { CrossSampleTests } from './CrossSampleTests';
+import { GroupComparison } from './GroupComparison';
+import { ZoneAcrossSamplesPanel } from './ZoneAcrossSamplesPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart3, GitCompare, Layers } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin } from 'lucide-react';
 
 interface CrossSamplePanelProps {
   fileSessions: FileSession[];
@@ -29,6 +33,8 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [groups, setGroups] = useState<SampleGroup[]>([]);
+  const [groupingOpen, setGroupingOpen] = useState(false);
 
   const getPropertyLabel = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -74,53 +80,78 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   return (
     <div className="h-full flex">
       {/* Left Sidebar - Sample Selection */}
-      <div className="w-64 border-r-2 border-border bg-card p-4 flex flex-col">
-        <h3 className="font-mono text-sm font-bold uppercase tracking-wider mb-4">
-          Cross-Sample Analysis
-        </h3>
+      <div className="w-72 border-r-2 border-border bg-card flex flex-col">
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-4">
+            <h3 className="font-mono text-sm font-bold uppercase tracking-wider">
+              Cross-Sample Analysis
+            </h3>
 
-        {/* Property Selector */}
-        <div className="mb-4">
-          <Label className="font-mono text-xs uppercase text-muted-foreground mb-2 block">
-            Property
-          </Label>
-          <Select value={selectedProperty} onValueChange={onPropertyChange}>
-            <SelectTrigger className="font-mono text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {propertyNames.map(prop => (
-                <SelectItem key={prop} value={prop} className="font-mono text-sm">
-                  {getPropertyLabel(prop)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            {/* Property Selector */}
+            <div>
+              <Label className="font-mono text-xs uppercase text-muted-foreground mb-2 block">
+                Property
+              </Label>
+              <Select value={selectedProperty} onValueChange={onPropertyChange}>
+                <SelectTrigger className="font-mono text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {propertyNames.map(prop => (
+                    <SelectItem key={prop} value={prop} className="font-mono text-sm">
+                      {getPropertyLabel(prop)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        {/* Sample Selection */}
-        <div className="flex-1 min-h-0">
-          <SampleSelector
-            sessions={fileSessions}
-            selectedSessionIds={selectedSessionIds}
-            onSelectionChange={setSelectedSessionIds}
-          />
-        </div>
+            {/* Sample Selection */}
+            <SampleSelector
+              sessions={fileSessions}
+              selectedSessionIds={selectedSessionIds}
+              onSelectionChange={setSelectedSessionIds}
+            />
 
-        {/* Plot Options */}
-        <div className="mt-4 pt-4 border-t border-border space-y-3">
-          <Label className="font-mono text-xs uppercase text-muted-foreground block">
-            Plot Options
-          </Label>
-          <div className="flex items-center justify-between">
-            <Label className="font-mono text-xs cursor-pointer">Show Violin</Label>
-            <Switch checked={showViolin} onCheckedChange={setShowViolin} />
+            {/* Sample Grouping */}
+            <Collapsible open={groupingOpen} onOpenChange={setGroupingOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  <span className="font-mono text-sm font-medium">Treatment Groups</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {groups.length > 0 && (
+                    <span className="text-xs text-muted-foreground">{groups.length}</span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${groupingOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-3">
+                <SampleGrouping
+                  sessions={fileSessions}
+                  groups={groups}
+                  onGroupsChange={setGroups}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Plot Options */}
+            <div className="pt-4 border-t border-border space-y-3">
+              <Label className="font-mono text-xs uppercase text-muted-foreground block">
+                Plot Options
+              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="font-mono text-xs cursor-pointer">Show Violin</Label>
+                <Switch checked={showViolin} onCheckedChange={setShowViolin} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
+                <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
-            <Switch checked={showJitter} onCheckedChange={setShowJitter} />
-          </div>
-        </div>
+        </ScrollArea>
       </div>
 
       {/* Main Content */}
@@ -134,14 +165,22 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
               </TabsTrigger>
               <TabsTrigger value="comparison" className="font-mono text-sm gap-2">
                 <GitCompare className="w-4 h-4" />
-                Statistical Tests
+                Tests
+              </TabsTrigger>
+              <TabsTrigger value="groups" className="font-mono text-sm gap-2">
+                <Users className="w-4 h-4" />
+                Groups
+              </TabsTrigger>
+              <TabsTrigger value="zones" className="font-mono text-sm gap-2">
+                <MapPin className="w-4 h-4" />
+                Zones
               </TabsTrigger>
             </TabsList>
           </div>
 
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-4">
-              {sampleData.length === 0 ? (
+              {sampleData.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 gap-4">
                   <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center">
                     <Layers className="w-8 h-8 text-muted-foreground/50" />
@@ -155,9 +194,11 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                     </p>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <TabsContent value="overview" className="mt-0 space-y-4">
+              )}
+
+              <TabsContent value="overview" className="mt-0 space-y-4">
+                {sampleData.length > 0 && (
+                  <>
                     <CrossSampleStats samples={sampleData} selectedProperty={selectedProperty} />
                     <CrossSamplePlots
                       samples={sampleData}
@@ -165,13 +206,30 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                       showViolin={showViolin}
                       showJitter={showJitter}
                     />
-                  </TabsContent>
+                  </>
+                )}
+              </TabsContent>
 
-                  <TabsContent value="comparison" className="mt-0 space-y-4">
-                    <CrossSampleTests samples={sampleData} selectedProperty={selectedProperty} />
-                  </TabsContent>
-                </>
-              )}
+              <TabsContent value="comparison" className="mt-0 space-y-4">
+                {sampleData.length > 0 ? (
+                  <CrossSampleTests samples={sampleData} selectedProperty={selectedProperty} />
+                ) : null}
+              </TabsContent>
+
+              <TabsContent value="groups" className="mt-0 space-y-4">
+                <GroupComparison
+                  fileSessions={fileSessions}
+                  groups={groups}
+                  selectedProperty={selectedProperty}
+                />
+              </TabsContent>
+
+              <TabsContent value="zones" className="mt-0 space-y-4">
+                <ZoneAcrossSamplesPanel
+                  fileSessions={fileSessions}
+                  selectedProperty={selectedProperty}
+                />
+              </TabsContent>
             </div>
           </ScrollArea>
         </Tabs>
