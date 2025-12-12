@@ -581,96 +581,96 @@ export const IndentViewApp: React.FC = () => {
       />
 
       <div className="flex-1 flex">
-        {/* Sidebar */}
-        <aside className="w-80 border-r-2 border-border bg-card p-4 space-y-6 overflow-y-auto">
-          <FileUploader
-            onDataLoaded={handleDataLoaded}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-          />
+        {/* Sidebar - Hidden in Analysis view since it has its own controls */}
+        {activeView !== 'analysis' && (
+          <aside className="w-80 border-r-2 border-border bg-card p-4 space-y-6 overflow-y-auto">
+            <FileUploader
+              onDataLoaded={handleDataLoaded}
+              isLoading={isLoading}
+              setIsLoading={setIsLoading}
+            />
 
-          {data && (
-            <>
-              <PropertySelector
-                availableProperties={data.propertyNames}
-                selectedProperty={selectedProperty}
-                onPropertyChange={handlePropertyChange}
-              />
-
-              <ColorSchemeSelector
-                colorScheme={colorScheme}
-                onColorSchemeChange={handleColorSchemeChange}
-              />
-
-              <RangeControls
-                dataMin={dataMin}
-                dataMax={dataMax}
-                currentMin={currentMin}
-                currentMax={currentMax}
-                onMinChange={(val) => updateActiveSession({ customMin: val })}
-                onMaxChange={(val) => updateActiveSession({ customMax: val })}
-                onReset={handleResetRange}
-              />
-
-              {activeView === '2d' && (
-                <VisualizationOptions
-                  showContours={showContours}
-                  showInterpolation={showInterpolation}
-                  onShowContoursChange={setShowContours}
-                  onShowInterpolationChange={setShowInterpolation}
-                />
-              )}
-
-              <ColorLegend
-                selectedProperty={selectedProperty}
-                unit={getPropertyUnit(selectedProperty)}
-                colorScheme={colorScheme}
-                minValue={currentMin}
-                maxValue={currentMax}
-              />
-
-              {isEditing && (
-                <OutlierDetector
-                  points={data.points}
+            {data && (
+              <>
+                <PropertySelector
+                  availableProperties={data.propertyNames}
                   selectedProperty={selectedProperty}
-                  onRemoveOutliers={handleRemoveOutliers}
-                  onHighlightOutliers={handleHighlightOutliers}
+                  onPropertyChange={handlePropertyChange}
                 />
-              )}
 
-              <SelectionStatisticsPanel
-                allPoints={data.points}
-                selectedPoints={selectedPoints}
-                selectedProperty={selectedProperty}
-                onExportSelected={selectedPoints.length > 0 ? handleExportSelected : undefined}
-              />
+                <ColorSchemeSelector
+                  colorScheme={colorScheme}
+                  onColorSchemeChange={handleColorSchemeChange}
+                />
 
-              <DistributionHistogram
-                allPoints={data.points}
-                selectedPoints={selectedPoints}
-                selectedProperty={selectedProperty}
-              />
+                <RangeControls
+                  dataMin={dataMin}
+                  dataMax={dataMax}
+                  currentMin={currentMin}
+                  currentMax={currentMax}
+                  onMinChange={(val) => updateActiveSession({ customMin: val })}
+                  onMaxChange={(val) => updateActiveSession({ customMax: val })}
+                  onReset={handleResetRange}
+                />
 
-              {/* Zone Panel for 2D View */}
-              {activeView === '2d' && zones.length > 0 && (
-                <div className="bg-card border-2 border-border rounded-lg">
-                  <h3 className="font-mono text-sm font-semibold uppercase tracking-wider px-4 py-3 border-b border-border">
-                    Zones ({zones.length})
-                  </h3>
-                  <ZonePanel
-                    zones={zones}
-                    selectedZoneId={selectedZoneId}
+                {activeView === '2d' && (
+                  <VisualizationOptions
+                    showContours={showContours}
+                    showInterpolation={showInterpolation}
+                    onShowContoursChange={setShowContours}
+                    onShowInterpolationChange={setShowInterpolation}
+                  />
+                )}
+
+                <ColorLegend
+                  selectedProperty={selectedProperty}
+                  unit={getPropertyUnit(selectedProperty)}
+                  colorScheme={colorScheme}
+                  minValue={currentMin}
+                  maxValue={currentMax}
+                />
+
+                {isEditing && (
+                  <OutlierDetector
                     points={data.points}
                     selectedProperty={selectedProperty}
-                    onSelectZone={handleSelectZone}
-                    onUpdateZone={handleZoneUpdate}
-                    onDeleteZone={handleZoneDelete}
+                    onRemoveOutliers={handleRemoveOutliers}
+                    onHighlightOutliers={handleHighlightOutliers}
                   />
-                </div>
-              )}
-            </>
-          )}
-        </aside>
+                )}
+
+                {/* Only show stats in 2D/3D views, not in Export */}
+                {(activeView === '2d' || activeView === '3d') && (
+                  <SelectionStatisticsPanel
+                    allPoints={data.points}
+                    selectedPoints={selectedPoints}
+                    selectedProperty={selectedProperty}
+                    onExportSelected={selectedPoints.length > 0 ? handleExportSelected : undefined}
+                    defaultOpen={false}
+                  />
+                )}
+
+                {/* Zone Panel for 2D View */}
+                {activeView === '2d' && zones.length > 0 && (
+                  <div className="bg-card border-2 border-border rounded-lg">
+                    <h3 className="font-mono text-sm font-semibold uppercase tracking-wider px-4 py-3 border-b border-border">
+                      Zones ({zones.length})
+                    </h3>
+                    <ZonePanel
+                      zones={zones}
+                      selectedZoneId={selectedZoneId}
+                      points={data.points}
+                      selectedProperty={selectedProperty}
+                      onSelectZone={handleSelectZone}
+                      onUpdateZone={handleZoneUpdate}
+                      onDeleteZone={handleZoneDelete}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </aside>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col">

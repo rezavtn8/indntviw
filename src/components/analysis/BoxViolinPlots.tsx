@@ -81,14 +81,20 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     return `${leftPath} ${rightPath} Z`;
   };
 
-  // Generate jittered points
-  const getJitteredPoints = (values: number[], centerX: number, width: number): { x: number; y: number }[] => {
+  // Seeded pseudo-random for consistent jitter positions
+  const seededRandom = (seed: number): number => {
+    const x = Math.sin(seed * 9999) * 10000;
+    return x - Math.floor(x);
+  };
+
+  // Generate jittered points with stable positions
+  const getJitteredPoints = useMemo(() => (values: number[], centerX: number, width: number, groupIndex: number): { x: number; y: number }[] => {
     const maxJitter = width * 0.3;
     return values.slice(0, 100).map((v, i) => ({
-      x: centerX + (Math.random() - 0.5) * maxJitter,
+      x: centerX + (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
       y: valueToY(v),
     }));
-  };
+  }, [globalMin, range]);
 
   const boxWidth = 40;
   const groupWidth = 80;
@@ -151,7 +157,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                 )}
 
                 {/* Jittered points (if enabled) */}
-                {showJitter && getJitteredPoints(values, centerX, boxWidth).map((pt, i) => (
+                {showJitter && getJitteredPoints(values, centerX, boxWidth, idx).map((pt, i) => (
                   <circle
                     key={i}
                     cx={pt.x}

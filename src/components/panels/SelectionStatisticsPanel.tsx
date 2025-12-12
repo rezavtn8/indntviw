@@ -1,14 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { IndentationPoint, PROPERTY_CONFIGS } from '@/types/indentation';
 import { calculateExtendedStatistics, calculateCoordinateRanges } from '@/utils/statisticsUtils';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Download, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SelectionStatisticsPanelProps {
   allPoints: IndentationPoint[];
   selectedPoints: IndentationPoint[];
   selectedProperty: string;
   onExportSelected?: () => void;
+  defaultOpen?: boolean;
 }
 
 export const SelectionStatisticsPanel: React.FC<SelectionStatisticsPanelProps> = ({
@@ -16,7 +19,9 @@ export const SelectionStatisticsPanel: React.FC<SelectionStatisticsPanelProps> =
   selectedPoints,
   selectedProperty,
   onExportSelected,
+  defaultOpen = true,
 }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const allStats = useMemo(
     () => calculateExtendedStatistics(allPoints, selectedProperty),
     [allPoints, selectedProperty]
@@ -59,18 +64,33 @@ export const SelectionStatisticsPanel: React.FC<SelectionStatisticsPanelProps> =
   const hasSelection = selectedPoints.length > 0;
 
   return (
-    <div className="border-2 border-border bg-card p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
-          Statistics
-        </h3>
-        {hasSelection && onExportSelected && (
-          <Button variant="ghost" size="sm" onClick={onExportSelected} className="h-6 px-2 gap-1">
-            <Download className="w-3 h-3" />
-            <span className="font-mono text-xs">Export</span>
-          </Button>
-        )}
-      </div>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="border-2 border-border bg-card shadow-sm">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors">
+          <h3 className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
+            Statistics
+          </h3>
+          <div className="flex items-center gap-2">
+            {hasSelection && onExportSelected && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExportSelected();
+                }} 
+                className="h-6 px-2 gap-1"
+              >
+                <Download className="w-3 h-3" />
+                <span className="font-mono text-xs">Export</span>
+              </Button>
+            )}
+            <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
+          </div>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <div className="px-4 pb-4">
 
       {/* Header */}
       <div className="grid grid-cols-3 gap-2 font-mono text-xs mb-2 pb-2 border-b border-border">
@@ -114,8 +134,11 @@ export const SelectionStatisticsPanel: React.FC<SelectionStatisticsPanelProps> =
               <span>{coordRanges.zRange[0].toFixed(3)} – {coordRanges.zRange[1].toFixed(3)} mm</span>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 };

@@ -27,44 +27,47 @@ export const FileTabs: React.FC<FileTabsProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-secondary/50 border-b border-border overflow-x-auto">
-      {sessions.map((session) => {
-        const isActive = session.id === activeSessionId;
-        const hasChanges = session.data.points !== session.originalData.points;
-        
-        return (
-          <div
-            key={session.id}
-            className={cn(
-              "group flex items-center gap-2 px-3 py-1.5 font-mono text-xs cursor-pointer transition-colors border",
-              isActive
-                ? "bg-card border-border text-foreground"
-                : "bg-transparent border-transparent text-muted-foreground hover:bg-card/50 hover:text-foreground"
-            )}
-            onClick={() => onSelectSession(session.id)}
-          >
-            <span className="flex items-center gap-1.5">
-              {hasChanges && (
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Unsaved changes" />
-              )}
-              {truncateFileName(session.fileName)}
-            </span>
-            <button
+    <div className="relative flex items-center gap-1 px-2 py-1 bg-secondary/50 border-b border-border">
+      {/* Scroll indicator shadows */}
+      <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-secondary/50 to-transparent pointer-events-none z-10 opacity-0 has-[+div:hover]:opacity-100" />
+      
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        {sessions.map((session) => {
+          const isActive = session.id === activeSessionId;
+          const hasChanges = session.data.points !== session.originalData.points;
+          
+          return (
+            <div
+              key={session.id}
               className={cn(
-                "p-0.5 rounded hover:bg-destructive/20 transition-colors",
-                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                "group flex items-center gap-2 px-3 py-1.5 font-mono text-xs cursor-pointer transition-colors border rounded-sm shrink-0",
+                isActive
+                  ? "bg-card border-border text-foreground shadow-sm"
+                  : "bg-transparent border-transparent text-muted-foreground hover:bg-card/50 hover:text-foreground"
               )}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCloseSession(session.id);
-              }}
-              title="Close tab"
+              onClick={() => onSelectSession(session.id)}
+              title={session.fileName}
             >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        );
-      })}
+              <span className="flex items-center gap-1.5">
+                {hasChanges && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" title="Unsaved changes" />
+                )}
+                {truncateFileName(session.fileName)}
+              </span>
+              <button
+                className="p-0.5 rounded hover:bg-destructive/20 transition-colors opacity-60 hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseSession(session.id);
+                }}
+                title="Close tab"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
