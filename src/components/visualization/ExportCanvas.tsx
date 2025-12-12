@@ -49,7 +49,12 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   const [currentPos, setCurrentPos] = useState<ZonePoint | null>(null);
 
   // Canvas dimensions with proper margins for labels
-  const margin = { top: 60, right: 120, bottom: 60, left: 70 };
+  // Increase right margin when zone labels are positioned outside
+  const visibleZonesCount = zones.filter(z => z.visible && z.showLabel).length;
+  const outsideLabelsSpace = settings.zoneLabelPosition === 'outside' && settings.showZoneLabels && settings.showZones
+    ? Math.max(100, visibleZonesCount * 24 + 40) 
+    : 0;
+  const margin = { top: 60, right: 120 + outsideLabelsSpace, bottom: 60, left: 70 };
   const width = settings.width;
   const height = settings.height;
   const plotWidth = width - margin.left - margin.right;
