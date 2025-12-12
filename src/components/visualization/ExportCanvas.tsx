@@ -52,9 +52,9 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   // Increase right margin when zone labels are positioned outside
   const visibleZonesCount = zones.filter(z => z.visible && z.showLabel).length;
   const outsideLabelsSpace = settings.zoneLabelPosition === 'outside' && settings.showZoneLabels && settings.showZones
-    ? Math.max(100, visibleZonesCount * 24 + 40) 
+    ? Math.max(80, visibleZonesCount * 22 + 30) 
     : 0;
-  const margin = { top: 60, right: 120 + outsideLabelsSpace, bottom: 60, left: 70 };
+  const margin = { top: 60, right: 100 + outsideLabelsSpace, bottom: 60, left: 70 };
   const width = settings.width;
   const height = settings.height;
   const plotWidth = width - margin.left - margin.right;
@@ -662,77 +662,95 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
         </g>
 
         {/* Zone labels - rendered ON TOP of points */}
-        {settings.showZones && settings.showZoneLabels && zones.filter(z => z.visible && z.showLabel).map((zone, zoneIndex) => {
-          const memberPoints = zone.memberPointIds.length > 0
-            ? points.filter(p => zone.memberPointIds.includes(p.id))
-            : [];
-          
-          if (memberPoints.length === 0) return null;
-          
-          const centroid = getZoneCentroid(zone, points);
-          const labelPos = transformPoint(centroid.x, centroid.y);
-          
-          // Calculate bounding box of member points for outside positioning
-          const xCoords = memberPoints.map(p => transformPoint(p.x, p.y).cx);
-          const yCoords = memberPoints.map(p => transformPoint(p.x, p.y).cy);
-          const minX = Math.min(...xCoords);
-          const maxX = Math.max(...xCoords);
-          const minY = Math.min(...yCoords);
-          const maxY = Math.max(...yCoords);
-          
-          // Determine label position based on setting
-          let finalX = labelPos.cx;
-          let finalY = labelPos.cy;
-          let textAnchor: 'start' | 'middle' | 'end' = 'middle';
+        {settings.showZones && settings.showZoneLabels && (() => {
+          const visibleLabeledZones = zones.filter(z => z.visible && z.showLabel);
           
           if (settings.zoneLabelPosition === 'outside') {
-            // Position label to the right of the zone, stacked vertically by zone index
-            const legendX = margin.left + plotWidth + 10;
+            // Render a clean legend to the right of the plot
+            const legendX = margin.left + plotWidth + 15;
             const baseY = margin.top + 20;
-            const spacing = 24;
+            const itemHeight = 22;
             
-            finalX = legendX;
-            finalY = baseY + zoneIndex * spacing;
-            textAnchor = 'start';
+            return (
+              <g>
+                {visibleLabeledZones.map((zone, zoneIndex) => {
+                  const memberPoints = zone.memberPointIds.length > 0
+                    ? points.filter(p => zone.memberPointIds.includes(p.id))
+                    : [];
+                  
+                  if (memberPoints.length === 0) return null;
+                  
+                  const itemY = baseY + zoneIndex * itemHeight;
+                  const labelColor = settings.zoneLabelColor === 'zone' ? zone.color : '#1f2937';
+                  
+                  return (
+                    <g key={`zone-legend-${zone.id}`}>
+                      {/* Color swatch */}
+                      <rect
+                        x={legendX}
+                        y={itemY - 6}
+                        width={12}
+                        height={12}
+                        rx={2}
+                        fill={zone.color}
+                        stroke="#374151"
+                        strokeWidth="0.5"
+                        fillOpacity={0.8}
+                      />
+                      {/* Zone name */}
+                      <text
+                        x={legendX + 18}
+                        y={itemY}
+                        textAnchor="start"
+                        dominantBaseline="middle"
+                        fontSize={zone.labelFontSize}
+                        fontWeight="500"
+                        fontFamily="sans-serif"
+                        fill={labelColor}
+                      >
+                        {zone.name}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          } else {
+            // Render labels at zone centroid (center position)
+            return visibleLabeledZones.map((zone) => {
+              const memberPoints = zone.memberPointIds.length > 0
+                ? points.filter(p => zone.memberPointIds.includes(p.id))
+                : [];
+              
+              if (memberPoints.length === 0) return null;
+              
+              const centroid = getZoneCentroid(zone, points);
+              const labelPos = transformPoint(centroid.x, centroid.y);
+              const labelColor = settings.zoneLabelColor === 'zone' ? zone.color : '#1f2937';
+              
+              return (
+                <g key={`zone-label-${zone.id}`}>
+                  <text
+                    x={labelPos.cx}
+                    y={labelPos.cy}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={zone.labelFontSize}
+                    fontWeight="bold"
+                    fontFamily="sans-serif"
+                    fill={labelColor}
+                    stroke="white"
+                    strokeWidth="3"
+                    paintOrder="stroke"
+                    className="pointer-events-none"
+                  >
+                    {zone.name}
+                  </text>
+                </g>
+              );
+            });
           }
-          
-          // Determine label color
-          const labelColor = settings.zoneLabelColor === 'zone' ? zone.color : '#1f2937';
-
-          return (
-            <g key={`zone-label-${zone.id}`}>
-              {/* Connector line for outside labels */}
-              {settings.zoneLabelPosition === 'outside' && (
-                <line
-                  x1={maxX + pointRadius}
-                  y1={(minY + maxY) / 2}
-                  x2={finalX - 5}
-                  y2={finalY}
-                  stroke={zone.color}
-                  strokeWidth="1.5"
-                  strokeOpacity="0.6"
-                  strokeDasharray="4 2"
-                />
-              )}
-              <text
-                x={finalX}
-                y={finalY}
-                textAnchor={textAnchor}
-                dominantBaseline="middle"
-                fontSize={zone.labelFontSize}
-                fontWeight="bold"
-                fontFamily="sans-serif"
-                fill={labelColor}
-                stroke="white"
-                strokeWidth="3"
-                paintOrder="stroke"
-                className="pointer-events-none"
-              >
-                {zone.name}
-              </text>
-            </g>
-          );
-        })}
+        })()}
         {/* Selection preview boundary */}
         {selectionPreviewPath && !isDrawing && (
           <path
