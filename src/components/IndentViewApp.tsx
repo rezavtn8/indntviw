@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Heatmap2D } from '@/components/visualization/Heatmap2D';
 import { Scene3D } from '@/components/visualization/Scene3D';
@@ -21,8 +21,10 @@ import { ZoneComparisonPanel } from '@/components/panels/ZoneComparisonPanel';
 import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
+import { FileTabs } from '@/components/FileTabs';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
 import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS } from '@/types/zones';
+import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
 import { generateZoneId, updateZoneBoundary, createZoneFromSelection } from '@/utils/zoneUtils';
 import { parseTabSeparatedData } from '@/utils/dataParser';
 import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput } from 'lucide-react';
@@ -30,43 +32,63 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
 export const IndentViewApp: React.FC = () => {
-  const [data, setData] = useState<IndentationData | null>(null);
-  const [originalData, setOriginalData] = useState<IndentationData | null>(null);
+  // Multi-file session state
+  const [fileSessions, setFileSessions] = useState<FileSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<string>('HIT');
-  const [colorScheme, setColorScheme] = useState<ColorScheme>('viridis');
   const [selectedPoint, setSelectedPoint] = useState<IndentationPoint | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<IndentationPoint | null>(null);
-  const [customMin, setCustomMin] = useState<number | null>(null);
-  const [customMax, setCustomMax] = useState<number | null>(null);
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'export'>('2d');
   
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
   const [editingPoint, setEditingPoint] = useState<IndentationPoint | null>(null);
   const [isAddingPoint, setIsAddingPoint] = useState(false);
-  const [highlightedOutliers, setHighlightedOutliers] = useState<number[]>([]);
   
   // Visualization options
   const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
   
-  // Selection state (unified for 2D view and Export Studio)
+  // Drawing tools
   const [heatmapDrawingTool, setHeatmapDrawingTool] = useState<DrawingTool>('select');
-  const [selectedPointIds, setSelectedPointIds] = useState<number[]>([]);
-  
-  // Ref for screenshot/export
-  const visualizationRef = useRef<HTMLDivElement>(null);
-  const exportCanvasRef = useRef<ExportCanvasRef>(null);
-  
-  // Zone state (shared between 2D view and Export Studio)
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
-  const [comparedZoneIds, setComparedZoneIds] = useState<string[]>([]);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>('select');
+  
+  // Export settings (global, not per-session)
   const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportSelectedPointIds, setExportSelectedPointIds] = useState<number[]>([]);
+  
+  // Refs
+  const visualizationRef = useRef<HTMLDivElement>(null);
+  const exportCanvasRef = useRef<ExportCanvasRef>(null);
+
+  // Get active session
+  const activeSession = useMemo(() => 
+    fileSessions.find(s => s.id === activeSessionId) || null,
+    [fileSessions, activeSessionId]
+  );
+
+  // Helper to update active session
+  const updateActiveSession = useCallback((updates: Partial<FileSession>) => {
+    if (!activeSessionId) return;
+    setFileSessions(prev => prev.map(s => 
+      s.id === activeSessionId ? { ...s, ...updates } : s
+    ));
+  }, [activeSessionId]);
+
+  // Derived data from active session
+  const data = activeSession?.data || null;
+  const originalData = activeSession?.originalData || null;
+  const selectedProperty = activeSession?.selectedProperty || 'HIT';
+  const colorScheme = activeSession?.colorScheme || 'viridis';
+  const customMin = activeSession?.customMin ?? null;
+  const customMax = activeSession?.customMax ?? null;
+  const zones = activeSession?.zones || [];
+  const selectedZoneId = activeSession?.selectedZoneId || null;
+  const comparedZoneIds = activeSession?.comparedZoneIds || [];
+  const selectedPointIds = activeSession?.selectedPointIds || [];
+  const highlightedOutliers = activeSession?.highlightedOutliers || [];
+  const exportSelectedPointIds = activeSession?.exportSelectedPointIds || [];
 
   // Load sample data on mount
   useEffect(() => {
@@ -76,8 +98,10 @@ export const IndentViewApp: React.FC = () => {
         if (response.ok) {
           const text = await response.text();
           const parsed = parseTabSeparatedData(text);
-          setData(parsed);
-          setOriginalData(parsed);
+          const sessionId = generateSessionId();
+          const session = createFileSession(sessionId, 'sample_indentation.txt', parsed);
+          setFileSessions([session]);
+          setActiveSessionId(sessionId);
           toast.success(`Loaded sample data: ${parsed.points.length} points`);
         }
       } catch (error) {
@@ -86,14 +110,6 @@ export const IndentViewApp: React.FC = () => {
     };
     loadSampleData();
   }, []);
-
-  // Update selected property when data changes
-  useEffect(() => {
-    if (data && !data.propertyNames.includes(selectedProperty)) {
-      const defaultProp = data.propertyNames.find(p => p === 'HIT') || data.propertyNames[0];
-      if (defaultProp) setSelectedProperty(defaultProp);
-    }
-  }, [data, selectedProperty]);
 
   // Calculate min/max for current property
   const { dataMin, dataMax, currentMin, currentMax } = useMemo(() => {
@@ -116,7 +132,7 @@ export const IndentViewApp: React.FC = () => {
     };
   }, [data, selectedProperty, customMin, customMax]);
 
-  // Calculate spatial data bounds for axis settings
+  // Calculate spatial data bounds
   const dataBounds = useMemo(() => {
     if (!data || data.points.length === 0) {
       return { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
@@ -131,44 +147,65 @@ export const IndentViewApp: React.FC = () => {
     };
   }, [data]);
 
-  // Calculate point radius in data units (for zone boundaries)
+  // Calculate point radius in data units
   const pointRadiusDataUnits = useMemo(() => {
     if (!data || data.points.length === 0) return 0.5;
     const xRange = dataBounds.xMax - dataBounds.xMin || 1;
     const yRange = dataBounds.yMax - dataBounds.yMin || 1;
     const avgDistance = Math.sqrt((xRange * yRange) / data.points.length);
-    // This matches the visual point radius calculation
     return avgDistance * 0.35;
   }, [data, dataBounds]);
 
   const handlePropertyChange = useCallback((property: string) => {
-    setSelectedProperty(property);
-    setCustomMin(null);
-    setCustomMax(null);
-  }, []);
+    updateActiveSession({ 
+      selectedProperty: property, 
+      customMin: null, 
+      customMax: null 
+    });
+  }, [updateActiveSession]);
+
+  const handleColorSchemeChange = useCallback((scheme: ColorScheme) => {
+    updateActiveSession({ colorScheme: scheme });
+  }, [updateActiveSession]);
 
   const handleResetRange = useCallback(() => {
-    setCustomMin(null);
-    setCustomMax(null);
+    updateActiveSession({ customMin: null, customMax: null });
+  }, [updateActiveSession]);
+
+  const handleDataLoaded = useCallback((newData: IndentationData, fileName: string) => {
+    const sessionId = generateSessionId();
+    const session = createFileSession(sessionId, fileName, newData);
+    setFileSessions(prev => [...prev, session]);
+    setActiveSessionId(sessionId);
+    setSelectedPoint(null);
   }, []);
 
-  const handleDataLoaded = useCallback((newData: IndentationData) => {
-    setData(newData);
-    setOriginalData(newData);
+  const handleSelectSession = useCallback((sessionId: string) => {
+    setActiveSessionId(sessionId);
     setSelectedPoint(null);
-    setCustomMin(null);
-    setCustomMax(null);
-    setHighlightedOutliers([]);
-    setSelectedPointIds([]);
   }, []);
+
+  const handleCloseSession = useCallback((sessionId: string) => {
+    setFileSessions(prev => {
+      const newSessions = prev.filter(s => s.id !== sessionId);
+      // If closing active session, switch to another
+      if (sessionId === activeSessionId && newSessions.length > 0) {
+        setActiveSessionId(newSessions[newSessions.length - 1].id);
+      } else if (newSessions.length === 0) {
+        setActiveSessionId(null);
+      }
+      return newSessions;
+    });
+    setSelectedPoint(null);
+  }, [activeSessionId]);
 
   // Handle lasso selection
   const handleLassoSelect = useCallback((pointIds: number[]) => {
-    setSelectedPointIds(pointIds);
+    updateActiveSession({ selectedPointIds: pointIds });
     if (pointIds.length > 0) {
       toast.success(`Selected ${pointIds.length} points`);
     }
-  }, []);
+  }, [updateActiveSession]);
 
   // Get selected points
   const selectedPoints = useMemo(() => {
@@ -245,7 +282,7 @@ export const IndentViewApp: React.FC = () => {
   }, []);
 
   const handleSavePoint = useCallback((updatedPoint: IndentationPoint) => {
-    if (!data) return;
+    if (!data || !activeSession) return;
 
     let newPoints: IndentationPoint[];
     
@@ -261,11 +298,11 @@ export const IndentViewApp: React.FC = () => {
       statistics: recalculateStatistics(newPoints, data.propertyNames),
     };
 
-    setData(newData);
+    updateActiveSession({ data: newData });
     setSelectedPoint(updatedPoint);
     setEditingPoint(null);
     setIsAddingPoint(false);
-  }, [data, isAddingPoint, recalculateStatistics]);
+  }, [data, activeSession, isAddingPoint, recalculateStatistics, updateActiveSession]);
 
   const handleDeletePoint = useCallback((pointId: number) => {
     if (!data) return;
@@ -280,10 +317,10 @@ export const IndentViewApp: React.FC = () => {
       statistics: recalculateStatistics(newPoints, data.propertyNames),
     };
 
-    setData(newData);
+    updateActiveSession({ data: newData });
     setSelectedPoint(null);
     setEditingPoint(null);
-  }, [data, recalculateStatistics]);
+  }, [data, recalculateStatistics, updateActiveSession]);
 
   const handleAddNewPoint = useCallback(() => {
     if (!data) return;
@@ -322,34 +359,34 @@ export const IndentViewApp: React.FC = () => {
       statistics: recalculateStatistics(newPoints, data.propertyNames),
     };
 
-    setData(newData);
-    setHighlightedOutliers([]);
+    updateActiveSession({ data: newData, highlightedOutliers: [] });
     setSelectedPoint(null);
-  }, [data, recalculateStatistics]);
+  }, [data, recalculateStatistics, updateActiveSession]);
 
   const handleResetData = useCallback(() => {
     if (originalData) {
-      setData(originalData);
+      updateActiveSession({ 
+        data: originalData, 
+        highlightedOutliers: [] 
+      });
       setSelectedPoint(null);
-      setHighlightedOutliers([]);
       toast.success('Data reset to original');
     }
-  }, [originalData]);
+  }, [originalData, updateActiveSession]);
 
   const getPropertyUnit = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
     return config?.unit || '';
   };
 
-  // Efficient change detection without JSON.stringify
+  // Efficient change detection
   const hasChanges = useMemo(() => {
     if (!data || !originalData) return false;
     if (data.points.length !== originalData.points.length) return true;
-    // Check if any point reference changed (works because we create new objects on edit)
     return data.points !== originalData.points;
   }, [data, originalData]);
 
-  // Zone management handlers - works for both 2D view and Export Studio
+  // Zone management handlers
   const handleCreateZoneFromSelection = useCallback((pointIds?: number[]) => {
     if (!data) return;
     const ids = pointIds || (activeView === 'export' ? exportSelectedPointIds : selectedPointIds);
@@ -366,51 +403,57 @@ export const IndentViewApp: React.FC = () => {
     
     if (!newZone) return;
     
-    setZones(prev => [...prev, newZone]);
-    setSelectedZoneId(newZone.id);
+    const newZones = [...zones, newZone];
     
-    // Clear selection in whichever view is active
     if (activeView === 'export') {
-      setExportSelectedPointIds([]);
+      updateActiveSession({ zones: newZones, selectedZoneId: newZone.id, exportSelectedPointIds: [] });
     } else {
-      setSelectedPointIds([]);
+      updateActiveSession({ zones: newZones, selectedZoneId: newZone.id, selectedPointIds: [] });
     }
     
     toast.success(`Created ${newZone.name} with ${ids.length} points`);
-  }, [data, exportSelectedPointIds, selectedPointIds, zones.length, pointRadiusDataUnits, activeView]);
+  }, [data, exportSelectedPointIds, selectedPointIds, zones, pointRadiusDataUnits, activeView, updateActiveSession]);
 
-  // Toggle zone comparison
   const handleToggleCompare = useCallback((zoneId: string) => {
-    setComparedZoneIds(prev => {
-      if (prev.includes(zoneId)) {
-        return prev.filter(id => id !== zoneId);
-      }
-      // Maximum 2 zones for comparison
-      if (prev.length >= 2) {
-        return [prev[1], zoneId];
-      }
-      return [...prev, zoneId];
-    });
-  }, []);
-
+    const newComparedIds = comparedZoneIds.includes(zoneId)
+      ? comparedZoneIds.filter(id => id !== zoneId)
+      : comparedZoneIds.length >= 2
+        ? [comparedZoneIds[1], zoneId]
+        : [...comparedZoneIds, zoneId];
+    updateActiveSession({ comparedZoneIds: newComparedIds });
+  }, [comparedZoneIds, updateActiveSession]);
 
   const handleZoneUpdate = useCallback((zone: Zone) => {
     if (!data) {
-      setZones(prev => prev.map(z => z.id === zone.id ? zone : z));
+      updateActiveSession({ zones: zones.map(z => z.id === zone.id ? zone : z) });
       return;
     }
-    // Regenerate boundary when boundary settings change
     const updatedZone = updateZoneBoundary(zone, data.points, pointRadiusDataUnits);
-    setZones(prev => prev.map(z => z.id === zone.id ? updatedZone : z));
-  }, [data, pointRadiusDataUnits]);
+    updateActiveSession({ zones: zones.map(z => z.id === zone.id ? updatedZone : z) });
+  }, [data, pointRadiusDataUnits, zones, updateActiveSession]);
 
   const handleZoneDelete = useCallback((zoneId: string) => {
-    setZones(prev => prev.filter(z => z.id !== zoneId));
-    if (selectedZoneId === zoneId) {
-      setSelectedZoneId(null);
-    }
+    const newZones = zones.filter(z => z.id !== zoneId);
+    const newSelectedZoneId = selectedZoneId === zoneId ? null : selectedZoneId;
+    updateActiveSession({ zones: newZones, selectedZoneId: newSelectedZoneId });
     toast.success('Zone deleted');
-  }, [selectedZoneId]);
+  }, [zones, selectedZoneId, updateActiveSession]);
+
+  const handleSelectZone = useCallback((zoneId: string | null) => {
+    updateActiveSession({ selectedZoneId: zoneId });
+  }, [updateActiveSession]);
+
+  const handleSelectedPointIds = useCallback((pointIds: number[]) => {
+    updateActiveSession({ selectedPointIds: pointIds });
+  }, [updateActiveSession]);
+
+  const handleExportSelectedPointIds = useCallback((pointIds: number[]) => {
+    updateActiveSession({ exportSelectedPointIds: pointIds });
+  }, [updateActiveSession]);
+
+  const handleHighlightOutliers = useCallback((pointIds: number[]) => {
+    updateActiveSession({ highlightedOutliers: pointIds });
+  }, [updateActiveSession]);
 
   const selectedZone = useMemo(() => 
     zones.find(z => z.id === selectedZoneId) || null, 
@@ -461,7 +504,7 @@ export const IndentViewApp: React.FC = () => {
         case 'v': setDrawingTool('select'); break;
         case 'l': setDrawingTool('lasso'); break;
         case 'b': setDrawingTool('box'); break;
-        case 'escape': setExportSelectedPointIds([]); break;
+        case 'escape': handleExportSelectedPointIds([]); break;
         case 'delete':
         case 'backspace':
           if (selectedZoneId) handleZoneDelete(selectedZoneId);
@@ -471,7 +514,7 @@ export const IndentViewApp: React.FC = () => {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeView, selectedZoneId, handleZoneDelete]);
+  }, [activeView, selectedZoneId, handleZoneDelete, handleExportSelectedPointIds]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -529,6 +572,14 @@ export const IndentViewApp: React.FC = () => {
         </div>
       </header>
 
+      {/* File Tabs */}
+      <FileTabs
+        sessions={fileSessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelectSession}
+        onCloseSession={handleCloseSession}
+      />
+
       <div className="flex-1 flex">
         {/* Sidebar */}
         <aside className="w-80 border-r-2 border-border bg-card p-4 space-y-6 overflow-y-auto">
@@ -548,7 +599,7 @@ export const IndentViewApp: React.FC = () => {
 
               <ColorSchemeSelector
                 colorScheme={colorScheme}
-                onColorSchemeChange={setColorScheme}
+                onColorSchemeChange={handleColorSchemeChange}
               />
 
               <RangeControls
@@ -556,8 +607,8 @@ export const IndentViewApp: React.FC = () => {
                 dataMax={dataMax}
                 currentMin={currentMin}
                 currentMax={currentMax}
-                onMinChange={setCustomMin}
-                onMaxChange={setCustomMax}
+                onMinChange={(val) => updateActiveSession({ customMin: val })}
+                onMaxChange={(val) => updateActiveSession({ customMax: val })}
                 onReset={handleResetRange}
               />
 
@@ -583,7 +634,7 @@ export const IndentViewApp: React.FC = () => {
                   points={data.points}
                   selectedProperty={selectedProperty}
                   onRemoveOutliers={handleRemoveOutliers}
-                  onHighlightOutliers={setHighlightedOutliers}
+                  onHighlightOutliers={handleHighlightOutliers}
                 />
               )}
 
@@ -611,7 +662,7 @@ export const IndentViewApp: React.FC = () => {
                     selectedZoneId={selectedZoneId}
                     points={data.points}
                     selectedProperty={selectedProperty}
-                    onSelectZone={setSelectedZoneId}
+                    onSelectZone={handleSelectZone}
                     onUpdateZone={handleZoneUpdate}
                     onDeleteZone={handleZoneDelete}
                   />
@@ -659,7 +710,7 @@ export const IndentViewApp: React.FC = () => {
             </Tabs>
           </div>
 
-          {/* Zone Toolbar - in 2D view (same as Export Studio) */}
+          {/* Zone Toolbar - in 2D view */}
           {activeView === '2d' && data && (
             <div className="px-4 py-2 border-b border-border flex items-center gap-4">
               <ZoneToolbar
@@ -667,7 +718,7 @@ export const IndentViewApp: React.FC = () => {
                 onToolChange={setHeatmapDrawingTool}
                 onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
                 onCreateZone={() => handleCreateZoneFromSelection()}
-                onClearSelection={() => setSelectedPointIds([])}
+                onClearSelection={() => handleSelectedPointIds([])}
                 hasSelectedZone={!!selectedZoneId}
                 hasSelectedPoints={selectedPointIds.length > 0}
                 selectedPointCount={selectedPointIds.length}
@@ -678,7 +729,7 @@ export const IndentViewApp: React.FC = () => {
             </div>
           )}
 
-          {/* Zone Toolbar - only in Export Studio */}
+          {/* Zone Toolbar - in Export Studio */}
           {activeView === 'export' && data && (
             <div className="px-4 py-2 border-b border-border flex items-center gap-4">
               <ZoneToolbar
@@ -686,7 +737,7 @@ export const IndentViewApp: React.FC = () => {
                 onToolChange={setDrawingTool}
                 onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
                 onCreateZone={() => handleCreateZoneFromSelection(exportSelectedPointIds)}
-                onClearSelection={() => setExportSelectedPointIds([])}
+                onClearSelection={() => handleExportSelectedPointIds([])}
                 hasSelectedZone={!!selectedZoneId}
                 hasSelectedPoints={exportSelectedPointIds.length > 0}
                 selectedPointCount={exportSelectedPointIds.length}
@@ -716,8 +767,8 @@ export const IndentViewApp: React.FC = () => {
                     drawingTool={drawingTool}
                     selectedPointIds={exportSelectedPointIds}
                     
-                    onZoneSelect={setSelectedZoneId}
-                    onPointsSelected={setExportSelectedPointIds}
+                    onZoneSelect={handleSelectZone}
+                    onPointsSelected={handleExportSelectedPointIds}
                   />
                 </div>
                 
@@ -733,7 +784,7 @@ export const IndentViewApp: React.FC = () => {
                       selectedZoneId={selectedZoneId}
                       points={data?.points || []}
                       selectedProperty={selectedProperty}
-                      onSelectZone={setSelectedZoneId}
+                      onSelectZone={handleSelectZone}
                       onUpdateZone={handleZoneUpdate}
                       onDeleteZone={handleZoneDelete}
                     />
@@ -782,8 +833,8 @@ export const IndentViewApp: React.FC = () => {
                       selectedZoneId={selectedZoneId}
                       onPointSelect={setSelectedPoint}
                       onPointHover={setHoveredPoint}
-                      onPointsSelected={setSelectedPointIds}
-                      onZoneSelect={setSelectedZoneId}
+                      onPointsSelected={handleSelectedPointIds}
+                      onZoneSelect={handleSelectZone}
                     />
                   </div>
                 ) : (
