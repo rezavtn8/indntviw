@@ -6,7 +6,7 @@ import { IndentationData } from '@/types/indentation';
 import { toast } from 'sonner';
 
 interface FileUploaderProps {
-  onDataLoaded: (data: IndentationData) => void;
+  onDataLoaded: (data: IndentationData, fileName: string) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
@@ -32,8 +32,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           data = await parseTextFile(file);
         }
 
-        onDataLoaded(data);
-        toast.success(`Loaded ${data.points.length} data points`);
+        onDataLoaded(data, file.name);
+        toast.success(`Loaded ${file.name}: ${data.points.length} data points`);
       } catch (error) {
         console.error('Error parsing file:', error);
         toast.error('Failed to parse file. Please check the format.');
