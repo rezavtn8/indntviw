@@ -746,6 +746,7 @@ export const IndentViewApp: React.FC = () => {
                   selectedProperty={selectedProperty}
                   propertyNames={data?.propertyNames || []}
                   onPropertyChange={handlePropertyChange}
+                  fileSessions={fileSessions}
                 />
               </div>
             ) : activeView === 'export' ? (

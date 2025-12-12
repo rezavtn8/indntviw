@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Zone } from '@/types/zones';
 import { IndentationPoint, PROPERTY_CONFIGS } from '@/types/indentation';
+import { FileSession } from '@/types/fileSession';
 import { getPointsInZone } from '@/utils/zoneUtils';
 import { calculateDescriptiveStats, getPropertyValues } from '@/utils/advancedStatistics';
 import { DescriptiveStats } from '@/components/analysis/DescriptiveStats';
@@ -9,13 +10,14 @@ import { StatisticalTests } from '@/components/analysis/StatisticalTests';
 import { DistributionPlots } from '@/components/analysis/DistributionPlots';
 import { CorrelationAnalysis } from '@/components/analysis/CorrelationAnalysis';
 import { AnalysisExport } from '@/components/analysis/AnalysisExport';
+import { CrossSamplePanel } from '@/components/analysis/CrossSamplePanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart3, TrendingUp, Layers, GitCompare, Download } from 'lucide-react';
+import { BarChart3, TrendingUp, Layers, GitCompare, Download, FileStack } from 'lucide-react';
 
 interface AnalysisPanelProps {
   zones: Zone[];
@@ -23,6 +25,7 @@ interface AnalysisPanelProps {
   selectedProperty: string;
   propertyNames: string[];
   onPropertyChange: (property: string) => void;
+  fileSessions: FileSession[];
 }
 
 export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
@@ -31,6 +34,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
   selectedProperty,
   propertyNames,
   onPropertyChange,
+  fileSessions,
 }) => {
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>([]);
   const [includeAllData, setIncludeAllData] = useState(true);
@@ -90,8 +94,55 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
     setSelectedZoneIds([]);
   };
 
+  const [analysisMode, setAnalysisMode] = useState<'single' | 'cross'>('single');
+
+  // Show cross-sample tab only if multiple files
+  const showCrossSample = fileSessions.length > 1;
+
   return (
-    <div className="h-full flex">
+    <div className="h-full flex flex-col">
+      {/* Mode Tabs - only show if multiple files */}
+      {showCrossSample && (
+        <div className="border-b-2 border-border bg-card px-4 py-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setAnalysisMode('single')}
+              className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
+                analysisMode === 'single'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Single Sample
+            </button>
+            <button
+              onClick={() => setAnalysisMode('cross')}
+              className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
+                analysisMode === 'cross'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <FileStack className="w-4 h-4" />
+              Cross-Sample ({fileSessions.length} files)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cross-Sample Analysis */}
+      {analysisMode === 'cross' && showCrossSample ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <CrossSamplePanel
+            fileSessions={fileSessions}
+            selectedProperty={selectedProperty}
+            propertyNames={propertyNames}
+            onPropertyChange={onPropertyChange}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 flex">
       {/* Left Sidebar - Zone Selection */}
       <div className="w-64 border-r-2 border-border bg-card p-4 flex flex-col">
         <h3 className="font-mono text-sm font-bold uppercase tracking-wider mb-4">
@@ -268,6 +319,8 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           </ScrollArea>
         </Tabs>
       </div>
+        </div>
+      )}
     </div>
   );
 };
