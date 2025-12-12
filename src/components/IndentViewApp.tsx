@@ -671,23 +671,6 @@ export const IndentViewApp: React.FC = () => {
             </>
           )}
         </aside>
-              {activeView === '2d' && zones.length > 0 && (
-                <div className="bg-card border-2 border-border rounded-lg p-4">
-                  <h3 className="font-mono text-sm font-semibold uppercase tracking-wider mb-4">
-                    Zone Comparison
-                  </h3>
-                  <ZoneComparisonPanel
-                    zones={zones}
-                    points={data.points}
-                    selectedProperty={selectedProperty}
-                    comparedZoneIds={comparedZoneIds}
-                    onToggleCompare={handleToggleCompare}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </aside>
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col">
