@@ -74,18 +74,22 @@ export const DisplaySection: React.FC<DisplaySectionProps> = ({ settings, onSett
                   <Label className="text-xs text-muted-foreground">Position</Label>
                   <RadioGroup
                     value={settings.zoneLabelPosition}
-                    onValueChange={(value: 'center' | 'outside') =>
+                    onValueChange={(value: 'center' | 'edge' | 'legend') =>
                       onSettingsChange({ ...settings, zoneLabelPosition: value })
                     }
-                    className="flex gap-4"
+                    className="flex flex-wrap gap-x-4 gap-y-2"
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="center" id="label-pos-center" />
                       <Label htmlFor="label-pos-center" className="text-sm cursor-pointer">Center</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="outside" id="label-pos-outside" />
-                      <Label htmlFor="label-pos-outside" className="text-sm cursor-pointer">Outside</Label>
+                      <RadioGroupItem value="edge" id="label-pos-edge" />
+                      <Label htmlFor="label-pos-edge" className="text-sm cursor-pointer">Edge</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="legend" id="label-pos-legend" />
+                      <Label htmlFor="label-pos-legend" className="text-sm cursor-pointer">Legend</Label>
                     </div>
                   </RadioGroup>
                 </div>
