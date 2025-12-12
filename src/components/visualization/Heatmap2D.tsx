@@ -56,8 +56,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lassoPath, setLassoPath] = useState<ZonePoint[]>([]);
+  const [lassoRawPath, setLassoRawPath] = useState<{ cx: number; cy: number }[]>([]);
   const [boxStart, setBoxStart] = useState<ZonePoint | null>(null);
+  const [boxRawStart, setBoxRawStart] = useState<{ cx: number; cy: number } | null>(null);
   const [currentPos, setCurrentPos] = useState<ZonePoint | null>(null);
+  const [currentRawPos, setCurrentRawPos] = useState<{ cx: number; cy: number } | null>(null);
   
   // Zoom state (button-controlled only)
   const [viewState, setViewState] = useState<ViewState>({ scale: 1, translateX: 0, translateY: 0 });
@@ -179,11 +182,25 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const svgHeight = 600;
     const rawX = ((e.clientX - rect.left) / rect.width) * svgWidth;
     const rawY = ((e.clientY - rect.top) / rect.height) * svgHeight;
-    // Convert to pre-transform coordinates, then to data coords
+    // Account for zoom/pan transform to get coordinates in the transformed space
     const svgX = (rawX - viewState.translateX) / viewState.scale;
     const svgY = (rawY - viewState.translateY) / viewState.scale;
     return inverseTransform(svgX, svgY);
   }, [viewState, inverseTransform]);
+
+  // Get raw SVG coordinates (for drawing preview, not transformed)
+  const getRawSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>): { cx: number; cy: number } => {
+    if (!svgRef.current) return { cx: 0, cy: 0 };
+    const rect = svgRef.current.getBoundingClientRect();
+    const svgWidth = 800;
+    const svgHeight = 600;
+    const rawX = ((e.clientX - rect.left) / rect.width) * svgWidth;
+    const rawY = ((e.clientY - rect.top) / rect.height) * svgHeight;
+    // Account for zoom/pan to get position inside transform group
+    const cx = (rawX - viewState.translateX) / viewState.scale;
+    const cy = (rawY - viewState.translateY) / viewState.scale;
+    return { cx, cy };
+  }, [viewState]);
 
   // Helper to check if point is in box
   const isPointInBox = useCallback((point: { x: number; y: number }, start: ZonePoint, end: ZonePoint): boolean => {
@@ -228,27 +245,34 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     }
 
     const coords = getSVGCoords(e);
+    const rawCoords = getRawSVGCoords(e);
     setIsDrawing(true);
 
     if (drawingTool === 'lasso') {
       setLassoPath([coords]);
+      setLassoRawPath([rawCoords]);
     } else if (drawingTool === 'box') {
       setBoxStart(coords);
+      setBoxRawStart(rawCoords);
       setCurrentPos(coords);
+      setCurrentRawPos(rawCoords);
     }
-  }, [drawingTool, getSVGCoords, points, pointRadiusDataUnits, selectedPointIds, onPointsSelected, onZoneSelect]);
+  }, [drawingTool, getSVGCoords, getRawSVGCoords, points, pointRadiusDataUnits, selectedPointIds, onPointsSelected, onZoneSelect]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!isDrawing) return;
 
     const coords = getSVGCoords(e);
+    const rawCoords = getRawSVGCoords(e);
 
     if (drawingTool === 'lasso') {
       setLassoPath(prev => [...prev, coords]);
+      setLassoRawPath(prev => [...prev, rawCoords]);
     } else if (drawingTool === 'box') {
       setCurrentPos(coords);
+      setCurrentRawPos(rawCoords);
     }
-  }, [isDrawing, drawingTool, getSVGCoords]);
+  }, [isDrawing, drawingTool, getSVGCoords, getRawSVGCoords]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!isDrawing) return;
@@ -281,8 +305,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
     setIsDrawing(false);
     setLassoPath([]);
+    setLassoRawPath([]);
     setBoxStart(null);
+    setBoxRawStart(null);
     setCurrentPos(null);
+    setCurrentRawPos(null);
   }, [isDrawing, drawingTool, lassoPath, boxStart, currentPos, points, selectedPointIds, isPointInBox, onPointsSelected]);
 
   // Reset zoom
@@ -321,29 +348,26 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     return boundaryToSVGPath(boundaryPoints, transformPoint);
   }, [selectedPointIds, points, transformPoint, pointRadiusDataUnits]);
 
-  // Generate drawing preview path (lasso)
+  // Generate drawing preview path (lasso) - use raw SVG coordinates directly
   const getDrawingPreviewPath = useCallback(() => {
-    if (drawingTool === 'lasso' && lassoPath.length >= 2) {
-      const transformed = lassoPath.map(p => transformPoint(p.x, p.y));
-      return transformed.map((t, i) => `${i === 0 ? 'M' : 'L'} ${t.cx} ${t.cy}`).join(' ');
+    if (drawingTool === 'lasso' && lassoRawPath.length >= 2) {
+      return lassoRawPath.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.cx} ${p.cy}`).join(' ');
     }
     return '';
-  }, [drawingTool, lassoPath, transformPoint]);
+  }, [drawingTool, lassoRawPath]);
 
-  // Generate drawing preview rect (box)
+  // Generate drawing preview rect (box) - use raw SVG coordinates directly
   const getDrawingPreviewRect = useCallback(() => {
-    if (drawingTool === 'box' && boxStart && currentPos) {
-      const p1 = transformPoint(boxStart.x, boxStart.y);
-      const p2 = transformPoint(currentPos.x, currentPos.y);
+    if (drawingTool === 'box' && boxRawStart && currentRawPos) {
       return {
-        x: Math.min(p1.cx, p2.cx),
-        y: Math.min(p1.cy, p2.cy),
-        width: Math.abs(p2.cx - p1.cx),
-        height: Math.abs(p2.cy - p1.cy),
+        x: Math.min(boxRawStart.cx, currentRawPos.cx),
+        y: Math.min(boxRawStart.cy, currentRawPos.cy),
+        width: Math.abs(currentRawPos.cx - boxRawStart.cx),
+        height: Math.abs(currentRawPos.cy - boxRawStart.cy),
       };
     }
     return null;
-  }, [drawingTool, boxStart, currentPos, transformPoint]);
+  }, [drawingTool, boxRawStart, currentRawPos]);
 
   if (points.length === 0) {
     return (
