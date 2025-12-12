@@ -576,6 +576,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
           {/* Data points */}
           {normalizedPoints.map((point) => {
             const isPointSelected = selectedPointIds.includes(point.id);
+            const isDrawingMode = drawingTool === 'lasso' || drawingTool === 'box';
             return (
               <g key={point.id}>
                 {/* Highlight ring for outliers */}
@@ -616,10 +617,11 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                           : '#374151'
                   }
                   strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5}
-                  className="cursor-pointer transition-all duration-150 hover:opacity-80"
+                  style={{ pointerEvents: isDrawingMode ? 'none' : 'auto' }}
+                  className={isDrawingMode ? '' : 'cursor-pointer transition-all duration-150 hover:opacity-80'}
                   onClick={(e) => handlePointClick(e, point)}
-                  onMouseEnter={() => onPointHover(point)}
-                  onMouseLeave={() => onPointHover(null)}
+                  onMouseEnter={() => !isDrawingMode && onPointHover(point)}
+                  onMouseLeave={() => !isDrawingMode && onPointHover(null)}
                 />
                 {selectedPoint?.id === point.id && (
                   <circle
