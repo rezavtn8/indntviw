@@ -143,6 +143,13 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   }, [points, selectedProperty, showInterpolation]);
 
   const handlePointClick = useCallback((e: React.MouseEvent, point: IndentationPoint) => {
+    e.stopPropagation();
+    
+    // Never open point details when lasso or box tool is active
+    if (drawingTool === 'lasso' || drawingTool === 'box') {
+      return;
+    }
+    
     // Only open point details in select mode without modifier keys (pure view mode)
     if (drawingTool === 'select' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       // Don't open details if we're in selection mode with selected points
@@ -150,7 +157,6 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         onPointSelect(selectedPoint?.id === point.id ? null : point);
       }
     }
-    e.stopPropagation();
   }, [selectedPoint, onPointSelect, drawingTool, selectedPointIds]);
 
   // Transform contour coordinates to SVG space (using centered offsets)
