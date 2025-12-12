@@ -142,9 +142,14 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           <ScrollArea className="flex-1">
             <div className="space-y-1 pr-2">
               {zones.length === 0 ? (
-                <p className="text-xs text-muted-foreground font-mono p-2">
-                  No zones created yet. Use the 2D view to create zones.
-                </p>
+                <div className="p-3 bg-muted/30 rounded border border-dashed border-border">
+                  <p className="text-xs text-muted-foreground font-mono mb-2">
+                    No zones created yet.
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 font-mono">
+                    Switch to <span className="text-primary font-semibold">2D Heatmap</span> view and use the lasso or box tool to select points, then click "Create Zone".
+                  </p>
+                </div>
               ) : (
                 zones.map(zone => (
                   <label
@@ -216,10 +221,18 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-4">
               {analysisData.length === 0 ? (
-                <div className="flex items-center justify-center h-64">
-                  <p className="text-muted-foreground font-mono text-sm">
-                    Select zones or enable "All Data" to view analysis.
-                  </p>
+                <div className="flex flex-col items-center justify-center h-64 gap-4">
+                  <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center">
+                    <BarChart3 className="w-8 h-8 text-muted-foreground/50" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-muted-foreground font-mono text-sm mb-1">
+                      No data selected for analysis
+                    </p>
+                    <p className="text-muted-foreground/70 font-mono text-xs">
+                      Enable "All Data" or select zones from the sidebar to begin.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <>
