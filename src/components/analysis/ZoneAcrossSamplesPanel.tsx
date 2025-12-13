@@ -17,6 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { BoxViolinPlots } from './BoxViolinPlots';
 import { Plus, X, GitCompare, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { getSampleColor } from './SampleSelector';
 
@@ -44,6 +47,8 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
   selectedProperty,
 }) => {
   const [selectedZones, setSelectedZones] = useState<ZoneSelection[]>([]);
+  const [showViolin, setShowViolin] = useState(false);
+  const [showJitter, setShowJitter] = useState(true);
   
   const sessionsWithZones = useMemo(() => {
     return fileSessions.filter(s => s.zones.length > 0);
@@ -94,7 +99,16 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
       .filter((d): d is ZoneComparisonData => d !== null && d.values.length > 0);
   }, [fileSessions, selectedZones, selectedProperty]);
 
-  // Two-zone comparison
+  // Prepare data for BoxViolinPlots
+  const boxPlotData = useMemo(() => {
+    return zoneData.map(d => ({
+      name: d.label.length > 15 ? d.label.slice(0, 12) + '...' : d.label,
+      color: d.zone.color,
+      values: d.values,
+      stats: d.stats,
+    }));
+  }, [zoneData]);
+
   const twoZoneTests = useMemo(() => {
     if (zoneData.length !== 2) return null;
     const [z1, z2] = zoneData;
@@ -105,7 +119,6 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
     };
   }, [zoneData]);
 
-  // Multi-zone comparison
   const multiZoneTests = useMemo(() => {
     if (zoneData.length < 2) return null;
     const valueArrays = zoneData.map(z => z.values);
@@ -136,7 +149,7 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {/* Zone Selection */}
       <div className="border border-border rounded p-2">
         <div className="flex items-center justify-between mb-2">
@@ -201,6 +214,29 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
           </ScrollArea>
         )}
       </div>
+
+      {/* Plot Options & BoxPlot */}
+      {zoneData.length > 0 && (
+        <>
+          <div className="flex items-center gap-4 p-2 bg-muted/30 rounded">
+            <div className="flex items-center gap-2">
+              <Label className="font-mono text-[10px]">Violin</Label>
+              <Switch checked={showViolin} onCheckedChange={setShowViolin} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="font-mono text-[10px]">Points</Label>
+              <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+            </div>
+          </div>
+
+          <BoxViolinPlots
+            data={boxPlotData}
+            selectedProperty={selectedProperty}
+            showViolin={showViolin}
+            showJitter={showJitter}
+          />
+        </>
+      )}
 
       {/* Zone Statistics Table */}
       {zoneData.length > 0 && (
