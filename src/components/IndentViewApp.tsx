@@ -56,6 +56,10 @@ export const IndentViewApp: React.FC = () => {
   const [surfaceOpacity, setSurfaceOpacity] = useState(0.8);
   const [showWireframe, setShowWireframe] = useState(false);
   const [showPointsWithSurface, setShowPointsWithSurface] = useState(true);
+  const [surfaceType, setSurfaceType] = useState<'full' | 'boundary'>('full');
+  const [flipX, setFlipX] = useState(false);
+  const [flipY, setFlipY] = useState(false);
+  const [flipZ, setFlipZ] = useState(false);
   
   // Drawing tools
   const [heatmapDrawingTool, setHeatmapDrawingTool] = useState<DrawingTool>('select');
@@ -858,9 +862,13 @@ export const IndentViewApp: React.FC = () => {
                         surfaceOpacity={surfaceOpacity}
                         showWireframe={showWireframe}
                         showPoints={showPointsWithSurface || !showSurfaceMesh}
+                        surfaceType={surfaceType}
+                        flipX={flipX}
+                        flipY={flipY}
+                        flipZ={flipZ}
                       />
                       {/* Surface Controls Overlay */}
-                      <div className="absolute top-2 left-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-3 max-w-[200px]">
+                      <div className="absolute top-2 left-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-3 max-w-[220px]">
                         <div className="space-y-2">
                           <label className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
                             Surface Mesh
@@ -881,6 +889,24 @@ export const IndentViewApp: React.FC = () => {
                         
                         {showSurfaceMesh && (
                           <>
+                            <div className="space-y-1">
+                              <label className="text-xs text-muted-foreground">Type</label>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setSurfaceType('full')}
+                                  className={`px-2 py-1 text-xs rounded ${surfaceType === 'full' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                                >
+                                  Full
+                                </button>
+                                <button
+                                  onClick={() => setSurfaceType('boundary')}
+                                  className={`px-2 py-1 text-xs rounded ${surfaceType === 'boundary' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                                >
+                                  Boundary
+                                </button>
+                              </div>
+                            </div>
+                            
                             <div className="space-y-1">
                               <label className="text-xs text-muted-foreground">
                                 Opacity: {Math.round(surfaceOpacity * 100)}%
@@ -923,6 +949,45 @@ export const IndentViewApp: React.FC = () => {
                             </div>
                           </>
                         )}
+                        
+                        {/* Axis Flip Controls */}
+                        <div className="space-y-2 pt-2 border-t border-border">
+                          <label className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
+                            Flip Axes
+                          </label>
+                          <div className="flex gap-3">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                id="flipX"
+                                checked={flipX}
+                                onChange={(e) => setFlipX(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <label htmlFor="flipX" className="text-xs text-muted-foreground">X</label>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                id="flipY"
+                                checked={flipY}
+                                onChange={(e) => setFlipY(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <label htmlFor="flipY" className="text-xs text-muted-foreground">Y</label>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                id="flipZ"
+                                checked={flipZ}
+                                onChange={(e) => setFlipZ(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <label htmlFor="flipZ" className="text-xs text-muted-foreground">Z</label>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div className="w-80 border-2 border-border bg-card rounded-lg overflow-hidden">

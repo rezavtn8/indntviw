@@ -113,6 +113,10 @@ interface Scene3DProps {
   surfaceOpacity?: number;
   showWireframe?: boolean;
   showPoints?: boolean;
+  surfaceType?: 'full' | 'boundary';
+  flipX?: boolean;
+  flipY?: boolean;
+  flipZ?: boolean;
 }
 
 export const Scene3D: React.FC<Scene3DProps> = ({
@@ -127,6 +131,10 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   surfaceOpacity = 0.8,
   showWireframe = false,
   showPoints = true,
+  surfaceType = 'full',
+  flipX = false,
+  flipY = false,
+  flipZ = false,
 }) => {
   const { scale, offset } = useMemo(() => {
     if (points.length === 0) {
@@ -219,6 +227,10 @@ export const Scene3D: React.FC<Scene3DProps> = ({
           offset={offset}
           opacity={surfaceOpacity}
           showWireframe={showWireframe}
+          surfaceType={surfaceType}
+          flipX={flipX}
+          flipY={flipY}
+          flipZ={flipZ}
         />
       )}
 
