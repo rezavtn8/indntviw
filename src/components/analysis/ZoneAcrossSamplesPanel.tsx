@@ -164,7 +164,7 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
             Click "Add" to select zones for comparison
           </p>
         ) : (
-          <ScrollArea className="max-h-32">
+          <ScrollArea className="h-32">
             <div className="space-y-1">
               {selectedZones.map((sel, idx) => {
                 const session = fileSessions.find(s => s.id === sel.sessionId);
