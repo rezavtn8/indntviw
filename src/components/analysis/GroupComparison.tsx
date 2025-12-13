@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FileSession } from '@/types/fileSession';
 import { SampleGroup } from './SampleGrouping';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
@@ -15,6 +15,9 @@ import {
 } from '@/utils/advancedStatistics';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { BoxViolinPlots } from './BoxViolinPlots';
 import { CheckCircle, XCircle, Users } from 'lucide-react';
 
 interface GroupData {
@@ -31,6 +34,9 @@ interface GroupComparisonProps {
 }
 
 export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, groups, selectedProperty }) => {
+  const [showViolin, setShowViolin] = useState(false);
+  const [showJitter, setShowJitter] = useState(true);
+
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
     if (Math.abs(val) >= 1000) return val.toFixed(1);
@@ -53,6 +59,16 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
       })
       .filter(g => g.values.length > 0);
   }, [fileSessions, groups, selectedProperty]);
+
+  // Prepare data for BoxViolinPlots
+  const boxPlotData = useMemo(() => {
+    return groupData.map(g => ({
+      name: g.group.name,
+      color: g.group.color,
+      values: g.values,
+      stats: g.stats,
+    }));
+  }, [groupData]);
 
   const twoGroupTests = useMemo(() => {
     if (groupData.length !== 2) return null;
@@ -96,7 +112,29 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Plot Options */}
+      <div className="flex items-center gap-4 p-2 bg-muted/30 rounded">
+        <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Violin</Label>
+          <Switch checked={showViolin} onCheckedChange={setShowViolin} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Points</Label>
+          <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+        </div>
+      </div>
+
+      {/* Box Plot */}
+      {boxPlotData.length > 0 && (
+        <BoxViolinPlots
+          data={boxPlotData}
+          selectedProperty={selectedProperty}
+          showViolin={showViolin}
+          showJitter={showJitter}
+        />
+      )}
+
       {/* Group Statistics */}
       <div className="border border-border rounded p-2">
         <h4 className="font-mono text-xs font-bold uppercase mb-2">
