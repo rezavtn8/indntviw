@@ -246,7 +246,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           {multiGroupTests.postHoc && multiGroupTests.postHoc.length > 0 && (
             <div className="space-y-1">
               <span className="font-mono text-[10px] font-bold">Post-hoc (Tukey)</span>
-              <ScrollArea className="max-h-24">
+              <ScrollArea className="h-24">
                 <div className="space-y-1">
                   {multiGroupTests.postHoc.map((ph, idx) => (
                     <div key={idx} className="flex items-center justify-between p-1 bg-muted/20 rounded text-[10px] font-mono">
