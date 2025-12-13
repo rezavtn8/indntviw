@@ -4,6 +4,7 @@ import { OrbitControls, PerspectiveCamera, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue3D } from '@/utils/colorScales';
+import { SurfaceMesh } from './SurfaceMesh';
 
 // Configure color management for accurate heatmap colors
 THREE.ColorManagement.enabled = true;
@@ -108,6 +109,10 @@ interface Scene3DProps {
   maxValue: number;
   selectedPoint: IndentationPoint | null;
   onPointSelect: (point: IndentationPoint | null) => void;
+  showSurface?: boolean;
+  surfaceOpacity?: number;
+  showWireframe?: boolean;
+  showPoints?: boolean;
 }
 
 export const Scene3D: React.FC<Scene3DProps> = ({
@@ -118,6 +123,10 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   maxValue,
   selectedPoint,
   onPointSelect,
+  showSurface = false,
+  surfaceOpacity = 0.8,
+  showWireframe = false,
+  showPoints = true,
 }) => {
   const { scale, offset } = useMemo(() => {
     if (points.length === 0) {
@@ -185,17 +194,33 @@ export const Scene3D: React.FC<Scene3DProps> = ({
         infiniteGrid
       />
 
-      <DataPoints
-        points={points}
-        selectedProperty={selectedProperty}
-        colorScheme={colorScheme}
-        minValue={minValue}
-        maxValue={maxValue}
-        selectedPoint={selectedPoint}
-        onPointSelect={onPointSelect}
-        scale={scale}
-        offset={offset}
-      />
+      {showPoints && (
+        <DataPoints
+          points={points}
+          selectedProperty={selectedProperty}
+          colorScheme={colorScheme}
+          minValue={minValue}
+          maxValue={maxValue}
+          selectedPoint={selectedPoint}
+          onPointSelect={onPointSelect}
+          scale={scale}
+          offset={offset}
+        />
+      )}
+
+      {showSurface && (
+        <SurfaceMesh
+          points={points}
+          selectedProperty={selectedProperty}
+          colorScheme={colorScheme}
+          minValue={minValue}
+          maxValue={maxValue}
+          scale={scale}
+          offset={offset}
+          opacity={surfaceOpacity}
+          showWireframe={showWireframe}
+        />
+      )}
 
       {/* Axis indicators */}
       <arrowHelper args={[new THREE.Vector3(1, 0, 0), new THREE.Vector3(-4, 0, 0), 1, 0xff0000]} />

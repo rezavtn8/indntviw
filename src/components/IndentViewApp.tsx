@@ -51,6 +51,12 @@ export const IndentViewApp: React.FC = () => {
   const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
   
+  // 3D Surface mesh options
+  const [showSurfaceMesh, setShowSurfaceMesh] = useState(false);
+  const [surfaceOpacity, setSurfaceOpacity] = useState(0.8);
+  const [showWireframe, setShowWireframe] = useState(false);
+  const [showPointsWithSurface, setShowPointsWithSurface] = useState(true);
+  
   // Drawing tools
   const [heatmapDrawingTool, setHeatmapDrawingTool] = useState<DrawingTool>('select');
   const [drawingTool, setDrawingTool] = useState<DrawingTool>('select');
@@ -839,7 +845,7 @@ export const IndentViewApp: React.FC = () => {
                   </div>
                 ) : (
                   <div className="w-full h-full flex gap-2">
-                    <div className="flex-1 border-2 border-border bg-card">
+                    <div className="flex-1 border-2 border-border bg-card relative">
                       <Scene3D
                         points={data?.points || []}
                         selectedProperty={selectedProperty}
@@ -848,7 +854,76 @@ export const IndentViewApp: React.FC = () => {
                         maxValue={currentMax}
                         selectedPoint={selectedPoint}
                         onPointSelect={setSelectedPoint}
+                        showSurface={showSurfaceMesh}
+                        surfaceOpacity={surfaceOpacity}
+                        showWireframe={showWireframe}
+                        showPoints={showPointsWithSurface || !showSurfaceMesh}
                       />
+                      {/* Surface Controls Overlay */}
+                      <div className="absolute top-2 left-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-3 max-w-[200px]">
+                        <div className="space-y-2">
+                          <label className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
+                            Surface Mesh
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="showSurface"
+                              checked={showSurfaceMesh}
+                              onChange={(e) => setShowSurfaceMesh(e.target.checked)}
+                              className="w-4 h-4"
+                            />
+                            <label htmlFor="showSurface" className="text-xs text-muted-foreground">
+                              Show Surface
+                            </label>
+                          </div>
+                        </div>
+                        
+                        {showSurfaceMesh && (
+                          <>
+                            <div className="space-y-1">
+                              <label className="text-xs text-muted-foreground">
+                                Opacity: {Math.round(surfaceOpacity * 100)}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={surfaceOpacity}
+                                onChange={(e) => setSurfaceOpacity(parseFloat(e.target.value))}
+                                className="w-full h-2 accent-primary"
+                              />
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="showWireframe"
+                                checked={showWireframe}
+                                onChange={(e) => setShowWireframe(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <label htmlFor="showWireframe" className="text-xs text-muted-foreground">
+                                Wireframe
+                              </label>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="showPoints"
+                                checked={showPointsWithSurface}
+                                onChange={(e) => setShowPointsWithSurface(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <label htmlFor="showPoints" className="text-xs text-muted-foreground">
+                                Show Points
+                              </label>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="w-80 border-2 border-border bg-card rounded-lg overflow-hidden">
                       <Spatial3DPanel
