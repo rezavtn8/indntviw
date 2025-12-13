@@ -11,6 +11,7 @@ import { RangeControls } from '@/components/controls/RangeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 import { ExportControls } from '@/components/controls/ExportControls';
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
+import { View3DControls } from '@/components/controls/View3DControls';
 import { ZoneToolbar, DrawingTool } from '@/components/controls/ZoneToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
 import { PointEditor } from '@/components/panels/PointEditor';
@@ -633,6 +634,27 @@ export const IndentViewApp: React.FC = () => {
                   />
                 )}
 
+                {activeView === '3d' && (
+                  <View3DControls
+                    showSurfaceMesh={showSurfaceMesh}
+                    surfaceOpacity={surfaceOpacity}
+                    showWireframe={showWireframe}
+                    showPoints={showPointsWithSurface}
+                    surfaceType={surfaceType}
+                    flipX={flipX}
+                    flipY={flipY}
+                    flipZ={flipZ}
+                    onShowSurfaceMeshChange={setShowSurfaceMesh}
+                    onSurfaceOpacityChange={setSurfaceOpacity}
+                    onShowWireframeChange={setShowWireframe}
+                    onShowPointsChange={setShowPointsWithSurface}
+                    onSurfaceTypeChange={setSurfaceType}
+                    onFlipXChange={setFlipX}
+                    onFlipYChange={setFlipY}
+                    onFlipZChange={setFlipZ}
+                  />
+                )}
+
                 <ColorLegend
                   selectedProperty={selectedProperty}
                   unit={getPropertyUnit(selectedProperty)}
@@ -849,7 +871,7 @@ export const IndentViewApp: React.FC = () => {
                   </div>
                 ) : (
                   <div className="w-full h-full flex gap-2">
-                    <div className="flex-1 border-2 border-border bg-card relative">
+                    <div className="flex-1 border-2 border-border bg-card">
                       <Scene3D
                         points={data?.points || []}
                         selectedProperty={selectedProperty}
@@ -867,130 +889,8 @@ export const IndentViewApp: React.FC = () => {
                         flipY={flipY}
                         flipZ={flipZ}
                       />
-                      {/* Surface Controls Overlay */}
-                      <div className="absolute top-2 left-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-3 max-w-[220px]">
-                        <div className="space-y-2">
-                          <label className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
-                            Surface Mesh
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id="showSurface"
-                              checked={showSurfaceMesh}
-                              onChange={(e) => setShowSurfaceMesh(e.target.checked)}
-                              className="w-4 h-4"
-                            />
-                            <label htmlFor="showSurface" className="text-xs text-muted-foreground">
-                              Show Surface
-                            </label>
-                          </div>
-                        </div>
-                        
-                        {showSurfaceMesh && (
-                          <>
-                            <div className="space-y-1">
-                              <label className="text-xs text-muted-foreground">Type</label>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => setSurfaceType('full')}
-                                  className={`px-2 py-1 text-xs rounded ${surfaceType === 'full' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-                                >
-                                  Full
-                                </button>
-                                <button
-                                  onClick={() => setSurfaceType('boundary')}
-                                  className={`px-2 py-1 text-xs rounded ${surfaceType === 'boundary' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-                                >
-                                  Boundary
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-1">
-                              <label className="text-xs text-muted-foreground">
-                                Opacity: {Math.round(surfaceOpacity * 100)}%
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={surfaceOpacity}
-                                onChange={(e) => setSurfaceOpacity(parseFloat(e.target.value))}
-                                className="w-full h-2 accent-primary"
-                              />
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id="showWireframe"
-                                checked={showWireframe}
-                                onChange={(e) => setShowWireframe(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <label htmlFor="showWireframe" className="text-xs text-muted-foreground">
-                                Wireframe
-                              </label>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id="showPoints"
-                                checked={showPointsWithSurface}
-                                onChange={(e) => setShowPointsWithSurface(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <label htmlFor="showPoints" className="text-xs text-muted-foreground">
-                                Show Points
-                              </label>
-                            </div>
-                          </>
-                        )}
-                        
-                        {/* Axis Flip Controls */}
-                        <div className="space-y-2 pt-2 border-t border-border">
-                          <label className="font-mono text-xs font-bold uppercase tracking-wide text-foreground">
-                            Flip Axes
-                          </label>
-                          <div className="flex gap-3">
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                id="flipX"
-                                checked={flipX}
-                                onChange={(e) => setFlipX(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <label htmlFor="flipX" className="text-xs text-muted-foreground">X</label>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                id="flipY"
-                                checked={flipY}
-                                onChange={(e) => setFlipY(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <label htmlFor="flipY" className="text-xs text-muted-foreground">Y</label>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                id="flipZ"
-                                checked={flipZ}
-                                onChange={(e) => setFlipZ(e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <label htmlFor="flipZ" className="text-xs text-muted-foreground">Z</label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
-                    <div className="w-80 border-2 border-border bg-card rounded-lg overflow-hidden">
+                    <div className="w-72 border-2 border-border bg-card rounded-lg overflow-hidden">
                       <Spatial3DPanel
                         points={data?.points || []}
                         selectedProperty={selectedProperty}
