@@ -20,6 +20,7 @@ import { ZonePanel } from '@/components/panels/ZonePanel';
 import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
+import { Spatial3DPanel } from '@/components/analysis/Spatial3DPanel';
 import { DistributionHistogram } from '@/components/visualization/DistributionHistogram';
 import { FileTabs } from '@/components/FileTabs';
 import { IndentationData, IndentationPoint, ColorScheme, PROPERTY_CONFIGS } from '@/types/indentation';
@@ -837,16 +838,24 @@ export const IndentViewApp: React.FC = () => {
                     />
                   </div>
                 ) : (
-                  <div className="w-full h-full border-2 border-border bg-card">
-                    <Scene3D
-                      points={data?.points || []}
-                      selectedProperty={selectedProperty}
-                      colorScheme={colorScheme}
-                      minValue={currentMin}
-                      maxValue={currentMax}
-                      selectedPoint={selectedPoint}
-                      onPointSelect={setSelectedPoint}
-                    />
+                  <div className="w-full h-full flex gap-2">
+                    <div className="flex-1 border-2 border-border bg-card">
+                      <Scene3D
+                        points={data?.points || []}
+                        selectedProperty={selectedProperty}
+                        colorScheme={colorScheme}
+                        minValue={currentMin}
+                        maxValue={currentMax}
+                        selectedPoint={selectedPoint}
+                        onPointSelect={setSelectedPoint}
+                      />
+                    </div>
+                    <div className="w-80 border-2 border-border bg-card rounded-lg overflow-hidden">
+                      <Spatial3DPanel
+                        points={data?.points || []}
+                        selectedProperty={selectedProperty}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
