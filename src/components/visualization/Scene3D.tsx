@@ -19,6 +19,9 @@ interface DataPointsProps {
   onPointSelect: (point: IndentationPoint | null) => void;
   scale: { x: number; y: number; z: number };
   offset: { x: number; y: number; z: number };
+  flipX?: boolean;
+  flipY?: boolean;
+  flipZ?: boolean;
 }
 
 const DataPoints: React.FC<DataPointsProps> = ({
@@ -31,6 +34,9 @@ const DataPoints: React.FC<DataPointsProps> = ({
   onPointSelect,
   scale,
   offset,
+  flipX = false,
+  flipY = false,
+  flipZ = false,
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
@@ -41,9 +47,15 @@ const DataPoints: React.FC<DataPointsProps> = ({
     const colors: [number, number, number][] = [];
 
     points.forEach((point) => {
-      const x = (point.x - offset.x) * scale.x;
-      const y = (point.y - offset.y) * scale.y;
-      const z = (point.z - offset.z) * scale.z;
+      let x = (point.x - offset.x) * scale.x;
+      let y = (point.y - offset.y) * scale.y;
+      let z = (point.z - offset.z) * scale.z;
+      
+      // Apply flip transformations
+      if (flipX) x = -x;
+      if (flipY) y = -y;
+      if (flipZ) z = -z;
+      
       positions.push([x, z, -y]);
 
       const value = point.properties[selectedProperty] ?? 0;
@@ -52,7 +64,7 @@ const DataPoints: React.FC<DataPointsProps> = ({
     });
 
     return { positions, colors };
-  }, [points, selectedProperty, colorScheme, minValue, maxValue, scale, offset]);
+  }, [points, selectedProperty, colorScheme, minValue, maxValue, scale, offset, flipX, flipY, flipZ]);
 
   React.useEffect(() => {
     if (!meshRef.current) return;
@@ -213,6 +225,9 @@ export const Scene3D: React.FC<Scene3DProps> = ({
           onPointSelect={onPointSelect}
           scale={scale}
           offset={offset}
+          flipX={flipX}
+          flipY={flipY}
+          flipZ={flipZ}
         />
       )}
 
