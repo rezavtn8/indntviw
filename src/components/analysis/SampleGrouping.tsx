@@ -82,7 +82,7 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
       </div>
 
       {/* Groups list */}
-      <ScrollArea className="max-h-48">
+      <ScrollArea className="h-48">
         <div className="space-y-2 pr-1">
           {groups.length === 0 && (
             <p className="text-[10px] text-muted-foreground italic text-center py-2">

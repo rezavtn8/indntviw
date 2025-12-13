@@ -256,7 +256,7 @@ export const ZoneComparisonPanel: React.FC<ZoneComparisonPanelProps> = ({
                 </div>
               </div>
               {multiZoneTests.postHoc && multiZoneTests.postHoc.length > 0 && (
-                <ScrollArea className="max-h-16">
+                <ScrollArea className="h-16">
                   <div className="space-y-0.5">
                     {multiZoneTests.postHoc.map((ph, idx) => (
                       <div key={idx} className="flex items-center justify-between p-1 bg-muted/20 rounded text-[9px] font-mono">
