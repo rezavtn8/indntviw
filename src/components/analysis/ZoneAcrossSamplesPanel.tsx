@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileSession } from '@/types/fileSession';
 import { Zone } from '@/types/zones';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
@@ -52,6 +52,16 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
   
   const sessionsWithZones = useMemo(() => {
     return fileSessions.filter(s => s.zones.length > 0);
+  }, [fileSessions]);
+
+  // Clean up invalid zone selections when fileSessions change
+  useEffect(() => {
+    setSelectedZones(prev => 
+      prev.filter(sel => {
+        const session = fileSessions.find(s => s.id === sel.sessionId);
+        return session?.zones.some(z => z.id === sel.zoneId);
+      })
+    );
   }, [fileSessions]);
 
   const addZoneSelection = () => {

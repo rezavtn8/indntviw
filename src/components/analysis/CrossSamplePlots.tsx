@@ -128,7 +128,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <svg width={svgWidth} height={280} className="block mx-auto">
+        <svg width={svgWidth} height={320} className="block mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
           {/* Y-axis */}
           <g>
             {[0, 0.25, 0.5, 0.75, 1].map(frac => {
@@ -137,7 +137,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
               return (
                 <g key={frac}>
                   <line x1={50} y1={y + 20} x2={svgWidth - 20} y2={y + 20} stroke="currentColor" strokeOpacity={0.1} />
-                  <text x={45} y={y + 24} textAnchor="end" className="fill-muted-foreground font-mono text-xs">
+                  <text x={45} y={y + 24} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px' }}>
                     {formatValue(value)}
                   </text>
                 </g>
@@ -224,17 +224,21 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
                 {/* Label */}
                 <text
                   x={centerX}
-                  y={230}
-                  textAnchor="middle"
-                  className="fill-foreground font-mono text-xs font-bold"
+                  y={240}
+                  textAnchor="end"
+                  transform={`rotate(-45, ${centerX}, 240)`}
+                  className="fill-foreground"
+                  style={{ fontSize: '11px', fontWeight: 'bold' }}
                 >
-                  {sample.name.length > 10 ? sample.name.slice(0, 10) + '...' : sample.name}
+                  {sample.name.length > 15 ? sample.name.slice(0, 12) + '...' : sample.name}
                 </text>
                 <text
                   x={centerX}
-                  y={245}
-                  textAnchor="middle"
-                  className="fill-muted-foreground font-mono text-xs"
+                  y={260}
+                  textAnchor="end"
+                  transform={`rotate(-45, ${centerX}, 260)`}
+                  className="fill-muted-foreground"
+                  style={{ fontSize: '10px' }}
                 >
                   n={stats.n}
                 </text>
