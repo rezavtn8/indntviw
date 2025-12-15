@@ -8,6 +8,7 @@ import { CrossSampleStats } from './CrossSampleStats';
 import { CrossSamplePlots } from './CrossSamplePlots';
 import { CrossSampleTests } from './CrossSampleTests';
 import { GroupComparison } from './GroupComparison';
+import { GroupZoneAnalysis } from './GroupZoneAnalysis';
 import { ZoneAcrossSamplesPanel } from './ZoneAcrossSamplesPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -222,6 +223,16 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                   groups={groups}
                   selectedProperty={selectedProperty}
                 />
+                {groups.length > 0 && (
+                  <div className="pt-4 border-t border-border">
+                    <h4 className="font-mono text-sm font-bold uppercase mb-3">Zone Analysis within Groups</h4>
+                    <GroupZoneAnalysis
+                      fileSessions={fileSessions}
+                      groups={groups}
+                      selectedProperty={selectedProperty}
+                    />
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="zones" className="mt-0 space-y-4">
