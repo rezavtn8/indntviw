@@ -10,13 +10,14 @@ import { CrossSampleTests } from './CrossSampleTests';
 import { GroupComparison } from './GroupComparison';
 import { GroupZoneAnalysis } from './GroupZoneAnalysis';
 import { ZoneAcrossSamplesPanel } from './ZoneAcrossSamplesPanel';
+import { SmartZoneAnalysis } from './SmartZoneAnalysis';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin } from 'lucide-react';
+import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin, Sparkles } from 'lucide-react';
 
 interface CrossSamplePanelProps {
   fileSessions: FileSession[];
@@ -236,10 +237,29 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
               </TabsContent>
 
               <TabsContent value="zones" className="mt-0 space-y-4">
-                <ZoneAcrossSamplesPanel
-                  fileSessions={fileSessions}
-                  selectedProperty={selectedProperty}
-                />
+                <Collapsible defaultOpen>
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors mb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      <span className="font-mono text-sm font-medium">Smart Zone Analysis (Auto-detect matching zones)</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SmartZoneAnalysis
+                      fileSessions={fileSessions}
+                      selectedProperty={selectedProperty}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+
+                <div className="pt-4 border-t border-border">
+                  <h4 className="font-mono text-sm font-bold uppercase mb-3">Manual Zone Selection</h4>
+                  <ZoneAcrossSamplesPanel
+                    fileSessions={fileSessions}
+                    selectedProperty={selectedProperty}
+                  />
+                </div>
               </TabsContent>
             </div>
           </ScrollArea>
