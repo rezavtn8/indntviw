@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { BoxViolinPlots } from './BoxViolinPlots';
-import { Plus, X, GitCompare, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, X, GitCompare, AlertCircle, CheckCircle, XCircle, ListPlus } from 'lucide-react';
 import { getSampleColor } from './SampleSelector';
 
 interface ZoneSelection {
@@ -74,6 +74,26 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
       { sessionId: firstSession.id, zoneId: firstSession.zones[0].id },
     ]);
   };
+
+  const addAllZones = () => {
+    const allZoneSelections: ZoneSelection[] = [];
+    sessionsWithZones.forEach(session => {
+      session.zones.forEach(zone => {
+        const exists = selectedZones.some(
+          sel => sel.sessionId === session.id && sel.zoneId === zone.id
+        );
+        if (!exists) {
+          allZoneSelections.push({ sessionId: session.id, zoneId: zone.id });
+        }
+      });
+    });
+    setSelectedZones([...selectedZones, ...allZoneSelections]);
+  };
+
+  // Key for forcing BoxViolinPlots re-render when selections change
+  const boxPlotKey = useMemo(() => {
+    return selectedZones.map(s => `${s.sessionId}-${s.zoneId}`).join('|');
+  }, [selectedZones]);
 
   const removeZoneSelection = (index: number) => {
     setSelectedZones(selectedZones.filter((_, i) => i !== index));
@@ -164,9 +184,14 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
       <div className="border border-border rounded p-2">
         <div className="flex items-center justify-between mb-2">
           <span className="font-mono text-xs font-bold uppercase">Select Zones</span>
-          <Button size="sm" variant="outline" onClick={addZoneSelection} className="h-6 px-2 text-xs gap-1">
-            <Plus className="w-3 h-3" /> Add
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={addAllZones} className="h-6 px-2 text-xs gap-1">
+              <ListPlus className="w-3 h-3" /> Add All
+            </Button>
+            <Button size="sm" variant="outline" onClick={addZoneSelection} className="h-6 px-2 text-xs gap-1">
+              <Plus className="w-3 h-3" /> Add
+            </Button>
+          </div>
         </div>
 
         {selectedZones.length === 0 ? (
@@ -240,6 +265,7 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
           </div>
 
           <BoxViolinPlots
+            key={boxPlotKey}
             data={boxPlotData}
             selectedProperty={selectedProperty}
             showViolin={showViolin}
