@@ -174,14 +174,38 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     y: yMin + (height - offsetY - cy) / scale,
   }), [padding, xMin, yMin, scale, height]);
 
-  // Get SVG coordinates from mouse event (accounting for zoom/pan)
+  // Get SVG coordinates from mouse event (accounting for zoom/pan and preserveAspectRatio)
   const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>): ZonePoint => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
     const svgWidth = 800;
     const svgHeight = 600;
-    const rawX = ((e.clientX - rect.left) / rect.width) * svgWidth;
-    const rawY = ((e.clientY - rect.top) / rect.height) * svgHeight;
+    
+    // Account for preserveAspectRatio="xMidYMid meet"
+    // Calculate the actual rendered size and offset of the viewBox content
+    const elementAspect = rect.width / rect.height;
+    const viewBoxAspect = svgWidth / svgHeight;
+    
+    let renderedWidth: number, renderedHeight: number, offsetX: number, offsetY: number;
+    
+    if (elementAspect > viewBoxAspect) {
+      // Element is wider - content is centered horizontally
+      renderedHeight = rect.height;
+      renderedWidth = renderedHeight * viewBoxAspect;
+      offsetX = (rect.width - renderedWidth) / 2;
+      offsetY = 0;
+    } else {
+      // Element is taller - content is centered vertically
+      renderedWidth = rect.width;
+      renderedHeight = renderedWidth / viewBoxAspect;
+      offsetX = 0;
+      offsetY = (rect.height - renderedHeight) / 2;
+    }
+    
+    // Convert mouse position to viewBox coordinates
+    const rawX = ((e.clientX - rect.left - offsetX) / renderedWidth) * svgWidth;
+    const rawY = ((e.clientY - rect.top - offsetY) / renderedHeight) * svgHeight;
+    
     // Account for zoom/pan transform to get coordinates in the transformed space
     const svgX = (rawX - viewState.translateX) / viewState.scale;
     const svgY = (rawY - viewState.translateY) / viewState.scale;
@@ -194,8 +218,28 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     const rect = svgRef.current.getBoundingClientRect();
     const svgWidth = 800;
     const svgHeight = 600;
-    const rawX = ((e.clientX - rect.left) / rect.width) * svgWidth;
-    const rawY = ((e.clientY - rect.top) / rect.height) * svgHeight;
+    
+    // Account for preserveAspectRatio="xMidYMid meet"
+    const elementAspect = rect.width / rect.height;
+    const viewBoxAspect = svgWidth / svgHeight;
+    
+    let renderedWidth: number, renderedHeight: number, offsetX: number, offsetY: number;
+    
+    if (elementAspect > viewBoxAspect) {
+      renderedHeight = rect.height;
+      renderedWidth = renderedHeight * viewBoxAspect;
+      offsetX = (rect.width - renderedWidth) / 2;
+      offsetY = 0;
+    } else {
+      renderedWidth = rect.width;
+      renderedHeight = renderedWidth / viewBoxAspect;
+      offsetX = 0;
+      offsetY = (rect.height - renderedHeight) / 2;
+    }
+    
+    const rawX = ((e.clientX - rect.left - offsetX) / renderedWidth) * svgWidth;
+    const rawY = ((e.clientY - rect.top - offsetY) / renderedHeight) * svgHeight;
+    
     // Account for zoom/pan to get position inside transform group
     const cx = (rawX - viewState.translateX) / viewState.scale;
     const cy = (rawY - viewState.translateY) / viewState.scale;
