@@ -409,7 +409,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
   const cursor = drawingTool === 'select' ? 'default' : 'crosshair';
 
   return (
-    <div className="w-full h-full flex items-start justify-center overflow-auto">
+    <div className="w-full h-full flex items-start justify-center overflow-auto select-none">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
@@ -835,6 +835,19 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
         {/* Color legend */}
         {settings.showColorLegend && (
           <g transform={`translate(${width - 90}, ${margin.top})`}>
+            {/* Label at top */}
+            <text
+              x={10}
+              y={-10}
+              textAnchor="middle"
+              fontSize={settings.legendFontSize}
+              fontFamily="sans-serif"
+              fill="#1f2937"
+            >
+              {settings.legendLabel || `${propertyLabel}${propertyUnit ? `(${propertyUnit})` : ''}`}
+            </text>
+            
+            {/* Gradient bar */}
             <rect
               x={0}
               y={0}
@@ -844,41 +857,70 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
               stroke="#374151"
               strokeWidth="1"
             />
+            
+            {/* Tick marks and labels */}
             {(() => {
+              // Generate nice round ticks
+              const generateNiceTicks = (min: number, max: number, targetCount: number = 5): number[] => {
+                const range = max - min;
+                if (range === 0) return [min];
+                
+                const roughStep = range / (targetCount - 1);
+                const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+                const residual = roughStep / magnitude;
+                
+                let niceStep: number;
+                if (residual <= 1.5) niceStep = magnitude;
+                else if (residual <= 3) niceStep = 2 * magnitude;
+                else if (residual <= 7) niceStep = 5 * magnitude;
+                else niceStep = 10 * magnitude;
+                
+                const niceMin = Math.ceil(min / niceStep) * niceStep;
+                const ticks: number[] = [];
+                
+                for (let tick = niceMin; tick <= max + niceStep * 0.01; tick += niceStep) {
+                  if (tick >= min && tick <= max) {
+                    ticks.push(Math.round(tick / niceStep) * niceStep);
+                  }
+                }
+                
+                return ticks.length > 0 ? ticks : [min, max];
+              };
+
+              // Format to show integers when appropriate
+              const formatLegendValue = (value: number, ticks: number[]): string => {
+                const allIntegers = ticks.every(t => Math.abs(t - Math.round(t)) < 0.0001);
+                if (allIntegers) return Math.round(value).toString();
+                if (Math.abs(value) >= 100) return value.toFixed(0);
+                if (Math.abs(value) >= 1) return value.toFixed(1);
+                return value.toFixed(2);
+              };
+
               const legendTicks = settings.useCustomLegendTicks && settings.customLegendTicks
                 ? parseCustomTicks(settings.customLegendTicks)
-                : Array.from({ length: settings.legendTickCount + 1 }, (_, i) => 
-                    minValue + (maxValue - minValue) * (i / settings.legendTickCount)
-                  );
+                : generateNiceTicks(minValue, maxValue, settings.legendTickCount);
+
               return legendTicks.map((value, i) => {
                 const t = (value - minValue) / (maxValue - minValue);
                 const y = plotHeight * (1 - Math.max(0, Math.min(1, t)));
                 return (
                   <g key={i}>
-                    <line x1={20} y1={y} x2={25} y2={y} stroke="#374151" strokeWidth="1" />
+                    {/* Horizontal tick line */}
+                    <line x1={20} y1={y} x2={28} y2={y} stroke="#374151" strokeWidth="1" />
+                    {/* Tick label */}
                     <text
-                      x={28}
+                      x={32}
                       y={y + 4}
                       fontSize={settings.legendFontSize}
                       fontFamily="sans-serif"
                       fill="#4b5563"
                     >
-                      {value.toFixed(settings.legendDecimals)}
+                      {formatLegendValue(value, legendTicks)}
                     </text>
                   </g>
                 );
               });
             })()}
-            <text
-              x={10}
-              y={-8}
-              textAnchor="middle"
-              fontSize={settings.legendFontSize}
-              fontFamily="sans-serif"
-              fill="#1f2937"
-            >
-              {settings.legendLabel || propertyUnit}
-            </text>
           </g>
         )}
       </svg>
