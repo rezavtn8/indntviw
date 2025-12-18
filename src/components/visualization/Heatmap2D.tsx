@@ -426,7 +426,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const cursor = drawingTool === 'select' ? 'cursor-default' : 'cursor-crosshair';
 
   return (
-    <div className="relative w-full h-full overflow-hidden flex items-center justify-center bg-card">
+    <div className="relative w-full h-full overflow-hidden flex items-center justify-center bg-card select-none">
       {/* Enhanced zoom controls */}
       <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-card/90 border border-border rounded p-1">
         <button
