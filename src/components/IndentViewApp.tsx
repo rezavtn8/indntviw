@@ -29,9 +29,10 @@ import { Zone, ExportSettings, DEFAULT_EXPORT_SETTINGS } from '@/types/zones';
 import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
 import { generateZoneId, updateZoneBoundary, createZoneFromSelection } from '@/utils/zoneUtils';
 import { parseTabSeparatedData } from '@/utils/dataParser';
-import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput, BarChart3 } from 'lucide-react';
+import { Grid2X2, Box, Edit3, Plus, Undo2, FileOutput, BarChart3, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import { usePageDropZone } from '@/hooks/usePageDropZone';
 
 export const IndentViewApp: React.FC = () => {
   // Multi-file session state
@@ -191,6 +192,13 @@ export const IndentViewApp: React.FC = () => {
     setActiveSessionId(sessionId);
     setSelectedPoint(null);
   }, []);
+
+  // Page-level drag and drop
+  const { isDraggingOverPage } = usePageDropZone({
+    onDataLoaded: handleDataLoaded,
+    isLoading,
+    setIsLoading,
+  });
 
   const handleSelectSession = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId);
@@ -529,7 +537,17 @@ export const IndentViewApp: React.FC = () => {
   }, [activeView, selectedZoneId, handleZoneDelete, handleExportSelectedPointIds]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Page-level drop overlay */}
+      {isDraggingOverPage && (
+        <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-4 p-8 border-2 border-dashed border-primary rounded-lg bg-card/50">
+            <Upload className="w-12 h-12 text-primary animate-bounce" />
+            <span className="font-mono text-lg font-bold text-primary">Drop files to upload</span>
+            <span className="font-mono text-xs text-muted-foreground">.txt, .csv, .tsv, .xlsx, .xls</span>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="border-b-2 border-border bg-card px-6 py-4">
         <div className="flex items-center justify-between">
