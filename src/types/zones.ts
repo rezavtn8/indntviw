@@ -147,7 +147,7 @@ export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
   memberPointIds: [],
   boundaryPadding: 0.1,       // Very tight default (10%)
   smoothness: 0.5,            // Moderate smoothing
-  boundaryType: 'convex',
+  boundaryType: 'concave',
   color: DEFAULT_ZONE_COLORS[colorIndex % DEFAULT_ZONE_COLORS.length],
   borderStyle: 'solid',
   borderWidth: 2,
@@ -156,3 +156,4 @@ export const createDefaultZone = (id: string, colorIndex: number): Zone => ({
   showLabel: true,
   visible: true,
 });
+
