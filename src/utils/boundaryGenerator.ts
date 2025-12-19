@@ -33,19 +33,18 @@ export function computeConvexHull(points: ZonePoint[]): ZonePoint[] {
   return [...lower, ...upper];
 }
 
-// PHASE 1: Bulletproof radius calculation
-// pointRadius is the VISUAL radius of points - we MUST exceed this
+// PHASE 1: Tight radius calculation for non-overlapping zones
+// pointRadius is the VISUAL radius of points - boundary should just enclose this
 function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): number {
-  // The boundary must be at least pointRadius away from each point center
-  // Add 20% safety margin to guarantee no point ever touches the edge
-  const safetyMargin = 1.2;
+  // Use exactly the point radius with minimal margin (5%) to keep zones tight
+  const safetyMargin = 1.05;
   
   if (pointRadius > 0) {
     return pointRadius * safetyMargin;
   }
   
   // Fallback: estimate based on point spacing if no radius given
-  if (memberPoints.length < 2) return 0.5;
+  if (memberPoints.length < 2) return 0.3;
   
   // Find minimum distance between any two points
   let minDist = Infinity;
@@ -59,8 +58,8 @@ function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): n
     }
   }
   
-  // Use half the minimum spacing as radius estimate, with safety margin
-  return minDist !== Infinity ? (minDist * 0.5 * safetyMargin) : 0.5;
+  // Use 40% of minimum spacing as radius - tight fit to avoid overlaps
+  return minDist !== Infinity ? (minDist * 0.4 * safetyMargin) : 0.3;
 }
 
 // FOOLPROOF approach: Generate circles around EVERY member point (not just hull)
@@ -91,16 +90,17 @@ function createRoundedEnvelope(memberPoints: ZonePoint[], radius: number): ZoneP
 // Main function: Generate smooth boundary from member points
 export function generateZoneBoundary(
   memberPoints: ZonePoint[],
-  padding: number = 0.1,       // Extra padding factor (0-1)
+  padding: number = 0.05,       // Extra padding factor (0-1) - reduced for tighter fit
   smoothness: number = 0.5,    // Not used currently, kept for API compatibility
   boundaryType: 'convex' | 'concave' = 'convex',
   pointRadius: number = 0      // Visual radius of points in data units
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
-  // PHASE 1: Calculate bulletproof radius
+  // PHASE 1: Calculate tight radius for non-overlapping zones
   const baseRadius = getMinimumSafeRadius(memberPoints, pointRadius);
-  const extraPadding = baseRadius * padding;
+  // Reduce extra padding to keep boundaries close to dots
+  const extraPadding = baseRadius * Math.min(padding, 0.1);
   const totalRadius = baseRadius + extraPadding;
 
   // Single point: simple circle
