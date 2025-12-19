@@ -27,6 +27,12 @@ const SIZE_PRESETS = [
 ];
 
 export const FormatSection: React.FC<FormatSectionProps> = ({ settings, onSettingsChange }) => {
+  // Provide defaults for new properties that may not exist in old sessions
+  const xStretch = settings.xStretch ?? 1.0;
+  const yStretch = settings.yStretch ?? 1.0;
+  const flipXAxis = settings.flipXAxis ?? false;
+  const flipYAxis = settings.flipYAxis ?? false;
+
   const handleSizePreset = (preset: string) => {
     const size = SIZE_PRESETS.find(s => s.value === preset);
     if (size) {
@@ -131,10 +137,10 @@ export const FormatSection: React.FC<FormatSectionProps> = ({ settings, onSettin
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs text-muted-foreground">X Stretch</Label>
-            <span className="text-xs font-mono text-muted-foreground">{settings.xStretch.toFixed(2)}x</span>
+            <span className="text-xs font-mono text-muted-foreground">{xStretch.toFixed(2)}x</span>
           </div>
           <Slider
-            value={[settings.xStretch]}
+            value={[xStretch]}
             min={0.5}
             max={2.0}
             step={0.05}
@@ -147,10 +153,10 @@ export const FormatSection: React.FC<FormatSectionProps> = ({ settings, onSettin
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs text-muted-foreground">Y Stretch</Label>
-            <span className="text-xs font-mono text-muted-foreground">{settings.yStretch.toFixed(2)}x</span>
+            <span className="text-xs font-mono text-muted-foreground">{yStretch.toFixed(2)}x</span>
           </div>
           <Slider
-            value={[settings.yStretch]}
+            value={[yStretch]}
             min={0.5}
             max={2.0}
             step={0.05}
@@ -164,7 +170,7 @@ export const FormatSection: React.FC<FormatSectionProps> = ({ settings, onSettin
           <div className="flex items-center gap-2">
             <Switch
               id="flip-x"
-              checked={settings.flipXAxis}
+              checked={flipXAxis}
               onCheckedChange={(checked) => onSettingsChange({ ...settings, flipXAxis: checked })}
             />
             <Label htmlFor="flip-x" className="text-xs flex items-center gap-1 cursor-pointer">
@@ -175,7 +181,7 @@ export const FormatSection: React.FC<FormatSectionProps> = ({ settings, onSettin
           <div className="flex items-center gap-2">
             <Switch
               id="flip-y"
-              checked={settings.flipYAxis}
+              checked={flipYAxis}
               onCheckedChange={(checked) => onSettingsChange({ ...settings, flipYAxis: checked })}
             />
             <Label htmlFor="flip-y" className="text-xs flex items-center gap-1 cursor-pointer">

@@ -119,11 +119,17 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     };
   }, [rawDataBounds, settings.useAutoAxisBounds, settings.customAxisBounds, settings.axisPadding, plotWidth, plotHeight]);
 
+  // Fallback defaults for new properties
+  const xStretch = settings.xStretch ?? 1.0;
+  const yStretch = settings.yStretch ?? 1.0;
+  const flipXAxis = settings.flipXAxis ?? false;
+  const flipYAxis = settings.flipYAxis ?? false;
+
   // Transform data coordinates to SVG coordinates with stretch and flip
   const transformPoint = useCallback((x: number, y: number) => {
     // Apply flip (mirror around center of data range)
-    let adjustedX = settings.flipXAxis ? (xMax - x + xMin) : x;
-    let adjustedY = settings.flipYAxis ? (yMax - y + yMin) : y;
+    let adjustedX = flipXAxis ? (xMax - x + xMin) : x;
+    let adjustedY = flipYAxis ? (yMax - y + yMin) : y;
     
     // Calculate base position in plot space
     const baseX = (adjustedX - xMin) * scaleX;
@@ -133,14 +139,14 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     const centerX = plotWidth / 2;
     const centerY = plotHeight / 2;
     
-    const stretchedX = centerX + (baseX - centerX) * settings.xStretch;
-    const stretchedY = centerY + (baseY - centerY) * settings.yStretch;
+    const stretchedX = centerX + (baseX - centerX) * xStretch;
+    const stretchedY = centerY + (baseY - centerY) * yStretch;
     
     return {
       cx: margin.left + stretchedX,
       cy: margin.top + stretchedY,
     };
-  }, [margin.left, margin.top, xMin, xMax, yMin, yMax, scaleX, scaleY, plotHeight, plotWidth, settings.xStretch, settings.yStretch, settings.flipXAxis, settings.flipYAxis]);
+  }, [margin.left, margin.top, xMin, xMax, yMin, yMax, scaleX, scaleY, plotHeight, plotWidth, xStretch, yStretch, flipXAxis, flipYAxis]);
 
   // Inverse transform: SVG to data coordinates (accounts for stretch and flip)
   const inverseTransform = useCallback((cx: number, cy: number) => {
@@ -148,23 +154,23 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     const centerX = plotWidth / 2;
     const centerY = plotHeight / 2;
     
-    const unstretchedX = centerX + (cx - margin.left - centerX) / settings.xStretch;
-    const unstretchedY = centerY + (cy - margin.top - centerY) / settings.yStretch;
+    const unstretchedX = centerX + (cx - margin.left - centerX) / xStretch;
+    const unstretchedY = centerY + (cy - margin.top - centerY) / yStretch;
     
     // Calculate base data coordinates
     let x = xMin + unstretchedX / scaleX;
     let y = yMin + (plotHeight - unstretchedY) / scaleY;
     
     // Reverse the flip
-    if (settings.flipXAxis) {
+    if (flipXAxis) {
       x = xMax - x + xMin;
     }
-    if (settings.flipYAxis) {
+    if (flipYAxis) {
       y = yMax - y + yMin;
     }
     
     return { x, y };
-  }, [margin.left, margin.top, xMin, xMax, yMin, yMax, scaleX, scaleY, plotHeight, plotWidth, settings.xStretch, settings.yStretch, settings.flipXAxis, settings.flipYAxis]);
+  }, [margin.left, margin.top, xMin, xMax, yMin, yMax, scaleX, scaleY, plotHeight, plotWidth, xStretch, yStretch, flipXAxis, flipYAxis]);
 
   // Get SVG coordinates from mouse event
   const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>): ZonePoint => {
