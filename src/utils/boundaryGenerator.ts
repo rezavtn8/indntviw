@@ -1,4 +1,5 @@
 import { ZonePoint } from '@/types/zones';
+import Delaunator from 'delaunator';
 
 // Cross product of vectors OA and OB where O is origin
 function cross(O: ZonePoint, A: ZonePoint, B: ZonePoint): number {
@@ -33,20 +34,121 @@ export function computeConvexHull(points: ZonePoint[]): ZonePoint[] {
   return [...lower, ...upper];
 }
 
+// Concave hull using alpha shape algorithm with Delaunay triangulation
+function computeConcaveHull(points: ZonePoint[], alpha: number): ZonePoint[] {
+  if (points.length < 3) return [...points];
+  if (points.length === 3) return [...points];
+
+  // Create flat coords array for Delaunator
+  const coords: number[] = [];
+  for (const p of points) {
+    coords.push(p.x, p.y);
+  }
+
+  // Compute Delaunay triangulation
+  const delaunay = new Delaunator(coords);
+  const triangles = delaunay.triangles;
+
+  // Build edge map: edge -> list of triangle indices that contain it
+  const edgeToTriangles = new Map<string, number[]>();
+  
+  const makeEdgeKey = (i: number, j: number) => {
+    const min = Math.min(i, j);
+    const max = Math.max(i, j);
+    return `${min}-${max}`;
+  };
+
+  const getEdgeLength = (i: number, j: number) => {
+    return Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+  };
+
+  // Process each triangle
+  for (let t = 0; t < triangles.length; t += 3) {
+    const a = triangles[t];
+    const b = triangles[t + 1];
+    const c = triangles[t + 2];
+    
+    // Get edge lengths
+    const lenAB = getEdgeLength(a, b);
+    const lenBC = getEdgeLength(b, c);
+    const lenCA = getEdgeLength(c, a);
+    
+    // Skip triangles with any edge longer than alpha (alpha filtering)
+    const maxEdge = Math.max(lenAB, lenBC, lenCA);
+    if (maxEdge > alpha) continue;
+    
+    // Add edges to map
+    for (const [i, j] of [[a, b], [b, c], [c, a]]) {
+      const key = makeEdgeKey(i, j);
+      if (!edgeToTriangles.has(key)) {
+        edgeToTriangles.set(key, []);
+      }
+      edgeToTriangles.get(key)!.push(t);
+    }
+  }
+
+  // Boundary edges are those that belong to exactly one triangle
+  const boundaryEdges: [number, number][] = [];
+  for (const [key, tris] of edgeToTriangles.entries()) {
+    if (tris.length === 1) {
+      const [a, b] = key.split('-').map(Number);
+      boundaryEdges.push([a, b]);
+    }
+  }
+
+  if (boundaryEdges.length === 0) {
+    // Fallback to convex hull if no boundary found
+    return computeConvexHull(points);
+  }
+
+  // Order boundary edges to form a closed polygon
+  const orderedPoints: ZonePoint[] = [];
+  const usedEdges = new Set<number>();
+  
+  // Start with first edge
+  let currentEdge = boundaryEdges[0];
+  usedEdges.add(0);
+  orderedPoints.push(points[currentEdge[0]]);
+  let currentVertex = currentEdge[1];
+
+  while (orderedPoints.length < boundaryEdges.length) {
+    orderedPoints.push(points[currentVertex]);
+    
+    // Find next edge that shares currentVertex
+    let found = false;
+    for (let i = 0; i < boundaryEdges.length; i++) {
+      if (usedEdges.has(i)) continue;
+      
+      const [a, b] = boundaryEdges[i];
+      if (a === currentVertex) {
+        usedEdges.add(i);
+        currentVertex = b;
+        found = true;
+        break;
+      } else if (b === currentVertex) {
+        usedEdges.add(i);
+        currentVertex = a;
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) break; // No more connected edges
+  }
+
+  return orderedPoints.length >= 3 ? orderedPoints : computeConvexHull(points);
+}
+
 // PHASE 1: Tight radius calculation for non-overlapping zones
-// pointRadius is the VISUAL radius of points - boundary should just enclose this
 function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): number {
-  // Use exactly the point radius with minimal margin (5%) to keep zones tight
   const safetyMargin = 1.05;
   
   if (pointRadius > 0) {
     return pointRadius * safetyMargin;
   }
   
-  // Fallback: estimate based on point spacing if no radius given
   if (memberPoints.length < 2) return 0.3;
   
-  // Find minimum distance between any two points
   let minDist = Infinity;
   const sampleSize = Math.min(memberPoints.length, 20);
   const step = Math.max(1, Math.floor(memberPoints.length / sampleSize));
@@ -58,21 +160,50 @@ function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): n
     }
   }
   
-  // Use 40% of minimum spacing as radius - tight fit to avoid overlaps
   return minDist !== Infinity ? (minDist * 0.4 * safetyMargin) : 0.3;
 }
 
-// FOOLPROOF approach: Generate circles around EVERY member point (not just hull)
-// This guarantees ALL points are fully inside with their visual radius
-function createRoundedEnvelope(memberPoints: ZonePoint[], radius: number): ZonePoint[] {
+// Calculate alpha parameter based on point spacing
+function calculateAlpha(memberPoints: ZonePoint[], radius: number): number {
+  if (memberPoints.length < 2) return radius * 4;
+  
+  // Find average nearest neighbor distance
+  let totalMinDist = 0;
+  let count = 0;
+  
+  for (let i = 0; i < memberPoints.length; i++) {
+    let minDist = Infinity;
+    for (let j = 0; j < memberPoints.length; j++) {
+      if (i === j) continue;
+      const dist = Math.hypot(memberPoints[i].x - memberPoints[j].x, memberPoints[i].y - memberPoints[j].y);
+      if (dist < minDist) minDist = dist;
+    }
+    if (minDist !== Infinity) {
+      totalMinDist += minDist;
+      count++;
+    }
+  }
+  
+  const avgNearestDist = count > 0 ? totalMinDist / count : radius * 2;
+  
+  // Alpha should be slightly larger than typical spacing to keep connected components
+  // but small enough to create indentations for gaps
+  return Math.max(avgNearestDist * 2.5, radius * 3);
+}
+
+// Create envelope around member points using concave or convex hull
+function createRoundedEnvelope(
+  memberPoints: ZonePoint[], 
+  radius: number, 
+  useConcave: boolean = true
+): ZonePoint[] {
   if (memberPoints.length === 0) return [];
   if (radius <= 0) return computeConvexHull(memberPoints);
   
   const circlePoints: ZonePoint[] = [];
-  const pointsPerCircle = 24; // More points = smoother boundary
+  const pointsPerCircle = 16; // Points per circle around each member
   
-  // Generate circle points around EVERY member point
-  // This ensures every single point is fully enclosed
+  // Generate circle points around each member point
   for (const p of memberPoints) {
     for (let i = 0; i < pointsPerCircle; i++) {
       const angle = (i / pointsPerCircle) * Math.PI * 2;
@@ -83,23 +214,31 @@ function createRoundedEnvelope(memberPoints: ZonePoint[], radius: number): ZoneP
     }
   }
   
-  // Convex hull of all circle points = guaranteed envelope
+  if (useConcave && memberPoints.length >= 3) {
+    // Calculate alpha based on typical spacing between member points
+    const alpha = calculateAlpha(memberPoints, radius);
+    const concaveResult = computeConcaveHull(circlePoints, alpha);
+    
+    // Verify result is valid, fallback to convex if not
+    if (concaveResult.length >= 3) {
+      return concaveResult;
+    }
+  }
+  
   return computeConvexHull(circlePoints);
 }
 
 // Main function: Generate smooth boundary from member points
 export function generateZoneBoundary(
   memberPoints: ZonePoint[],
-  padding: number = 0.05,       // Extra padding factor (0-1) - reduced for tighter fit
-  smoothness: number = 0.5,    // Not used currently, kept for API compatibility
-  boundaryType: 'convex' | 'concave' = 'convex',
-  pointRadius: number = 0      // Visual radius of points in data units
+  padding: number = 0.05,
+  smoothness: number = 0.5,
+  boundaryType: 'convex' | 'concave' = 'concave', // Default to concave now
+  pointRadius: number = 0
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
-  // PHASE 1: Calculate tight radius for non-overlapping zones
   const baseRadius = getMinimumSafeRadius(memberPoints, pointRadius);
-  // Reduce extra padding to keep boundaries close to dots
   const extraPadding = baseRadius * Math.min(padding, 0.1);
   const totalRadius = baseRadius + extraPadding;
 
@@ -124,7 +263,6 @@ export function generateZoneBoundary(
     const capsule: ZonePoint[] = [];
     const arcSegs = 16;
     
-    // Arc around p1
     const baseAngle1 = Math.atan2(dy, dx) + Math.PI;
     for (let i = 0; i <= arcSegs; i++) {
       const angle = baseAngle1 - Math.PI / 2 + (i / arcSegs) * Math.PI;
@@ -134,7 +272,6 @@ export function generateZoneBoundary(
       });
     }
     
-    // Arc around p2
     const baseAngle2 = Math.atan2(dy, dx);
     for (let i = 0; i <= arcSegs; i++) {
       const angle = baseAngle2 - Math.PI / 2 + (i / arcSegs) * Math.PI;
@@ -147,9 +284,9 @@ export function generateZoneBoundary(
     return capsule;
   }
 
-  // 3+ points: Create envelope around ALL member points (not just hull)
-  // This guarantees every single point is fully inside
-  return createRoundedEnvelope(memberPoints, totalRadius);
+  // 3+ points: Use concave or convex based on boundaryType
+  const useConcave = boundaryType === 'concave';
+  return createRoundedEnvelope(memberPoints, totalRadius, useConcave);
 }
 
 // Generate SVG path from boundary points
