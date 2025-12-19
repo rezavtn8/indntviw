@@ -165,12 +165,14 @@ function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): n
 
 // Calculate alpha parameter based on point spacing
 function calculateAlpha(memberPoints: ZonePoint[], radius: number): number {
-  if (memberPoints.length < 2) return radius * 4;
-  
-  // Find average nearest neighbor distance
+  // Alpha controls how much the boundary is allowed to "bridge" across gaps.
+  // Smaller alpha = more concave (tighter, avoids swallowing nearby unselected dots).
+  if (memberPoints.length < 2) return radius * 3;
+
+  // Average nearest-neighbor distance among the *member points* (not the circle points).
   let totalMinDist = 0;
   let count = 0;
-  
+
   for (let i = 0; i < memberPoints.length; i++) {
     let minDist = Infinity;
     for (let j = 0; j < memberPoints.length; j++) {
@@ -183,13 +185,14 @@ function calculateAlpha(memberPoints: ZonePoint[], radius: number): number {
       count++;
     }
   }
-  
+
   const avgNearestDist = count > 0 ? totalMinDist / count : radius * 2;
-  
-  // Alpha should be slightly larger than typical spacing to keep connected components
-  // but small enough to create indentations for gaps
-  return Math.max(avgNearestDist * 2.5, radius * 3);
+
+  // Tight by default: allow bridging only a bit more than typical spacing.
+  // Also ensure we can still connect the offset circles around points.
+  return Math.max(avgNearestDist * 1.35, radius * 2.5);
 }
+
 
 // Create envelope around member points using concave or convex hull
 function createRoundedEnvelope(
