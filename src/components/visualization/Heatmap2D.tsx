@@ -377,7 +377,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     setViewState({ scale: clampedScale, translateX: newTranslateX, translateY: newTranslateY });
   }, [viewState]);
 
-  // Generate selection preview boundary (same as ExportCanvas)
+  // Generate selection preview boundary - now avoids unselected points
   const selectionPreviewPath = useMemo(() => {
     if (selectedPointIds.length < 1) return null;
     
@@ -385,8 +385,27 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
     if (selectedPoints.length === 0) return null;
     
     const memberCoords: ZonePoint[] = selectedPoints.map(p => ({ x: p.x, y: p.y }));
-    const boundaryPoints = generateZoneBoundary(memberCoords, 0.1, 0.5, 'concave', pointRadiusDataUnits);
     
+    // Pass ALL points and selected IDs so the algorithm can avoid unselected dots
+    const allPointCoords: ZonePoint[] = points.map(p => ({ x: p.x, y: p.y }));
+    const selectedIdxSet = new Set<number>();
+    points.forEach((p, idx) => {
+      if (selectedPointIds.includes(p.id)) {
+        selectedIdxSet.add(idx);
+      }
+    });
+    
+    const boundaryPoints = generateZoneBoundary(
+      memberCoords, 
+      0.1, 
+      0.5, 
+      'concave', 
+      pointRadiusDataUnits,
+      allPointCoords,
+      selectedIdxSet
+    );
+    
+    if (boundaryPoints.length < 3) return null;
     
     return boundaryToSVGPath(boundaryPoints, transformPoint);
   }, [selectedPointIds, points, transformPoint, pointRadiusDataUnits]);

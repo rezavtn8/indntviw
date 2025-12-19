@@ -34,78 +34,26 @@ export function computeConvexHull(points: ZonePoint[]): ZonePoint[] {
   return [...lower, ...upper];
 }
 
-// Concave hull using alpha shape algorithm with Delaunay triangulation
-function computeConcaveHull(points: ZonePoint[], alpha: number): ZonePoint[] {
-  if (points.length < 3) return [...points];
-  if (points.length === 3) return [...points];
-
-  // Create flat coords array for Delaunator
-  const coords: number[] = [];
-  for (const p of points) {
-    coords.push(p.x, p.y);
-  }
-
-  // Compute Delaunay triangulation
-  const delaunay = new Delaunator(coords);
-  const triangles = delaunay.triangles;
-
-  // Build edge map: edge -> list of triangle indices that contain it
-  const edgeToTriangles = new Map<string, number[]>();
-  
-  const makeEdgeKey = (i: number, j: number) => {
-    const min = Math.min(i, j);
-    const max = Math.max(i, j);
-    return `${min}-${max}`;
-  };
-
-  const getEdgeLength = (i: number, j: number) => {
-    return Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
-  };
-
-  // Process each triangle
-  for (let t = 0; t < triangles.length; t += 3) {
-    const a = triangles[t];
-    const b = triangles[t + 1];
-    const c = triangles[t + 2];
-    
-    // Get edge lengths
-    const lenAB = getEdgeLength(a, b);
-    const lenBC = getEdgeLength(b, c);
-    const lenCA = getEdgeLength(c, a);
-    
-    // Skip triangles with any edge longer than alpha (alpha filtering)
-    const maxEdge = Math.max(lenAB, lenBC, lenCA);
-    if (maxEdge > alpha) continue;
-    
-    // Add edges to map
-    for (const [i, j] of [[a, b], [b, c], [c, a]]) {
-      const key = makeEdgeKey(i, j);
-      if (!edgeToTriangles.has(key)) {
-        edgeToTriangles.set(key, []);
-      }
-      edgeToTriangles.get(key)!.push(t);
-    }
-  }
-
-  // Boundary edges are those that belong to exactly one triangle
+// Extract boundary from a set of edges (edges that appear exactly once)
+function extractBoundaryFromEdges(
+  edges: Map<string, number>,
+  points: ZonePoint[]
+): ZonePoint[] {
+  // Get edges that appear exactly once (boundary edges)
   const boundaryEdges: [number, number][] = [];
-  for (const [key, tris] of edgeToTriangles.entries()) {
-    if (tris.length === 1) {
+  for (const [key, count] of edges.entries()) {
+    if (count === 1) {
       const [a, b] = key.split('-').map(Number);
       boundaryEdges.push([a, b]);
     }
   }
 
-  if (boundaryEdges.length === 0) {
-    // Fallback to convex hull if no boundary found
-    return computeConvexHull(points);
-  }
+  if (boundaryEdges.length === 0) return [];
 
   // Order boundary edges to form a closed polygon
   const orderedPoints: ZonePoint[] = [];
   const usedEdges = new Set<number>();
-  
-  // Start with first edge
+
   let currentEdge = boundaryEdges[0];
   usedEdges.add(0);
   orderedPoints.push(points[currentEdge[0]]);
@@ -113,12 +61,11 @@ function computeConcaveHull(points: ZonePoint[], alpha: number): ZonePoint[] {
 
   while (orderedPoints.length < boundaryEdges.length) {
     orderedPoints.push(points[currentVertex]);
-    
-    // Find next edge that shares currentVertex
+
     let found = false;
     for (let i = 0; i < boundaryEdges.length; i++) {
       if (usedEdges.has(i)) continue;
-      
+
       const [a, b] = boundaryEdges[i];
       if (a === currentVertex) {
         usedEdges.add(i);
@@ -132,44 +79,175 @@ function computeConcaveHull(points: ZonePoint[], alpha: number): ZonePoint[] {
         break;
       }
     }
-    
-    if (!found) break; // No more connected edges
+
+    if (!found) break;
   }
 
-  return orderedPoints.length >= 3 ? orderedPoints : computeConvexHull(points);
+  return orderedPoints;
 }
 
-// PHASE 1: Tight radius calculation for non-overlapping zones
+// NEW: Compute boundary that explicitly avoids unselected points
+// Uses Delaunay triangulation of ALL points, keeps only triangles where all vertices are selected
+function computeBoundaryAvoidingPoints(
+  allPoints: ZonePoint[],
+  selectedIndices: Set<number>,
+  padding: number
+): ZonePoint[] {
+  if (selectedIndices.size === 0) return [];
+  if (allPoints.length < 3) {
+    const selected = Array.from(selectedIndices).map(i => allPoints[i]);
+    return computeConvexHull(selected);
+  }
+
+  // Create flat coords array for Delaunator
+  const coords: number[] = [];
+  for (const p of allPoints) {
+    coords.push(p.x, p.y);
+  }
+
+  // Compute Delaunay triangulation of ALL points
+  const delaunay = new Delaunator(coords);
+  const triangles = delaunay.triangles;
+
+  // Build edge count map for triangles where ALL vertices are selected
+  const edgeCounts = new Map<string, number>();
+
+  const makeEdgeKey = (i: number, j: number) => {
+    const min = Math.min(i, j);
+    const max = Math.max(i, j);
+    return `${min}-${max}`;
+  };
+
+  // Process each triangle - only keep if all 3 vertices are selected
+  for (let t = 0; t < triangles.length; t += 3) {
+    const a = triangles[t];
+    const b = triangles[t + 1];
+    const c = triangles[t + 2];
+
+    // Check if all vertices are selected
+    if (!selectedIndices.has(a) || !selectedIndices.has(b) || !selectedIndices.has(c)) {
+      continue; // Skip triangles that touch unselected points
+    }
+
+    // Add edges of this valid triangle
+    for (const [i, j] of [[a, b], [b, c], [c, a]]) {
+      const key = makeEdgeKey(i, j);
+      edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
+    }
+  }
+
+  // Extract boundary (edges that appear exactly once)
+  const boundary = extractBoundaryFromEdges(edgeCounts, allPoints);
+
+  if (boundary.length >= 3) {
+    // Add padding around the boundary
+    return addPaddingToBoundary(boundary, padding);
+  }
+
+  // Fallback: just use convex hull of selected points with padding
+  const selected = Array.from(selectedIndices).map(i => allPoints[i]);
+  const hull = computeConvexHull(selected);
+  return addPaddingToBoundary(hull, padding);
+}
+
+// Add padding/offset to a boundary polygon
+function addPaddingToBoundary(boundary: ZonePoint[], padding: number): ZonePoint[] {
+  if (boundary.length < 3 || padding <= 0) return boundary;
+
+  // Calculate centroid
+  const cx = boundary.reduce((sum, p) => sum + p.x, 0) / boundary.length;
+  const cy = boundary.reduce((sum, p) => sum + p.y, 0) / boundary.length;
+
+  // Offset each point outward from centroid
+  return boundary.map(p => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) return p;
+    
+    const scale = (dist + padding) / dist;
+    return {
+      x: cx + dx * scale,
+      y: cy + dy * scale,
+    };
+  });
+}
+
+// Simple concave hull using alpha shapes (for when we don't have all points)
+function computeConcaveHull(points: ZonePoint[], alpha: number): ZonePoint[] {
+  if (points.length < 3) return [...points];
+  if (points.length === 3) return [...points];
+
+  const coords: number[] = [];
+  for (const p of points) {
+    coords.push(p.x, p.y);
+  }
+
+  const delaunay = new Delaunator(coords);
+  const triangles = delaunay.triangles;
+
+  const edgeCounts = new Map<string, number>();
+
+  const makeEdgeKey = (i: number, j: number) => {
+    const min = Math.min(i, j);
+    const max = Math.max(i, j);
+    return `${min}-${max}`;
+  };
+
+  const getEdgeLength = (i: number, j: number) => {
+    return Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+  };
+
+  for (let t = 0; t < triangles.length; t += 3) {
+    const a = triangles[t];
+    const b = triangles[t + 1];
+    const c = triangles[t + 2];
+
+    const lenAB = getEdgeLength(a, b);
+    const lenBC = getEdgeLength(b, c);
+    const lenCA = getEdgeLength(c, a);
+
+    const maxEdge = Math.max(lenAB, lenBC, lenCA);
+    if (maxEdge > alpha) continue;
+
+    for (const [i, j] of [[a, b], [b, c], [c, a]]) {
+      const key = makeEdgeKey(i, j);
+      edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const boundary = extractBoundaryFromEdges(edgeCounts, points);
+  return boundary.length >= 3 ? boundary : computeConvexHull(points);
+}
+
+// Calculate point radius in data units
 function getMinimumSafeRadius(memberPoints: ZonePoint[], pointRadius: number): number {
   const safetyMargin = 1.05;
-  
+
   if (pointRadius > 0) {
     return pointRadius * safetyMargin;
   }
-  
+
   if (memberPoints.length < 2) return 0.3;
-  
+
   let minDist = Infinity;
   const sampleSize = Math.min(memberPoints.length, 20);
   const step = Math.max(1, Math.floor(memberPoints.length / sampleSize));
-  
+
   for (let i = 0; i < memberPoints.length; i += step) {
     for (let j = i + 1; j < memberPoints.length; j++) {
       const dist = Math.hypot(memberPoints[i].x - memberPoints[j].x, memberPoints[i].y - memberPoints[j].y);
       if (dist > 0 && dist < minDist) minDist = dist;
     }
   }
-  
+
   return minDist !== Infinity ? (minDist * 0.4 * safetyMargin) : 0.3;
 }
 
-// Calculate alpha parameter based on point spacing
+// Calculate alpha for concave hull
 function calculateAlpha(memberPoints: ZonePoint[], radius: number): number {
-  // Alpha controls how much the boundary is allowed to "bridge" across gaps.
-  // Smaller alpha = more concave (tighter, avoids swallowing nearby unselected dots).
   if (memberPoints.length < 2) return radius * 3;
 
-  // Average nearest-neighbor distance among the *member points* (not the circle points).
   let totalMinDist = 0;
   let count = 0;
 
@@ -187,26 +265,21 @@ function calculateAlpha(memberPoints: ZonePoint[], radius: number): number {
   }
 
   const avgNearestDist = count > 0 ? totalMinDist / count : radius * 2;
-
-  // Tight by default: allow bridging only a bit more than typical spacing.
-  // Also ensure we can still connect the offset circles around points.
-  return Math.max(avgNearestDist * 1.35, radius * 2.5);
+  return Math.max(avgNearestDist * 1.5, radius * 2.5);
 }
 
-
-// Create envelope around member points using concave or convex hull
+// Create envelope with circles around points
 function createRoundedEnvelope(
-  memberPoints: ZonePoint[], 
-  radius: number, 
+  memberPoints: ZonePoint[],
+  radius: number,
   useConcave: boolean = true
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
   if (radius <= 0) return computeConvexHull(memberPoints);
-  
+
   const circlePoints: ZonePoint[] = [];
-  const pointsPerCircle = 16; // Points per circle around each member
-  
-  // Generate circle points around each member point
+  const pointsPerCircle = 16;
+
   for (const p of memberPoints) {
     for (let i = 0; i < pointsPerCircle; i++) {
       const angle = (i / pointsPerCircle) * Math.PI * 2;
@@ -216,33 +289,33 @@ function createRoundedEnvelope(
       });
     }
   }
-  
+
   if (useConcave && memberPoints.length >= 3) {
-    // Calculate alpha based on typical spacing between member points
     const alpha = calculateAlpha(memberPoints, radius);
     const concaveResult = computeConcaveHull(circlePoints, alpha);
-    
-    // Verify result is valid, fallback to convex if not
     if (concaveResult.length >= 3) {
       return concaveResult;
     }
   }
-  
+
   return computeConvexHull(circlePoints);
 }
 
 // Main function: Generate smooth boundary from member points
+// Now accepts optional allPoints to avoid unselected dots
 export function generateZoneBoundary(
   memberPoints: ZonePoint[],
   padding: number = 0.05,
   smoothness: number = 0.5,
-  boundaryType: 'convex' | 'concave' = 'concave', // Default to concave now
-  pointRadius: number = 0
+  boundaryType: 'convex' | 'concave' = 'concave',
+  pointRadius: number = 0,
+  allPoints?: ZonePoint[],           // All data points (selected + unselected)
+  selectedPointIds?: Set<number>     // Which indices in allPoints are selected
 ): ZonePoint[] {
   if (memberPoints.length === 0) return [];
 
   const baseRadius = getMinimumSafeRadius(memberPoints, pointRadius);
-  const extraPadding = baseRadius * Math.min(padding, 0.1);
+  const extraPadding = baseRadius * Math.min(padding, 0.15);
   const totalRadius = baseRadius + extraPadding;
 
   // Single point: simple circle
@@ -262,10 +335,10 @@ export function generateZoneBoundary(
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
     const dx = (p2.x - p1.x) / (dist || 1);
     const dy = (p2.y - p1.y) / (dist || 1);
-    
+
     const capsule: ZonePoint[] = [];
     const arcSegs = 16;
-    
+
     const baseAngle1 = Math.atan2(dy, dx) + Math.PI;
     for (let i = 0; i <= arcSegs; i++) {
       const angle = baseAngle1 - Math.PI / 2 + (i / arcSegs) * Math.PI;
@@ -274,7 +347,7 @@ export function generateZoneBoundary(
         y: p1.y + totalRadius * Math.sin(angle),
       });
     }
-    
+
     const baseAngle2 = Math.atan2(dy, dx);
     for (let i = 0; i <= arcSegs; i++) {
       const angle = baseAngle2 - Math.PI / 2 + (i / arcSegs) * Math.PI;
@@ -283,11 +356,20 @@ export function generateZoneBoundary(
         y: p2.y + totalRadius * Math.sin(angle),
       });
     }
-    
+
     return capsule;
   }
 
-  // 3+ points: Use concave or convex based on boundaryType
+  // 3+ points: Try to avoid unselected points if we have all the data
+  if (boundaryType === 'concave' && allPoints && selectedPointIds && allPoints.length > memberPoints.length) {
+    // Use the new algorithm that triangulates all points and excludes triangles touching unselected ones
+    const boundary = computeBoundaryAvoidingPoints(allPoints, selectedPointIds, totalRadius);
+    if (boundary.length >= 3) {
+      return boundary;
+    }
+  }
+
+  // Fallback: Use standard concave/convex envelope
   const useConcave = boundaryType === 'concave';
   return createRoundedEnvelope(memberPoints, totalRadius, useConcave);
 }
@@ -307,11 +389,11 @@ export function boundaryToSVGPath(
     : points;
 
   let path = `M ${transformed[0].x.toFixed(2)} ${transformed[0].y.toFixed(2)}`;
-  
+
   for (let i = 1; i < transformed.length; i++) {
     path += ` L ${transformed[i].x.toFixed(2)} ${transformed[i].y.toFixed(2)}`;
   }
-  
+
   path += ' Z';
   return path;
 }

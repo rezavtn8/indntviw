@@ -137,12 +137,23 @@ export function updateZoneBoundary(
   const memberPoints = getMemberPoints(allPoints, zone.memberPointIds);
   const memberCoords: ZonePoint[] = memberPoints.map(p => ({ x: p.x, y: p.y }));
 
+  // Build all points coords and selected indices for avoiding unselected dots
+  const allPointCoords: ZonePoint[] = allPoints.map(p => ({ x: p.x, y: p.y }));
+  const selectedIdxSet = new Set<number>();
+  allPoints.forEach((p, idx) => {
+    if (zone.memberPointIds.includes(p.id)) {
+      selectedIdxSet.add(idx);
+    }
+  });
+
   const boundaryPoints = generateZoneBoundary(
     memberCoords,
     zone.boundaryPadding,
     zone.smoothness,
     zone.boundaryType,
-    pointRadius
+    pointRadius,
+    allPointCoords,
+    selectedIdxSet
   );
 
   return {
@@ -188,12 +199,24 @@ export function getZoneSVGPath(
     const memberPoints = getMemberPoints(allPoints, zone.memberPointIds);
     if (memberPoints.length > 0) {
       const memberCoords: ZonePoint[] = memberPoints.map(p => ({ x: p.x, y: p.y }));
+      
+      // Build all points coords and selected indices for avoiding unselected dots
+      const allPointCoords: ZonePoint[] = allPoints.map(p => ({ x: p.x, y: p.y }));
+      const selectedIdxSet = new Set<number>();
+      allPoints.forEach((p, idx) => {
+        if (zone.memberPointIds.includes(p.id)) {
+          selectedIdxSet.add(idx);
+        }
+      });
+      
       const boundaryPoints = generateZoneBoundary(
         memberCoords,
         zone.boundaryPadding,
         zone.smoothness,
         zone.boundaryType,
-        pointRadius || 0
+        pointRadius || 0,
+        allPointCoords,
+        selectedIdxSet
       );
       
       if (boundaryPoints.length >= 3) {
