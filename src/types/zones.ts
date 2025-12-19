@@ -90,6 +90,11 @@ export interface ExportSettings {
   // Zone label options
   zoneLabelPosition: 'center' | 'edge' | 'legend';
   zoneLabelColor: 'zone' | 'black';
+  // View shape controls
+  xStretch: number; // 0.5 to 2.0 (1.0 = normal)
+  yStretch: number; // 0.5 to 2.0 (1.0 = normal)
+  flipXAxis: boolean; // Mirror data horizontally
+  flipYAxis: boolean; // Mirror data vertically
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -137,6 +142,10 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   customLegendTicks: '',
   zoneLabelPosition: 'center',
   zoneLabelColor: 'zone',
+  xStretch: 1.0,
+  yStretch: 1.0,
+  flipXAxis: false,
+  flipYAxis: false,
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({

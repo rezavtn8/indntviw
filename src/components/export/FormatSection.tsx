@@ -3,7 +3,9 @@ import { ExportSettings } from '@/types/zones';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileImage, FileCode, FileText } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { FileImage, FileCode, FileText, FlipHorizontal, FlipVertical } from 'lucide-react';
 
 interface FormatSectionProps {
   settings: ExportSettings;
@@ -119,6 +121,69 @@ export const FormatSection: React.FC<FormatSectionProps> = ({ settings, onSettin
             </Select>
           </div>
         )}
+      </div>
+
+      {/* View Shape Controls */}
+      <div className="space-y-3 pt-2 border-t border-border">
+        <Label className="text-xs font-mono uppercase text-muted-foreground">View Shape</Label>
+        
+        {/* X Stretch */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">X Stretch</Label>
+            <span className="text-xs font-mono text-muted-foreground">{settings.xStretch.toFixed(2)}x</span>
+          </div>
+          <Slider
+            value={[settings.xStretch]}
+            min={0.5}
+            max={2.0}
+            step={0.05}
+            onValueChange={([value]) => onSettingsChange({ ...settings, xStretch: value })}
+            className="w-full"
+          />
+        </div>
+
+        {/* Y Stretch */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Y Stretch</Label>
+            <span className="text-xs font-mono text-muted-foreground">{settings.yStretch.toFixed(2)}x</span>
+          </div>
+          <Slider
+            value={[settings.yStretch]}
+            min={0.5}
+            max={2.0}
+            step={0.05}
+            onValueChange={([value]) => onSettingsChange({ ...settings, yStretch: value })}
+            className="w-full"
+          />
+        </div>
+
+        {/* Flip Axes */}
+        <div className="flex gap-4 pt-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="flip-x"
+              checked={settings.flipXAxis}
+              onCheckedChange={(checked) => onSettingsChange({ ...settings, flipXAxis: checked })}
+            />
+            <Label htmlFor="flip-x" className="text-xs flex items-center gap-1 cursor-pointer">
+              <FlipHorizontal className="w-3.5 h-3.5" />
+              Flip X
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="flip-y"
+              checked={settings.flipYAxis}
+              onCheckedChange={(checked) => onSettingsChange({ ...settings, flipYAxis: checked })}
+            />
+            <Label htmlFor="flip-y" className="text-xs flex items-center gap-1 cursor-pointer">
+              <FlipVertical className="w-3.5 h-3.5" />
+              Flip Y
+            </Label>
+          </div>
+        </div>
       </div>
     </div>
   );

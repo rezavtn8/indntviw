@@ -119,17 +119,52 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     };
   }, [rawDataBounds, settings.useAutoAxisBounds, settings.customAxisBounds, settings.axisPadding, plotWidth, plotHeight]);
 
-  // Transform data coordinates to SVG coordinates
-  const transformPoint = useCallback((x: number, y: number) => ({
-    cx: margin.left + (x - xMin) * scaleX,
-    cy: margin.top + plotHeight - (y - yMin) * scaleY,
-  }), [margin.left, margin.top, xMin, yMin, scaleX, scaleY, plotHeight]);
+  // Transform data coordinates to SVG coordinates with stretch and flip
+  const transformPoint = useCallback((x: number, y: number) => {
+    // Apply flip (mirror around center of data range)
+    let adjustedX = settings.flipXAxis ? (xMax - x + xMin) : x;
+    let adjustedY = settings.flipYAxis ? (yMax - y + yMin) : y;
+    
+    // Calculate base position in plot space
+    const baseX = (adjustedX - xMin) * scaleX;
+    const baseY = plotHeight - (adjustedY - yMin) * scaleY;
+    
+    // Apply stretch from center of plot
+    const centerX = plotWidth / 2;
+    const centerY = plotHeight / 2;
+    
+    const stretchedX = centerX + (baseX - centerX) * settings.xStretch;
+    const stretchedY = centerY + (baseY - centerY) * settings.yStretch;
+    
+    return {
+      cx: margin.left + stretchedX,
+      cy: margin.top + stretchedY,
+    };
+  }, [margin.left, margin.top, xMin, xMax, yMin, yMax, scaleX, scaleY, plotHeight, plotWidth, settings.xStretch, settings.yStretch, settings.flipXAxis, settings.flipYAxis]);
 
-  // Inverse transform: SVG to data coordinates
-  const inverseTransform = useCallback((cx: number, cy: number) => ({
-    x: xMin + (cx - margin.left) / scaleX,
-    y: yMin + (margin.top + plotHeight - cy) / scaleY,
-  }), [margin.left, margin.top, xMin, yMin, scaleX, scaleY, plotHeight]);
+  // Inverse transform: SVG to data coordinates (accounts for stretch and flip)
+  const inverseTransform = useCallback((cx: number, cy: number) => {
+    // Reverse the stretch from center
+    const centerX = plotWidth / 2;
+    const centerY = plotHeight / 2;
+    
+    const unstretchedX = centerX + (cx - margin.left - centerX) / settings.xStretch;
+    const unstretchedY = centerY + (cy - margin.top - centerY) / settings.yStretch;
+    
+    // Calculate base data coordinates
+    let x = xMin + unstretchedX / scaleX;
+    let y = yMin + (plotHeight - unstretchedY) / scaleY;
+    
+    // Reverse the flip
+    if (settings.flipXAxis) {
+      x = xMax - x + xMin;
+    }
+    if (settings.flipYAxis) {
+      y = yMax - y + yMin;
+    }
+    
+    return { x, y };
+  }, [margin.left, margin.top, xMin, xMax, yMin, yMax, scaleX, scaleY, plotHeight, plotWidth, settings.xStretch, settings.yStretch, settings.flipXAxis, settings.flipYAxis]);
 
   // Get SVG coordinates from mouse event
   const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>): ZonePoint => {
