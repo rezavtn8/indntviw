@@ -4,7 +4,7 @@ import { Zone, ZonePoint, ExportSettings } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
 import { getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
 import { generateZoneBoundary, boundaryToSVGPath } from '@/utils/boundaryGenerator';
-import { generateBoundaryContour, generateSmoothBoundaryPath, generateMultiClusterBoundaryPath } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 import { isPointInPolygon } from '@/utils/statisticsUtils';
 import { DrawingTool } from '@/components/controls/ZoneToolbar';
 
@@ -589,8 +589,8 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
           
           if (memberPoints.length === 0) return null;
           
-          // Generate multi-cluster boundary path (separate boundaries for each cluster)
-          const zonePath = generateMultiClusterBoundaryPath(
+          // Generate smooth boundary path (same logic as boundary contour)
+          const zonePath = generateSmoothBoundaryPath(
             memberPoints.map(p => {
               const { cx, cy } = transformPoint(p.x, p.y);
               return { x: cx, y: cy };

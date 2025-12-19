@@ -2,7 +2,7 @@ import React, { useMemo, useCallback, useState, useRef } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { Zone, ZonePoint } from '@/types/zones';
 import { getColorForValue } from '@/utils/colorScales';
-import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath, generateMultiClusterBoundaryPath } from '@/utils/contourGenerator';
+import { generateBoundaryContour, generateFilledContours, generateSmoothBoundaryPath } from '@/utils/contourGenerator';
 import { isPointInPolygon } from '@/utils/statisticsUtils';
 import { getZoneDashArray, getZoneCentroid } from '@/utils/zoneUtils';
 import { generateZoneBoundary, boundaryToSVGPath } from '@/utils/boundaryGenerator';
@@ -574,8 +574,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             
             if (memberPoints.length === 0) return null;
             
-            // Generate multi-cluster boundary path (separate boundaries for each cluster)
-            const zonePath = generateMultiClusterBoundaryPath(
+            // Generate smooth boundary path (same logic as boundary contour)
+            const zonePath = generateSmoothBoundaryPath(
               memberPoints.map(p => {
                 const { cx, cy } = transformPoint(p.x, p.y);
                 return { x: cx, y: cy };

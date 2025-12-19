@@ -211,7 +211,7 @@ export function generateBoundaryContour(
 
 // Bulletproof radius calculation matching boundaryGenerator.ts
 function getMinimumSafeRadius(points: { x: number; y: number }[], pointRadius: number): number {
-  const safetyMargin = 1.05; // Reduced from 1.2 to match boundaryGenerator
+  const safetyMargin = 1.2;
   
   if (pointRadius > 0) {
     return pointRadius * safetyMargin;
@@ -231,7 +231,7 @@ function getMinimumSafeRadius(points: { x: number; y: number }[], pointRadius: n
     }
   }
   
-  return minDist !== Infinity ? (minDist * 0.4 * safetyMargin) : 5;
+  return minDist !== Infinity ? (minDist * 0.5 * safetyMargin) : 5;
 }
 
 // Create rounded envelope using circles around ALL points
@@ -258,66 +258,6 @@ function createRoundedEnvelope(
   return convexHull(circlePoints);
 }
 
-// Calculate typical point spacing for cluster detection
-function getTypicalSpacing(points: { x: number; y: number }[]): number {
-  if (points.length < 2) return 1;
-  
-  const distances: number[] = [];
-  const sampleSize = Math.min(points.length, 30);
-  const step = Math.max(1, Math.floor(points.length / sampleSize));
-  
-  for (let i = 0; i < points.length; i += step) {
-    let minDist = Infinity;
-    for (let j = 0; j < points.length; j++) {
-      if (i === j) continue;
-      const dist = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
-      if (dist > 0 && dist < minDist) minDist = dist;
-    }
-    if (minDist !== Infinity) distances.push(minDist);
-  }
-  
-  if (distances.length === 0) return 1;
-  distances.sort((a, b) => a - b);
-  return distances[Math.floor(distances.length / 2)];
-}
-
-// Detect separate clusters of points
-function findClusters(points: { x: number; y: number }[], maxDistance: number): { x: number; y: number }[][] {
-  if (points.length === 0) return [];
-  if (points.length === 1) return [[points[0]]];
-  
-  const visited = new Set<number>();
-  const clusters: { x: number; y: number }[][] = [];
-  
-  for (let i = 0; i < points.length; i++) {
-    if (visited.has(i)) continue;
-    
-    const cluster: { x: number; y: number }[] = [];
-    const queue = [i];
-    
-    while (queue.length > 0) {
-      const idx = queue.shift()!;
-      if (visited.has(idx)) continue;
-      visited.add(idx);
-      cluster.push(points[idx]);
-      
-      for (let j = 0; j < points.length; j++) {
-        if (visited.has(j)) continue;
-        const dist = Math.hypot(points[idx].x - points[j].x, points[idx].y - points[j].y);
-        if (dist <= maxDistance) {
-          queue.push(j);
-        }
-      }
-    }
-    
-    if (cluster.length > 0) {
-      clusters.push(cluster);
-    }
-  }
-  
-  return clusters;
-}
-
 // Generate smooth SVG path using circle-based envelope (matching zone boundaries exactly)
 export function generateSmoothBoundaryPath(
   points: { x: number; y: number }[],
@@ -339,90 +279,6 @@ export function generateSmoothBoundaryPath(
   path += ' Z';
   
   return path;
-}
-
-// NEW: Generate SVG paths for multiple clusters separately
-export function generateMultiClusterBoundaryPath(
-  points: { x: number; y: number }[],
-  padding: number = 0
-): string {
-  if (points.length < 1) return '';
-  
-  const radius = getMinimumSafeRadius(points, padding);
-  const typicalSpacing = getTypicalSpacing(points);
-  const clusterDistance = typicalSpacing * 2.5;
-  
-  const clusters = findClusters(points, clusterDistance);
-  
-  const paths: string[] = [];
-  
-  for (const cluster of clusters) {
-    if (cluster.length === 1) {
-      // Single point: circle
-      const p = cluster[0];
-      const numSegs = 24;
-      let circlePath = '';
-      for (let i = 0; i <= numSegs; i++) {
-        const angle = (i / numSegs) * Math.PI * 2;
-        const x = p.x + radius * Math.cos(angle);
-        const y = p.y + radius * Math.sin(angle);
-        if (i === 0) {
-          circlePath = `M ${x.toFixed(2)} ${y.toFixed(2)}`;
-        } else {
-          circlePath += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
-        }
-      }
-      circlePath += ' Z';
-      paths.push(circlePath);
-    } else if (cluster.length === 2) {
-      // Two points: capsule
-      const [p1, p2] = cluster;
-      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const dx = (p2.x - p1.x) / (dist || 1);
-      const dy = (p2.y - p1.y) / (dist || 1);
-      
-      let capsulePath = '';
-      const arcSegs = 12;
-      
-      // Arc around p1
-      const baseAngle1 = Math.atan2(dy, dx) + Math.PI;
-      for (let i = 0; i <= arcSegs; i++) {
-        const angle = baseAngle1 - Math.PI / 2 + (i / arcSegs) * Math.PI;
-        const x = p1.x + radius * Math.cos(angle);
-        const y = p1.y + radius * Math.sin(angle);
-        if (i === 0) {
-          capsulePath = `M ${x.toFixed(2)} ${y.toFixed(2)}`;
-        } else {
-          capsulePath += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
-        }
-      }
-      
-      // Arc around p2
-      const baseAngle2 = Math.atan2(dy, dx);
-      for (let i = 0; i <= arcSegs; i++) {
-        const angle = baseAngle2 - Math.PI / 2 + (i / arcSegs) * Math.PI;
-        const x = p2.x + radius * Math.cos(angle);
-        const y = p2.y + radius * Math.sin(angle);
-        capsulePath += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
-      }
-      
-      capsulePath += ' Z';
-      paths.push(capsulePath);
-    } else {
-      // 3+ points: envelope
-      const envelope = createRoundedEnvelope(cluster, radius);
-      if (envelope.length >= 3) {
-        let clusterPath = `M ${envelope[0].x.toFixed(2)} ${envelope[0].y.toFixed(2)}`;
-        for (let i = 1; i < envelope.length; i++) {
-          clusterPath += ` L ${envelope[i].x.toFixed(2)} ${envelope[i].y.toFixed(2)}`;
-        }
-        clusterPath += ' Z';
-        paths.push(clusterPath);
-      }
-    }
-  }
-  
-  return paths.join(' ');
 }
 
 // (Old offsetPolygonRounded function removed - now using circle-based envelope approach)
