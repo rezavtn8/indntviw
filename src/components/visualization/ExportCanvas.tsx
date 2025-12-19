@@ -235,7 +235,7 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     return config?.unit || '';
   }, [selectedProperty]);
 
-  // Generate preview boundary for selected points
+  // Generate preview boundary for selected points - now avoids unselected points
   const selectionPreviewPath = useMemo(() => {
     if (selectedPointIds.length < 1) return null;
     
@@ -243,7 +243,25 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     if (selectedPoints.length === 0) return null;
     
     const memberCoords: ZonePoint[] = selectedPoints.map(p => ({ x: p.x, y: p.y }));
-    const boundaryPoints = generateZoneBoundary(memberCoords, 0.1, 0.5, 'concave', pointRadiusDataUnits);
+    
+    // Pass ALL points and selected IDs so the algorithm can avoid unselected dots
+    const allPointCoords: ZonePoint[] = points.map(p => ({ x: p.x, y: p.y }));
+    const selectedIdxSet = new Set<number>();
+    points.forEach((p, idx) => {
+      if (selectedPointIds.includes(p.id)) {
+        selectedIdxSet.add(idx);
+      }
+    });
+    
+    const boundaryPoints = generateZoneBoundary(
+      memberCoords, 
+      0.1, 
+      0.5, 
+      'concave', 
+      pointRadiusDataUnits,
+      allPointCoords,
+      selectedIdxSet
+    );
     
     if (boundaryPoints.length < 3) return null;
     
