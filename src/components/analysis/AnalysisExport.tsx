@@ -1,15 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, Table } from 'lucide-react';
+import { Download, FileText, Table, FileDown } from 'lucide-react';
 import { DescriptiveStats } from '@/utils/advancedStatistics';
-import { PROPERTY_CONFIGS } from '@/types/indentation';
+import { PROPERTY_CONFIGS, IndentationPoint } from '@/types/indentation';
+import { AnalysisReportGenerator } from './AnalysisReportGenerator';
 
 interface AnalysisExportProps {
   data: { name: string; color: string; values: number[]; stats: DescriptiveStats }[];
   selectedProperty: string;
+  points?: IndentationPoint[];
+  propertyNames?: string[];
+  showViolin?: boolean;
+  showJitter?: boolean;
 }
 
-export const AnalysisExport: React.FC<AnalysisExportProps> = ({ data, selectedProperty }) => {
+export const AnalysisExport: React.FC<AnalysisExportProps> = ({ 
+  data, 
+  selectedProperty,
+  points = [],
+  propertyNames = [],
+  showViolin = false,
+  showJitter = true,
+}) => {
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+
   const getPropertyLabel = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
     return config?.label || key;
@@ -71,7 +85,6 @@ export const AnalysisExport: React.FC<AnalysisExportProps> = ({ data, selectedPr
     md += `**Date:** ${new Date().toLocaleDateString()}\n\n`;
     md += `## Descriptive Statistics\n\n`;
 
-    // Table header
     md += `| Zone | N | Mean ± SEM | 95% CI | Median | Min | Max |\n`;
     md += `|------|---|------------|--------|--------|-----|-----|\n`;
 
@@ -96,7 +109,6 @@ export const AnalysisExport: React.FC<AnalysisExportProps> = ({ data, selectedPr
   const exportRawData = () => {
     const unit = getPropertyUnit(selectedProperty);
     
-    // Export raw values for each zone
     const headers = data.map(d => d.name);
     const maxLength = Math.max(...data.map(d => d.values.length));
     
@@ -125,29 +137,59 @@ export const AnalysisExport: React.FC<AnalysisExportProps> = ({ data, selectedPr
   };
 
   return (
-    <div className="border-2 border-border rounded-lg p-4">
-      <h4 className="font-mono text-sm font-bold uppercase tracking-wider mb-4">Export Analysis</h4>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Button variant="outline" onClick={exportCSV} className="gap-2">
-          <Table className="w-4 h-4" />
-          Statistics (CSV)
-        </Button>
-        
-        <Button variant="outline" onClick={exportMarkdown} className="gap-2">
-          <FileText className="w-4 h-4" />
-          Report (Markdown)
-        </Button>
-        
-        <Button variant="outline" onClick={exportRawData} className="gap-2">
-          <Download className="w-4 h-4" />
-          Raw Data (TSV)
-        </Button>
+    <>
+      <div className="border-2 border-border rounded-lg p-4 space-y-4">
+        {/* Primary Action - Full Report */}
+        <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+          <h4 className="font-mono text-sm font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+            <FileDown className="w-4 h-4" />
+            Generate Full Report
+          </h4>
+          <p className="text-xs text-muted-foreground font-mono mb-3">
+            Create a comprehensive PDF with all charts, statistics, and analysis.
+          </p>
+          <Button onClick={() => setReportDialogOpen(true)} className="w-full gap-2">
+            <FileDown className="w-4 h-4" />
+            Open Report Generator
+          </Button>
+        </div>
+
+        {/* Quick Export Options */}
+        <div>
+          <h4 className="font-mono text-sm font-bold uppercase tracking-wider mb-3">Quick Export</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Button variant="outline" onClick={exportCSV} className="gap-2">
+              <Table className="w-4 h-4" />
+              Statistics (CSV)
+            </Button>
+            
+            <Button variant="outline" onClick={exportMarkdown} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Report (Markdown)
+            </Button>
+            
+            <Button variant="outline" onClick={exportRawData} className="gap-2">
+              <Download className="w-4 h-4" />
+              Raw Data (TSV)
+            </Button>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground font-mono">
+          Export publication-ready statistics and data for further analysis.
+        </p>
       </div>
 
-      <p className="text-xs text-muted-foreground mt-3 font-mono">
-        Export publication-ready statistics and data for further analysis.
-      </p>
-    </div>
+      <AnalysisReportGenerator
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        data={data}
+        selectedProperty={selectedProperty}
+        points={points}
+        propertyNames={propertyNames}
+        showViolin={showViolin}
+        showJitter={showJitter}
+      />
+    </>
   );
 };

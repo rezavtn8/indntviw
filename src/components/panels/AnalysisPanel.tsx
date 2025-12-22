@@ -310,7 +310,14 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                   </TabsContent>
 
                   <TabsContent value="export" className="mt-0 space-y-4">
-                    <AnalysisExport data={analysisData} selectedProperty={selectedProperty} />
+                    <AnalysisExport 
+                      data={analysisData} 
+                      selectedProperty={selectedProperty}
+                      points={points}
+                      propertyNames={propertyNames}
+                      showViolin={showViolin}
+                      showJitter={showJitter}
+                    />
                     <DescriptiveStats stats={analysisData} selectedProperty={selectedProperty} />
                   </TabsContent>
                 </>
