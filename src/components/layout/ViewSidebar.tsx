@@ -1,0 +1,65 @@
+import React from 'react';
+import { Grid2X2, Box, BarChart3, FileOutput } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+type ViewType = '2d' | '3d' | 'analysis' | 'export';
+
+interface ViewSidebarProps {
+  activeView: ViewType;
+  onViewChange: (view: ViewType) => void;
+  children?: React.ReactNode;
+}
+
+const viewItems: { id: ViewType; icon: React.ElementType; label: string }[] = [
+  { id: '2d', icon: Grid2X2, label: '2D Heatmap' },
+  { id: '3d', icon: Box, label: '3D View' },
+  { id: 'analysis', icon: BarChart3, label: 'Analysis' },
+  { id: 'export', icon: FileOutput, label: 'Export Studio' },
+];
+
+export const ViewSidebar: React.FC<ViewSidebarProps> = ({
+  activeView,
+  onViewChange,
+  children,
+}) => {
+  return (
+    <aside className="flex h-full border-r border-border bg-card">
+      {/* View Navigation Icons */}
+      <div className="w-14 border-r border-border flex flex-col items-center py-2 gap-1 bg-muted/30">
+        {viewItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          
+          return (
+            <Tooltip key={item.id}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onViewChange(item.id)}
+                  className={cn(
+                    'w-10 h-10 flex items-center justify-center rounded transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  <Icon className="w-5 h-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="font-mono text-xs">
+                {item.label}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+
+      {/* Controls Panel */}
+      {children && (
+        <div className="w-64 overflow-y-auto p-4 space-y-4">
+          {children}
+        </div>
+      )}
+    </aside>
+  );
+};
