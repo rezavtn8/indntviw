@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DescriptiveStats } from '@/utils/advancedStatistics';
+import { DescriptiveStats, welchTTest, oneWayANOVA } from '@/utils/advancedStatistics';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 
 interface BoxViolinPlotsProps {
@@ -7,13 +7,23 @@ interface BoxViolinPlotsProps {
   selectedProperty: string;
   showViolin?: boolean;
   showJitter?: boolean;
+  showPValueAsterisks?: boolean;
 }
+
+// Get p-value significance asterisks
+const getPValueAsterisks = (pValue: number): string => {
+  if (pValue < 0.001) return '***';
+  if (pValue < 0.01) return '**';
+  if (pValue < 0.05) return '*';
+  return 'ns';
+};
 
 export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   data,
   selectedProperty,
   showViolin = false,
   showJitter = true,
+  showPValueAsterisks = false,
 }) => {
   const getPropertyUnit = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -28,7 +38,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     if (allValues.length === 0) return { globalMin: 0, globalMax: 100, range: 100 };
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
-    const padding = (max - min) * 0.1;
+    const padding = (max - min) * 0.15; // Extra padding for asterisks
     return { globalMin: min - padding, globalMax: max + padding, range: max - min + 2 * padding };
   }, [data]);
 
@@ -41,6 +51,33 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     if (Math.abs(val) >= 1) return val.toFixed(2);
     return val.toFixed(4);
   };
+
+  // Calculate pairwise p-values for asterisks
+  const pairwiseResults = useMemo(() => {
+    if (!showPValueAsterisks || data.length < 2) return [];
+    
+    const results: { i: number; j: number; pValue: number; asterisks: string }[] = [];
+    
+    // For 2 groups, just show one comparison
+    if (data.length === 2) {
+      const test = welchTTest(data[0].values, data[1].values);
+      results.push({ i: 0, j: 1, pValue: test.pValue, asterisks: getPValueAsterisks(test.pValue) });
+    } else {
+      // For multiple groups, first check ANOVA significance
+      const groups = data.map(d => d.values);
+      const anova = oneWayANOVA(groups);
+      
+      if (anova.isSignificant) {
+        // Show pairwise comparisons (limit to adjacent pairs to avoid clutter)
+        for (let i = 0; i < data.length - 1; i++) {
+          const test = welchTTest(data[i].values, data[i + 1].values);
+          results.push({ i, j: i + 1, pValue: test.pValue, asterisks: getPValueAsterisks(test.pValue) });
+        }
+      }
+    }
+    
+    return results;
+  }, [data, showPValueAsterisks]);
 
   // Generate violin path (kernel density estimation)
   const getViolinPath = (values: number[], centerX: number, width: number): string => {
@@ -99,6 +136,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   const boxWidth = 40;
   const groupWidth = 80;
   const svgWidth = Math.max(400, data.length * groupWidth + 80);
+  const svgHeight = showPValueAsterisks && pairwiseResults.length > 0 ? 360 : 320;
 
   return (
     <div className="border-2 border-border rounded-lg p-4">
@@ -110,7 +148,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <svg width={svgWidth} height={320} className="block mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
           {/* Y-axis */}
           <g>
             {[0, 0.25, 0.5, 0.75, 1].map(frac => {
@@ -127,6 +165,38 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
             })}
           </g>
 
+          {/* P-value brackets and asterisks */}
+          {showPValueAsterisks && pairwiseResults.map((result, idx) => {
+            const centerX1 = 80 + result.i * groupWidth + groupWidth / 2;
+            const centerX2 = 80 + result.j * groupWidth + groupWidth / 2;
+            const bracketY = 8 - idx * 18; // Stack multiple brackets
+            const midX = (centerX1 + centerX2) / 2;
+            
+            return (
+              <g key={`bracket-${idx}`} transform="translate(0, 20)">
+                {/* Bracket lines */}
+                <line x1={centerX1} y1={bracketY + 6} x2={centerX1} y2={bracketY} stroke="currentColor" strokeWidth={1} />
+                <line x1={centerX1} y1={bracketY} x2={centerX2} y2={bracketY} stroke="currentColor" strokeWidth={1} />
+                <line x1={centerX2} y1={bracketY} x2={centerX2} y2={bracketY + 6} stroke="currentColor" strokeWidth={1} />
+                
+                {/* Asterisks or ns */}
+                <text 
+                  x={midX} 
+                  y={bracketY - 3} 
+                  textAnchor="middle" 
+                  className="fill-foreground"
+                  style={{ 
+                    fontSize: result.asterisks === 'ns' ? '9px' : '14px', 
+                    fontWeight: 'bold',
+                    fontStyle: result.asterisks === 'ns' ? 'italic' : 'normal'
+                  }}
+                >
+                  {result.asterisks}
+                </text>
+              </g>
+            );
+          })}
+
           {/* Box plots */}
           {data.map((d, idx) => {
             const centerX = 80 + idx * groupWidth + groupWidth / 2;
@@ -138,8 +208,6 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
             const q3Y = valueToY(stats.q3);
             const medianY = valueToY(stats.median);
             const meanY = valueToY(stats.mean);
-            const minY = valueToY(stats.min);
-            const maxY = valueToY(stats.max);
             const whiskerLow = valueToY(Math.max(stats.min, stats.q1 - 1.5 * stats.iqr));
             const whiskerHigh = valueToY(Math.min(stats.max, stats.q3 + 1.5 * stats.iqr));
 
@@ -232,7 +300,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mt-4 text-xs font-mono text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 mt-4 text-xs font-mono text-muted-foreground">
         <div className="flex items-center gap-2">
           <div className="w-8 h-0.5 bg-foreground" />
           <span>Median</span>
@@ -245,6 +313,16 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           <div className="w-6 h-3 bg-foreground/20 border border-foreground" />
           <span>IQR</span>
         </div>
+        {showPValueAsterisks && (
+          <div className="flex items-center gap-2 border-l border-border pl-4">
+            <span className="font-bold">*</span>
+            <span>p&lt;0.05</span>
+            <span className="font-bold">**</span>
+            <span>p&lt;0.01</span>
+            <span className="font-bold">***</span>
+            <span>p&lt;0.001</span>
+          </div>
+        )}
       </div>
     </div>
   );

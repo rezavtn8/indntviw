@@ -84,6 +84,7 @@ export const AnalysisReportGenerator: React.FC<AnalysisReportGeneratorProps> = (
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [includeRawData, setIncludeRawData] = useState(false);
   const [includeSummary, setIncludeSummary] = useState(true);
+  const [showPValueAsterisks, setShowPValueAsterisks] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   
@@ -335,8 +336,8 @@ export const AnalysisReportGenerator: React.FC<AnalysisReportGeneratorProps> = (
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl h-[90vh] p-0 overflow-hidden flex flex-col">
-        <div className="flex flex-1 min-h-0">
+      <DialogContent className="max-w-7xl max-h-[90vh] p-0 !flex !flex-col overflow-hidden">
+        <div className="flex flex-1 min-h-0 h-full overflow-hidden">
           {/* Left Panel - Settings */}
           <div className="w-80 border-r border-border bg-muted/30 flex flex-col flex-shrink-0">
             <div className="p-4 border-b border-border">
@@ -524,6 +525,13 @@ export const AnalysisReportGenerator: React.FC<AnalysisReportGeneratorProps> = (
                     </label>
                     <label className="flex items-center gap-3 cursor-pointer">
                       <Checkbox
+                        checked={showPValueAsterisks}
+                        onCheckedChange={(checked) => setShowPValueAsterisks(checked as boolean)}
+                      />
+                      <span className="font-mono text-sm">Show p-value asterisks on plots</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
                         checked={includeRawData}
                         onCheckedChange={(checked) => setIncludeRawData(checked as boolean)}
                       />
@@ -627,6 +635,7 @@ export const AnalysisReportGenerator: React.FC<AnalysisReportGeneratorProps> = (
                       selectedProperty={selectedProperty}
                       showViolin={showViolin}
                       showJitter={showJitter}
+                      showPValueAsterisks={showPValueAsterisks}
                     />
                     <button
                       onClick={() => handleExportChart('box_violin_plot', boxplotRef)}
