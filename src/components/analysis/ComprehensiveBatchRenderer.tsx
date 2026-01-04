@@ -1,5 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
 import { FileSession } from '@/types/fileSession';
+import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { BoxViolinPlots } from './BoxViolinPlots';
 import { DistributionPlots } from './DistributionPlots';
 import { CrossSamplePlots } from './CrossSamplePlots';
@@ -14,26 +15,39 @@ interface TreatmentGroup {
   sessionIds: string[];
 }
 
-interface BatchExportRendererProps {
+interface ComprehensiveBatchRendererProps {
   fileSessions: FileSession[];
   selectedProperty: string;
   groups: TreatmentGroup[];
   options: BatchExportOptions;
 }
 
-export interface BatchExportRendererRef {
+export interface ComprehensiveBatchRendererRef {
   captureAll: (onProgress: (current: number, total: number, message: string) => void) => Promise<ChartCapture[]>;
 }
 
-export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExportRendererProps>(
+export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererRef, ComprehensiveBatchRendererProps>(
   ({ fileSessions, selectedProperty, groups, options }, ref) => {
     const chartRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+    const getPropertyUnit = (key: string): string => {
+      const config = PROPERTY_CONFIGS.find(c => c.key === key);
+      return config?.unit || '';
+    };
+
+    const getPropertyLabel = (key: string): string => {
+      const config = PROPERTY_CONFIGS.find(c => c.key === key);
+      return config?.label || key;
+    };
+
+    const propertyLabel = getPropertyLabel(selectedProperty);
+    const propertyUnit = getPropertyUnit(selectedProperty);
 
     // Calculate sample data for cross-sample plots
     const sampleData = useMemo(() => {
       return fileSessions
         .filter(session => session.data)
-        .map((session, idx) => {
+        .map((session) => {
           const colorIndex = fileSessions.findIndex(s => s.id === session.id);
           const values = getPropertyValues(session.data.points, selectedProperty);
           const stats = calculateDescriptiveStats(values);
@@ -52,8 +66,7 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
     const perSampleZoneData = useMemo(() => {
       return fileSessions
         .filter(session => session.data && session.zones.length > 0)
-        .map((session, idx) => {
-          const colorIndex = fileSessions.findIndex(s => s.id === session.id);
+        .map((session) => {
           const zoneData = session.zones.map(zone => {
             const values = session.data.points
               .filter(p => zone.memberPointIds.includes(p.id))
@@ -78,14 +91,13 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
           return {
             sessionId: session.id,
             sessionName: session.fileName.replace(/\.[^/.]+$/, ''),
-            colorIndex,
             data: [
-              { name: 'All Data', color: '#6b7280', values: allValues, stats: calculateDescriptiveStats(allValues) },
+              { name: 'All Data', color: 'hsl(var(--muted-foreground))', values: allValues, stats: calculateDescriptiveStats(allValues) },
               ...zoneData
             ]
           };
         })
-        .filter(s => s.data.length > 1); // Must have at least "All Data" + 1 zone
+        .filter(s => s.data.length > 1);
     }, [fileSessions, selectedProperty]);
 
     // Calculate smart zone data (same-named zones across samples)
@@ -130,7 +142,7 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
 
     // Group data for treatment groups
     const groupData = useMemo(() => {
-      if (groups.length === 0) return [];
+      if (groups.length < 2) return [];
       
       return groups.map(group => {
         const groupSessions = fileSessions.filter(s => group.sessionIds.includes(s.id));
@@ -204,19 +216,45 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
 
     const { includeSections } = options;
 
+    // Common chart wrapper style for publication-ready output
+    const chartWrapperStyle: React.CSSProperties = {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      backgroundColor: '#ffffff',
+      padding: '24px',
+      width: '800px'
+    };
+
+    const chartTitleStyle: React.CSSProperties = {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSize: '16px',
+      fontWeight: 'bold',
+      marginBottom: '8px',
+      color: '#1a1a1a'
+    };
+
+    const chartSubtitleStyle: React.CSSProperties = {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSize: '12px',
+      color: '#666666',
+      marginBottom: '16px'
+    };
+
     return (
-      <div className="absolute left-[-9999px] top-0 bg-white">
+      <div className="absolute left-[-9999px] top-0" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
         {/* Per-Sample Distribution Charts */}
         {includeSections.perSample && includeSections.perSampleDistribution && 
           sampleData.map(sample => (
             <div
               key={`per_sample__${sample.name}__distribution`}
               ref={el => setChartRef(`per_sample__${sample.name}__distribution`, el)}
-              className="w-[800px] p-4 bg-white"
+              style={chartWrapperStyle}
             >
-              <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'Arial' }}>
-                {sample.name} - Distribution
-              </h3>
+              <div style={chartTitleStyle}>
+                {sample.name}
+              </div>
+              <div style={chartSubtitleStyle}>
+                Distribution of {propertyLabel} {propertyUnit && `(${propertyUnit})`} • n={sample.stats.n}
+              </div>
               <DistributionPlots
                 data={[{
                   name: sample.name,
@@ -232,15 +270,18 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
 
         {/* Per-Sample Zone Comparison Charts */}
         {includeSections.perSample && includeSections.perSampleZones &&
-          perSampleZoneData.map(({ sessionId, sessionName, data }) => (
+          perSampleZoneData.map(({ sessionName, data }) => (
             <div
               key={`per_sample__${sessionName}__zones_boxplot`}
               ref={el => setChartRef(`per_sample__${sessionName}__zones_boxplot`, el)}
-              className="w-[800px] p-4 bg-white"
+              style={chartWrapperStyle}
             >
-              <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'Arial' }}>
-                {sessionName} - Zone Comparison
-              </h3>
+              <div style={chartTitleStyle}>
+                {sessionName} — Zone Comparison
+              </div>
+              <div style={chartSubtitleStyle}>
+                {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {data.length} groups
+              </div>
               <BoxViolinPlots
                 data={data}
                 showViolin={true}
@@ -255,11 +296,14 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
         {includeSections.crossSample && includeSections.crossSamplePlots && sampleData.length >= 2 && (
           <div
             ref={el => setChartRef('cross_sample__sample_comparison', el)}
-            className="w-[800px] p-4 bg-white"
+            style={chartWrapperStyle}
           >
-            <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'Arial' }}>
+            <div style={chartTitleStyle}>
               Cross-Sample Comparison
-            </h3>
+            </div>
+            <div style={chartSubtitleStyle}>
+              {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {sampleData.length} samples
+            </div>
             <CrossSamplePlots
               samples={sampleData}
               selectedProperty={selectedProperty}
@@ -273,11 +317,14 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
         {includeSections.treatmentGroups && groupData.length >= 2 && (
           <div
             ref={el => setChartRef('treatment_groups__group_comparison', el)}
-            className="w-[800px] p-4 bg-white"
+            style={chartWrapperStyle}
           >
-            <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'Arial' }}>
+            <div style={chartTitleStyle}>
               Treatment Group Comparison
-            </h3>
+            </div>
+            <div style={chartSubtitleStyle}>
+              {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {groupData.length} groups
+            </div>
             <BoxViolinPlots
               data={groupData}
               showViolin={true}
@@ -287,15 +334,18 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
           </div>
         )}
 
-        {/* Smart Zone: Cross-zone comparison (all zone types combined) */}
+        {/* Smart Zone: Cross-zone comparison */}
         {includeSections.smartZones && includeSections.smartZonesCrossComparison && smartZoneData.size >= 2 && (
           <div
             ref={el => setChartRef('smart_zones__all__cross_zone', el)}
-            className="w-[800px] p-4 bg-white"
+            style={chartWrapperStyle}
           >
-            <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'Arial' }}>
+            <div style={chartTitleStyle}>
               Cross-Zone Comparison (Aggregated)
-            </h3>
+            </div>
+            <div style={chartSubtitleStyle}>
+              {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {smartZoneData.size} zone types across all samples
+            </div>
             <BoxViolinPlots
               data={Array.from(smartZoneData.entries()).map(([zoneName, entries]) => {
                 const allValues = entries.flatMap(e => e.values);
@@ -319,11 +369,14 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
             <div
               key={`smart_zones__${zoneName}__zone_across_samples`}
               ref={el => setChartRef(`smart_zones__${zoneName}__zone_across_samples`, el)}
-              className="w-[800px] p-4 bg-white"
+              style={chartWrapperStyle}
             >
-              <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'Arial' }}>
-                Zone "{zoneName}" Across Samples
-              </h3>
+              <div style={chartTitleStyle}>
+                Zone: {zoneName}
+              </div>
+              <div style={chartSubtitleStyle}>
+                {propertyLabel} {propertyUnit && `(${propertyUnit})`} • Across {entries.length} samples
+              </div>
               <BoxViolinPlots
                 data={entries.map(e => ({
                   name: e.sessionName,
@@ -343,4 +396,4 @@ export const BatchExportRenderer = forwardRef<BatchExportRendererRef, BatchExpor
   }
 );
 
-BatchExportRenderer.displayName = 'BatchExportRenderer';
+ComprehensiveBatchRenderer.displayName = 'ComprehensiveBatchRenderer';

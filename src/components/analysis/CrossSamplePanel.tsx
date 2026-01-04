@@ -11,14 +11,13 @@ import { GroupComparison } from './GroupComparison';
 import { GroupZoneAnalysis } from './GroupZoneAnalysis';
 import { ZoneAcrossSamplesPanel } from './ZoneAcrossSamplesPanel';
 import { SmartZoneAnalysis } from './SmartZoneAnalysis';
-import { BatchExportPanel } from './BatchExportPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin, Sparkles, Download } from 'lucide-react';
+import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin, Sparkles } from 'lucide-react';
 
 interface CrossSamplePanelProps {
   fileSessions: FileSession[];
@@ -178,10 +177,6 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                 <MapPin className="w-4 h-4" />
                 Zones
               </TabsTrigger>
-              <TabsTrigger value="batch-export" className="font-mono text-sm gap-2">
-                <Download className="w-4 h-4" />
-                Batch Export
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -265,14 +260,6 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                     selectedProperty={selectedProperty}
                   />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="batch-export" className="mt-0 h-full">
-                <BatchExportPanel
-                  fileSessions={fileSessions}
-                  selectedProperty={selectedProperty}
-                  groups={groups}
-                />
               </TabsContent>
             </div>
           </ScrollArea>
