@@ -10,7 +10,7 @@ export interface BatchExportOptions {
   property: string;
   propertyLabel: string;
   format: 'pdf' | 'zip' | 'both';
-  quality: 'screen' | 'print';
+  quality: 'screen' | 'print' | 'publication';
   includeSections: {
     perSample: boolean;
     perSampleDistribution: boolean;
@@ -45,26 +45,31 @@ export interface ExportProgress {
   message: string;
 }
 
-const QUALITY_SCALE = {
+// Quality scales for publication-ready output
+// screen: 72 DPI, print: 150 DPI, publication: 300 DPI
+const QUALITY_SCALE: Record<string, number> = {
   screen: 1,
-  print: 2
+  print: 2.08,      // ~150 DPI
+  publication: 4.17  // ~300 DPI
 };
 
 export async function captureChartElement(
   element: HTMLElement,
-  quality: 'screen' | 'print' = 'print'
+  quality: 'screen' | 'print' | 'publication' = 'publication'
 ): Promise<{ dataUrl: string; width: number; height: number }> {
-  const scale = QUALITY_SCALE[quality];
+  const scale = QUALITY_SCALE[quality] || QUALITY_SCALE.publication;
   
   const canvas = await html2canvas(element, {
     scale,
     backgroundColor: '#ffffff',
     logging: false,
-    useCORS: true
+    useCORS: true,
+    allowTaint: false,
+    imageTimeout: 0
   });
   
   return {
-    dataUrl: canvas.toDataURL('image/png'),
+    dataUrl: canvas.toDataURL('image/png', 1.0),
     width: canvas.width,
     height: canvas.height
   };
@@ -133,121 +138,174 @@ export async function generateBatchPDF(
     format: 'a4'
   });
 
+  // Use Helvetica (closest to Arial in jsPDF built-in fonts)
+  pdf.setFont('helvetica');
+
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 15;
+  const margin = 20;
   const contentWidth = pageWidth - 2 * margin;
 
-  // Title page
-  pdf.setFontSize(24);
+  // Helper to add page numbers
+  const addPageNumber = (pageNum: number) => {
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(128, 128, 128);
+    pdf.text(`Page ${pageNum}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+  };
+
+  let currentPage = 1;
+
+  // ============ TITLE PAGE ============
+  pdf.setFontSize(28);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(options.title || 'Batch Analysis Report', pageWidth / 2, 60, { align: 'center' });
+  pdf.text(options.title || 'Analysis Report', pageWidth / 2, 50, { align: 'center' });
   
-  pdf.setFontSize(14);
+  pdf.setFontSize(16);
   pdf.setFont('helvetica', 'normal');
-  pdf.text(`Property: ${options.propertyLabel}`, pageWidth / 2, 80, { align: 'center' });
+  pdf.text(`Property: ${options.propertyLabel}`, pageWidth / 2, 70, { align: 'center' });
   
   if (options.author) {
-    pdf.text(`Author: ${options.author}`, pageWidth / 2, 90, { align: 'center' });
+    pdf.setFontSize(12);
+    pdf.text(`Author: ${options.author}`, pageWidth / 2, 85, { align: 'center' });
   }
   
-  pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 100, { align: 'center' });
+  pdf.setFontSize(11);
+  pdf.setTextColor(100, 100, 100);
+  pdf.text(`Generated: ${new Date().toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })}`, pageWidth / 2, 100, { align: 'center' });
+  pdf.setTextColor(0, 0, 0);
   
-  // Summary
-  pdf.setFontSize(12);
+  // Summary box
   const perSampleCount = captures.filter(c => c.category === 'per_sample').length;
   const crossSampleCount = captures.filter(c => c.category === 'cross_sample').length;
   const groupCount = captures.filter(c => c.category === 'treatment_groups').length;
   const zoneCount = captures.filter(c => c.category === 'smart_zones').length;
   
-  let yPos = 120;
-  pdf.text('Report Contents:', margin, yPos);
-  yPos += 8;
+  let yPos = 130;
+  pdf.setFontSize(14);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Report Contents', margin, yPos);
+  yPos += 10;
+  
+  pdf.setFontSize(11);
+  pdf.setFont('helvetica', 'normal');
+  
   if (perSampleCount > 0) {
     pdf.text(`• Per-Sample Analysis: ${perSampleCount} charts`, margin + 5, yPos);
-    yPos += 6;
+    yPos += 7;
   }
   if (crossSampleCount > 0) {
     pdf.text(`• Cross-Sample Comparison: ${crossSampleCount} charts`, margin + 5, yPos);
-    yPos += 6;
+    yPos += 7;
   }
   if (groupCount > 0) {
     pdf.text(`• Treatment Groups: ${groupCount} charts`, margin + 5, yPos);
-    yPos += 6;
+    yPos += 7;
   }
   if (zoneCount > 0) {
     pdf.text(`• Smart Zone Analysis: ${zoneCount} charts`, margin + 5, yPos);
-    yPos += 6;
+    yPos += 7;
   }
 
-  // Add charts by category
+  yPos += 10;
+  pdf.setFontSize(10);
+  pdf.setTextColor(100, 100, 100);
+  pdf.text(`Total: ${captures.length} charts • Quality: ${options.quality === 'publication' ? '300 DPI' : options.quality === 'print' ? '150 DPI' : '72 DPI'}`, margin, yPos);
+  pdf.setTextColor(0, 0, 0);
+
+  addPageNumber(currentPage);
+
+  // ============ CHARTS BY CATEGORY ============
   const categoryOrder = ['per_sample', 'cross_sample', 'treatment_groups', 'smart_zones'] as const;
-  const categoryTitles = {
-    per_sample: 'Per-Sample Analysis',
-    cross_sample: 'Cross-Sample Comparison',
-    treatment_groups: 'Treatment Group Analysis',
-    smart_zones: 'Smart Zone Analysis'
+  const categoryTitles: Record<string, string> = {
+    per_sample: 'Section 1: Per-Sample Analysis',
+    cross_sample: 'Section 2: Cross-Sample Comparison',
+    treatment_groups: 'Section 3: Treatment Group Analysis',
+    smart_zones: 'Section 4: Smart Zone Analysis'
   };
+
+  let figureNum = 1;
 
   for (const category of categoryOrder) {
     const categoryCaptures = captures.filter(c => c.category === category);
     if (categoryCaptures.length === 0) continue;
 
-    // Category title page
+    // Category section header page
     pdf.addPage();
-    pdf.setFontSize(20);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(categoryTitles[category], pageWidth / 2, 40, { align: 'center' });
+    currentPage++;
     
-    let currentY = 60;
-
+    pdf.setFontSize(22);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(categoryTitles[category], pageWidth / 2, 50, { align: 'center' });
+    
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`${categoryCaptures.length} charts`, pageWidth / 2, 65, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+    
+    addPageNumber(currentPage);
+    
+    // Add charts
     for (const capture of categoryCaptures) {
-      // Calculate image dimensions to fit on page
+      pdf.addPage();
+      currentPage++;
+      
+      // Calculate image dimensions to fit on page with proper margins
       const aspectRatio = capture.width / capture.height;
-      let imgWidth = contentWidth;
+      const maxImgWidth = contentWidth;
+      const maxImgHeight = pageHeight - margin * 2 - 40; // Leave room for caption
+      
+      let imgWidth = maxImgWidth;
       let imgHeight = imgWidth / aspectRatio;
       
-      // If too tall, scale down
-      const maxHeight = pageHeight - margin * 2 - 30; // Leave room for caption
-      if (imgHeight > maxHeight) {
-        imgHeight = maxHeight;
+      if (imgHeight > maxImgHeight) {
+        imgHeight = maxImgHeight;
         imgWidth = imgHeight * aspectRatio;
       }
 
-      // Check if we need a new page
-      if (currentY + imgHeight + 20 > pageHeight - margin) {
-        pdf.addPage();
-        currentY = margin;
-      }
-
-      // Add chart
+      // Center the image
       const xOffset = (pageWidth - imgWidth) / 2;
-      pdf.addImage(capture.dataUrl, 'PNG', xOffset, currentY, imgWidth, imgHeight);
+      const yOffset = margin + 10;
       
-      // Add caption
-      currentY += imgHeight + 5;
+      pdf.addImage(capture.dataUrl, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
+      
+      // Figure caption
+      const captionY = yOffset + imgHeight + 8;
       pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'italic');
-      const caption = generateCaption(capture);
-      pdf.text(caption, pageWidth / 2, currentY, { align: 'center' });
+      pdf.setFont('helvetica', 'bold');
+      const caption = `Figure ${figureNum}. ${generateCaption(capture)}`;
+      pdf.text(caption, pageWidth / 2, captionY, { align: 'center', maxWidth: contentWidth });
       
-      currentY += 15;
+      figureNum++;
+      addPageNumber(currentPage);
     }
   }
 
-  // Add statistics tables if provided
+  // ============ STATISTICS APPENDIX ============
   if (statsData && statsData.length > 0) {
     pdf.addPage();
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Statistical Summary', pageWidth / 2, 20, { align: 'center' });
+    currentPage++;
     
-    let tableY = 35;
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Appendix: Statistical Summary', pageWidth / 2, 30, { align: 'center' });
+    
+    let tableY = 50;
     
     for (const table of statsData) {
-      if (tableY > pageHeight - 50) {
+      if (tableY > pageHeight - 60) {
         pdf.addPage();
-        tableY = 20;
+        currentPage++;
+        tableY = 30;
+        addPageNumber(currentPage);
       }
       
       pdf.setFontSize(12);
@@ -259,19 +317,23 @@ export async function generateBatchPDF(
       pdf.setFont('helvetica', 'normal');
       
       for (const row of table.rows) {
-        if (tableY > pageHeight - 15) {
+        if (tableY > pageHeight - 20) {
           pdf.addPage();
-          tableY = 20;
+          currentPage++;
+          tableY = 30;
+          addPageNumber(currentPage);
         }
         pdf.text(row.join('  |  '), margin, tableY);
         tableY += 5;
       }
       
-      tableY += 10;
+      tableY += 12;
     }
+    
+    addPageNumber(currentPage);
   }
 
-  pdf.save(`batch_report_${new Date().toISOString().split('T')[0]}_${options.property}.pdf`);
+  pdf.save(`${sanitizeFileName(options.title || 'analysis_report')}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 function generateFileName(capture: ChartCapture): string {

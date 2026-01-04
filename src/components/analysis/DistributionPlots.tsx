@@ -123,7 +123,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
             </div>
 
             {/* Histogram SVG */}
-            <svg width={svgWidth} height={svgHeight} className="block">
+            <svg width={svgWidth} height={svgHeight} className="block" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
               <g transform={`translate(${margin.left}, ${margin.top})`}>
                 {/* Y-axis */}
                 <line x1={0} y1={0} x2={0} y2={plotHeight} stroke="currentColor" strokeOpacity={0.3} />
