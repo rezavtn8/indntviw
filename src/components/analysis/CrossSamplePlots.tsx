@@ -41,14 +41,49 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
     return { globalMin: min - padding, globalMax: max + padding, range: max - min + 2 * padding };
   }, [samples]);
 
+  const plotHeight = 200;
+  const topMargin = 30;
+
   const valueToY = (value: number): number => {
-    return ((globalMax - value) / range) * 200;
+    return topMargin + ((globalMax - value) / range) * plotHeight;
   };
 
+  // Calculate nice rounded tick values for Y-axis
+  const getNiceTicks = (min: number, max: number, targetCount: number = 5): number[] => {
+    const range = max - min;
+    if (range === 0) return [min];
+    
+    const roughStep = range / (targetCount - 1);
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const residual = roughStep / magnitude;
+    
+    let niceStep: number;
+    if (residual <= 1.5) niceStep = magnitude;
+    else if (residual <= 3) niceStep = 2 * magnitude;
+    else if (residual <= 7) niceStep = 5 * magnitude;
+    else niceStep = 10 * magnitude;
+    
+    const niceMin = Math.floor(min / niceStep) * niceStep;
+    const niceMax = Math.ceil(max / niceStep) * niceStep;
+    
+    const ticks: number[] = [];
+    for (let v = niceMin; v <= niceMax + niceStep * 0.01; v += niceStep) {
+      if (v >= min - niceStep * 0.1 && v <= max + niceStep * 0.1) {
+        ticks.push(v);
+      }
+    }
+    return ticks.length > 0 ? ticks : [min, max];
+  };
+
+  const yTicks = useMemo(() => getNiceTicks(globalMin, globalMax, 5), [globalMin, globalMax]);
+
   const formatValue = (val: number): string => {
-    if (Math.abs(val) >= 1000) return val.toFixed(0);
-    if (Math.abs(val) >= 1) return val.toFixed(2);
-    return val.toFixed(4);
+    const absVal = Math.abs(val);
+    if (absVal >= 1000) return val.toFixed(0);
+    if (absVal >= 100) return val.toFixed(1);
+    if (absVal >= 1) return val.toFixed(2);
+    if (absVal >= 0.01) return val.toFixed(3);
+    return val.toExponential(1);
   };
 
   // Generate violin path
@@ -105,10 +140,12 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   };
 
   const boxWidth = 40;
-  const groupWidth = 100; // Increased for better spacing
+  const groupWidth = 100;
   const leftPadding = 70;
-  const rightPadding = 60;
+  const rightPadding = 40;
   const svgWidth = Math.max(450, samples.length * groupWidth + leftPadding + rightPadding);
+  const labelAreaHeight = 80;
+  const svgHeight = topMargin + plotHeight + labelAreaHeight;
 
   if (samples.length === 0) {
     return (
@@ -130,16 +167,15 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <svg width={svgWidth} height={340} className="block mx-auto" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          {/* Y-axis */}
+        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+          {/* Y-axis with nice ticks */}
           <g>
-            {[0, 0.25, 0.5, 0.75, 1].map(frac => {
-              const value = globalMin + frac * range;
+            {yTicks.map(value => {
               const y = valueToY(value);
               return (
-                <g key={frac}>
-                  <line x1={50} y1={y + 20} x2={svgWidth - 20} y2={y + 20} stroke="currentColor" strokeOpacity={0.1} />
-                  <text x={45} y={y + 24} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px' }}>
+                <g key={value}>
+                  <line x1={50} y1={y} x2={svgWidth - 20} y2={y} stroke="currentColor" strokeOpacity={0.1} />
+                  <text x={45} y={y + 4} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                     {formatValue(value)}
                   </text>
                 </g>
@@ -161,9 +197,10 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
             const meanY = valueToY(stats.mean);
             const whiskerLow = valueToY(Math.max(stats.min, stats.q1 - 1.5 * stats.iqr));
             const whiskerHigh = valueToY(Math.min(stats.max, stats.q3 + 1.5 * stats.iqr));
+            const labelY = topMargin + plotHeight + 25;
 
             return (
-              <g key={sample.id} transform="translate(0, 20)">
+              <g key={sample.id}>
                 {/* Violin */}
                 {showViolin && (
                   <path
@@ -226,9 +263,9 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
                 {/* Label */}
                 <text
                   x={centerX}
-                  y={250}
+                  y={labelY}
                   textAnchor="end"
-                  transform={`rotate(-45, ${centerX}, 250)`}
+                  transform={`rotate(-45, ${centerX}, ${labelY})`}
                   className="fill-foreground"
                   style={{ fontSize: '11px', fontWeight: 'bold', fontFamily: 'Arial, Helvetica, sans-serif' }}
                 >
@@ -236,9 +273,9 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
                 </text>
                 <text
                   x={centerX}
-                  y={270}
+                  y={labelY + 18}
                   textAnchor="end"
-                  transform={`rotate(-45, ${centerX}, 270)`}
+                  transform={`rotate(-45, ${centerX}, ${labelY + 18})`}
                   className="fill-muted-foreground"
                   style={{ fontSize: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}
                 >

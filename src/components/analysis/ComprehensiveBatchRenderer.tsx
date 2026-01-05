@@ -301,6 +301,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
                   stats: sample.stats
                 }]}
                 selectedProperty={selectedProperty}
+                isExport={true}
               />
             </div>
           ))
