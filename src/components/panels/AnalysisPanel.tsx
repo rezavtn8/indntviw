@@ -41,6 +41,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
   const [includeAllData, setIncludeAllData] = useState(true);
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [blackAndWhite, setBlackAndWhite] = useState(false);
 
   const getPropertyLabel = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -262,6 +263,10 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
             <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
             <Switch checked={showJitter} onCheckedChange={setShowJitter} />
           </div>
+          <div className="flex items-center justify-between">
+            <Label className="font-mono text-xs cursor-pointer">B&W Mode</Label>
+            <Switch checked={blackAndWhite} onCheckedChange={setBlackAndWhite} />
+          </div>
         </div>
       </div>
 
@@ -318,6 +323,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                       selectedProperty={selectedProperty}
                       showViolin={showViolin}
                       showJitter={showJitter}
+                      blackAndWhite={blackAndWhite}
                     />
                   </TabsContent>
 
