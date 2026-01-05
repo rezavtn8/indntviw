@@ -327,6 +327,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
                 showJitter={true}
                 showPValueAsterisks={true}
                 selectedProperty={selectedProperty}
+                isExport={true}
               />
             </div>
           ))
@@ -349,6 +350,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
               selectedProperty={selectedProperty}
               showViolin={true}
               showJitter={true}
+              isExport={true}
             />
           </div>
         )}
@@ -371,6 +373,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
               showJitter={true}
               showPValueAsterisks={true}
               selectedProperty={selectedProperty}
+              isExport={true}
             />
           </div>
         )}
@@ -393,6 +396,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
               showJitter={true}
               showPValueAsterisks={true}
               selectedProperty={selectedProperty}
+              isExport={true}
             />
           </div>
         )}
@@ -423,6 +427,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
               showJitter={true}
               showPValueAsterisks={true}
               selectedProperty={selectedProperty}
+              isExport={true}
             />
           </div>
         )}
@@ -452,6 +457,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
                 showJitter={true}
                 showPValueAsterisks={true}
                 selectedProperty={selectedProperty}
+                isExport={true}
               />
             </div>
           ))

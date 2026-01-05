@@ -8,6 +8,7 @@ interface BoxViolinPlotsProps {
   showViolin?: boolean;
   showJitter?: boolean;
   showPValueAsterisks?: boolean;
+  isExport?: boolean;
 }
 
 // Get p-value significance asterisks
@@ -24,6 +25,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   showViolin = false,
   showJitter = true,
   showPValueAsterisks = false,
+  isExport = false,
 }) => {
   const getPropertyUnit = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -32,17 +34,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
   const unit = getPropertyUnit(selectedProperty);
 
-  // Calculate global min/max for consistent scaling
-  const { globalMin, globalMax, range } = useMemo(() => {
-    const allValues = data.flatMap(d => d.values);
-    if (allValues.length === 0) return { globalMin: 0, globalMax: 100, range: 100 };
-    const min = Math.min(...allValues);
-    const max = Math.max(...allValues);
-    const padding = (max - min) * 0.15; // Extra padding for asterisks
-    return { globalMin: min - padding, globalMax: max + padding, range: max - min + 2 * padding };
-  }, [data]);
-
-  // Calculate pairwise p-values for asterisks (moved before topMargin calculation)
+  // Calculate pairwise p-values for asterisks (needed before topMargin calculation)
   const pairwiseResults = useMemo(() => {
     if (!showPValueAsterisks || data.length < 2) return [];
     
@@ -69,21 +61,20 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     return results;
   }, [data, showPValueAsterisks]);
 
-  // Plot area dimensions
-  const plotHeight = 200;
-  const topMargin = showPValueAsterisks && pairwiseResults.length > 0 
-    ? Math.max(60, pairwiseResults.length * 22 + 40) 
-    : 30;
-
-  const valueToY = (value: number): number => {
-    return topMargin + ((globalMax - value) / range) * plotHeight;
-  };
-
-  // Calculate nice rounded tick values for Y-axis
-  const getNiceTicks = (min: number, max: number, targetCount: number = 5): number[] => {
-    const range = max - min;
-    if (range === 0) return [min];
+  // Calculate nice axis boundaries FIRST, then use for all scaling
+  const { niceMin, niceMax, niceTicks } = useMemo(() => {
+    const allValues = data.flatMap(d => d.values);
+    if (allValues.length === 0) return { niceMin: 0, niceMax: 100, niceTicks: [0, 25, 50, 75, 100] };
     
+    const rawMin = Math.min(...allValues);
+    const rawMax = Math.max(...allValues);
+    const padding = (rawMax - rawMin) * 0.15;
+    const paddedMin = rawMin - padding;
+    const paddedMax = rawMax + padding;
+    
+    // Calculate nice step
+    const range = paddedMax - paddedMin;
+    const targetCount = 5;
     const roughStep = range / (targetCount - 1);
     const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
     const residual = roughStep / magnitude;
@@ -94,24 +85,42 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     else if (residual <= 7) niceStep = 5 * magnitude;
     else niceStep = 10 * magnitude;
     
-    const niceMin = Math.floor(min / niceStep) * niceStep;
-    const niceMax = Math.ceil(max / niceStep) * niceStep;
+    // Round min DOWN and max UP to nice values
+    const computedNiceMin = Math.floor(paddedMin / niceStep) * niceStep;
+    const computedNiceMax = Math.ceil(paddedMax / niceStep) * niceStep;
     
+    // Generate ticks
     const ticks: number[] = [];
-    for (let v = niceMin; v <= niceMax + niceStep * 0.01; v += niceStep) {
-      if (v >= min - niceStep * 0.1 && v <= max + niceStep * 0.1) {
-        ticks.push(v);
-      }
+    for (let v = computedNiceMin; v <= computedNiceMax + niceStep * 0.001; v += niceStep) {
+      ticks.push(Math.round(v / niceStep) * niceStep); // Avoid floating point issues
     }
-    return ticks.length > 0 ? ticks : [min, max];
-  };
+    
+    return { niceMin: computedNiceMin, niceMax: computedNiceMax, niceTicks: ticks.length > 0 ? ticks : [computedNiceMin, computedNiceMax] };
+  }, [data]);
 
-  const yTicks = useMemo(() => getNiceTicks(globalMin, globalMax, 5), [globalMin, globalMax]);
+  const niceRange = niceMax - niceMin;
+
+  // Bracket layout constants
+  const bracketRowHeight = 24;
+  const bracketTopPadding = 16;
+  const bracketAreaHeight = showPValueAsterisks && pairwiseResults.length > 0 
+    ? pairwiseResults.length * bracketRowHeight + bracketTopPadding 
+    : 0;
+
+  // Plot area dimensions
+  const plotHeight = 200;
+  const baseTopMargin = 20;
+  const topMargin = baseTopMargin + bracketAreaHeight;
+
+  const valueToY = (value: number): number => {
+    return topMargin + ((niceMax - value) / niceRange) * plotHeight;
+  };
 
   const formatValue = (val: number): string => {
     const absVal = Math.abs(val);
     if (absVal >= 1000) return val.toFixed(0);
     if (absVal >= 100) return val.toFixed(1);
+    if (absVal >= 10) return val.toFixed(1);
     if (absVal >= 1) return val.toFixed(2);
     if (absVal >= 0.01) return val.toFixed(3);
     return val.toExponential(1);
@@ -129,7 +138,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     let maxDensity = 0;
     
     for (let i = 0; i <= steps; i++) {
-      const value = globalMin + (i / steps) * range;
+      const value = niceMin + (i / steps) * niceRange;
       let density = 0;
       for (const v of values) {
         const u = (value - v) / bandwidth;
@@ -169,35 +178,42 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
       x: centerX + (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
       y: valueToY(v),
     }));
-  }, [globalMin, range]);
+  }, [niceMin, niceRange, topMargin]);
 
   const boxWidth = 40;
   const groupWidth = 100;
   const leftPadding = 70;
-  const rightPadding = 40;
+  const rightPadding = 60; // Increased for violins
   const svgWidth = Math.max(450, data.length * groupWidth + leftPadding + rightPadding);
   const labelAreaHeight = 80; // Space for rotated labels
   const svgHeight = topMargin + plotHeight + labelAreaHeight;
 
-  return (
-    <div className="border-2 border-border rounded-lg p-4" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-      <div className="mb-4">
-        <h4 className="font-mono text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          Box Plot Comparison
-          {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
-        </h4>
-      </div>
+  const fontStyle: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
 
-      <div className="overflow-x-auto">
-        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+  return (
+    <div 
+      className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} 
+      style={fontStyle}
+    >
+      {!isExport && (
+        <div className="mb-4">
+          <h4 className="text-sm font-bold uppercase tracking-wider" style={fontStyle}>
+            Box Plot Comparison
+            {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
+          </h4>
+        </div>
+      )}
+
+      <div className={isExport ? '' : 'overflow-x-auto'}>
+        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={fontStyle}>
           {/* Y-axis with nice ticks */}
           <g>
-            {yTicks.map(value => {
+            {niceTicks.map(value => {
               const y = valueToY(value);
               return (
                 <g key={value}>
                   <line x1={50} y1={y} x2={svgWidth - 20} y2={y} stroke="currentColor" strokeOpacity={0.1} />
-                  <text x={45} y={y + 4} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                  <text x={45} y={y + 4} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px', ...fontStyle }}>
                     {formatValue(value)}
                   </text>
                 </g>
@@ -205,19 +221,20 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
             })}
           </g>
 
-          {/* P-value brackets and asterisks - positioned from top down */}
+          {/* P-value brackets and asterisks - positioned in bracket area */}
           {showPValueAsterisks && pairwiseResults.map((result, idx) => {
             const centerX1 = leftPadding + result.i * groupWidth + groupWidth / 2;
             const centerX2 = leftPadding + result.j * groupWidth + groupWidth / 2;
-            const bracketY = 15 + idx * 20; // Stack from top, 20px apart
+            // Position brackets within the bracket area, from top down
+            const bracketY = bracketTopPadding + idx * bracketRowHeight;
             const midX = (centerX1 + centerX2) / 2;
             
             return (
               <g key={`bracket-${idx}`}>
                 {/* Bracket lines */}
-                <line x1={centerX1} y1={bracketY + 8} x2={centerX1} y2={bracketY} stroke="currentColor" strokeWidth={1} />
+                <line x1={centerX1} y1={bracketY + 10} x2={centerX1} y2={bracketY} stroke="currentColor" strokeWidth={1} />
                 <line x1={centerX1} y1={bracketY} x2={centerX2} y2={bracketY} stroke="currentColor" strokeWidth={1} />
-                <line x1={centerX2} y1={bracketY} x2={centerX2} y2={bracketY + 8} stroke="currentColor" strokeWidth={1} />
+                <line x1={centerX2} y1={bracketY} x2={centerX2} y2={bracketY + 10} stroke="currentColor" strokeWidth={1} />
                 
                 {/* Asterisks or ns */}
                 <text 
@@ -229,7 +246,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                     fontSize: result.asterisks === 'ns' ? '9px' : '14px', 
                     fontWeight: 'bold',
                     fontStyle: result.asterisks === 'ns' ? 'italic' : 'normal',
-                    fontFamily: 'Arial, Helvetica, sans-serif'
+                    ...fontStyle
                   }}
                 >
                   {result.asterisks}
@@ -321,7 +338,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                   textAnchor="end"
                   transform={`rotate(-45, ${centerX}, ${labelY})`}
                   className="fill-foreground"
-                  style={{ fontSize: '11px', fontWeight: 'bold', fontFamily: 'Arial, Helvetica, sans-serif' }}
+                  style={{ fontSize: '11px', fontWeight: 'bold', ...fontStyle }}
                 >
                   {name.length > 20 ? name.slice(0, 17) + '...' : name}
                 </text>
@@ -331,7 +348,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                   textAnchor="end"
                   transform={`rotate(-45, ${centerX}, ${labelY + 18})`}
                   className="fill-muted-foreground"
-                  style={{ fontSize: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+                  style={{ fontSize: '10px', ...fontStyle }}
                 >
                   n={stats.n}
                 </text>
@@ -341,31 +358,36 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
         </svg>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 mt-4 text-xs font-mono text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-0.5 bg-foreground" />
-          <span>Median</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-foreground rotate-45" />
-          <span>Mean</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-3 bg-foreground/20 border border-foreground" />
-          <span>IQR</span>
-        </div>
-        {showPValueAsterisks && (
-          <div className="flex items-center gap-2 border-l border-border pl-4">
-            <span className="font-bold">*</span>
-            <span>p&lt;0.05</span>
-            <span className="font-bold">**</span>
-            <span>p&lt;0.01</span>
-            <span className="font-bold">***</span>
-            <span>p&lt;0.001</span>
+      {/* Legend - hide in export mode */}
+      {!isExport && (
+        <div 
+          className="flex flex-wrap items-center justify-center gap-4 md:gap-6 mt-4 text-xs text-muted-foreground"
+          style={fontStyle}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-0.5 bg-foreground" />
+            <span>Median</span>
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-foreground rotate-45" />
+            <span>Mean</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-3 bg-foreground/20 border border-foreground" />
+            <span>IQR</span>
+          </div>
+          {showPValueAsterisks && (
+            <div className="flex items-center gap-2 border-l border-border pl-4">
+              <span className="font-bold">*</span>
+              <span>p&lt;0.05</span>
+              <span className="font-bold">**</span>
+              <span>p&lt;0.01</span>
+              <span className="font-bold">***</span>
+              <span>p&lt;0.001</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

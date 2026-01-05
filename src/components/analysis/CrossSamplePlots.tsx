@@ -16,6 +16,7 @@ interface CrossSamplePlotsProps {
   selectedProperty: string;
   showViolin?: boolean;
   showJitter?: boolean;
+  isExport?: boolean;
 }
 
 export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
@@ -23,6 +24,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   selectedProperty,
   showViolin = false,
   showJitter = true,
+  isExport = false,
 }) => {
   const getPropertyUnit = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -31,28 +33,20 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
 
   const unit = getPropertyUnit(selectedProperty);
 
-  // Calculate global min/max for consistent scaling
-  const { globalMin, globalMax, range } = useMemo(() => {
+  // Calculate nice axis boundaries FIRST, then use for all scaling
+  const { niceMin, niceMax, niceTicks } = useMemo(() => {
     const allValues = samples.flatMap(s => s.values);
-    if (allValues.length === 0) return { globalMin: 0, globalMax: 100, range: 100 };
-    const min = Math.min(...allValues);
-    const max = Math.max(...allValues);
-    const padding = (max - min) * 0.1;
-    return { globalMin: min - padding, globalMax: max + padding, range: max - min + 2 * padding };
-  }, [samples]);
-
-  const plotHeight = 200;
-  const topMargin = 30;
-
-  const valueToY = (value: number): number => {
-    return topMargin + ((globalMax - value) / range) * plotHeight;
-  };
-
-  // Calculate nice rounded tick values for Y-axis
-  const getNiceTicks = (min: number, max: number, targetCount: number = 5): number[] => {
-    const range = max - min;
-    if (range === 0) return [min];
+    if (allValues.length === 0) return { niceMin: 0, niceMax: 100, niceTicks: [0, 25, 50, 75, 100] };
     
+    const rawMin = Math.min(...allValues);
+    const rawMax = Math.max(...allValues);
+    const padding = (rawMax - rawMin) * 0.1;
+    const paddedMin = rawMin - padding;
+    const paddedMax = rawMax + padding;
+    
+    // Calculate nice step
+    const range = paddedMax - paddedMin;
+    const targetCount = 5;
     const roughStep = range / (targetCount - 1);
     const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
     const residual = roughStep / magnitude;
@@ -63,24 +57,33 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
     else if (residual <= 7) niceStep = 5 * magnitude;
     else niceStep = 10 * magnitude;
     
-    const niceMin = Math.floor(min / niceStep) * niceStep;
-    const niceMax = Math.ceil(max / niceStep) * niceStep;
+    // Round min DOWN and max UP to nice values
+    const computedNiceMin = Math.floor(paddedMin / niceStep) * niceStep;
+    const computedNiceMax = Math.ceil(paddedMax / niceStep) * niceStep;
     
+    // Generate ticks
     const ticks: number[] = [];
-    for (let v = niceMin; v <= niceMax + niceStep * 0.01; v += niceStep) {
-      if (v >= min - niceStep * 0.1 && v <= max + niceStep * 0.1) {
-        ticks.push(v);
-      }
+    for (let v = computedNiceMin; v <= computedNiceMax + niceStep * 0.001; v += niceStep) {
+      ticks.push(Math.round(v / niceStep) * niceStep);
     }
-    return ticks.length > 0 ? ticks : [min, max];
-  };
+    
+    return { niceMin: computedNiceMin, niceMax: computedNiceMax, niceTicks: ticks.length > 0 ? ticks : [computedNiceMin, computedNiceMax] };
+  }, [samples]);
 
-  const yTicks = useMemo(() => getNiceTicks(globalMin, globalMax, 5), [globalMin, globalMax]);
+  const niceRange = niceMax - niceMin;
+
+  const plotHeight = 200;
+  const topMargin = 30;
+
+  const valueToY = (value: number): number => {
+    return topMargin + ((niceMax - value) / niceRange) * plotHeight;
+  };
 
   const formatValue = (val: number): string => {
     const absVal = Math.abs(val);
     if (absVal >= 1000) return val.toFixed(0);
     if (absVal >= 100) return val.toFixed(1);
+    if (absVal >= 10) return val.toFixed(1);
     if (absVal >= 1) return val.toFixed(2);
     if (absVal >= 0.01) return val.toFixed(3);
     return val.toExponential(1);
@@ -98,7 +101,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
     let maxDensity = 0;
     
     for (let i = 0; i <= steps; i++) {
-      const value = globalMin + (i / steps) * range;
+      const value = niceMin + (i / steps) * niceRange;
       let density = 0;
       for (const v of values) {
         const u = (value - v) / bandwidth;
@@ -142,15 +145,17 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   const boxWidth = 40;
   const groupWidth = 100;
   const leftPadding = 70;
-  const rightPadding = 40;
+  const rightPadding = 60; // Increased for violins
   const svgWidth = Math.max(450, samples.length * groupWidth + leftPadding + rightPadding);
   const labelAreaHeight = 80;
   const svgHeight = topMargin + plotHeight + labelAreaHeight;
 
+  const fontStyle: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
+
   if (samples.length === 0) {
     return (
-      <div className="border-2 border-border rounded-lg p-4" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        <p className="text-muted-foreground font-mono text-sm text-center">
+      <div className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} style={fontStyle}>
+        <p className="text-muted-foreground text-sm text-center" style={fontStyle}>
           Select samples to view plots
         </p>
       </div>
@@ -158,24 +163,26 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   }
 
   return (
-    <div className="border-2 border-border rounded-lg p-4" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-      <div className="mb-4">
-        <h4 className="font-mono text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          Cross-Sample Box Plot
-          {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
-        </h4>
-      </div>
+    <div className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} style={fontStyle}>
+      {!isExport && (
+        <div className="mb-4">
+          <h4 className="text-sm font-bold uppercase tracking-wider" style={fontStyle}>
+            Cross-Sample Box Plot
+            {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
+          </h4>
+        </div>
+      )}
 
-      <div className="overflow-x-auto">
-        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      <div className={isExport ? '' : 'overflow-x-auto'}>
+        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={fontStyle}>
           {/* Y-axis with nice ticks */}
           <g>
-            {yTicks.map(value => {
+            {niceTicks.map(value => {
               const y = valueToY(value);
               return (
                 <g key={value}>
                   <line x1={50} y1={y} x2={svgWidth - 20} y2={y} stroke="currentColor" strokeOpacity={0.1} />
-                  <text x={45} y={y + 4} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                  <text x={45} y={y + 4} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px', ...fontStyle }}>
                     {formatValue(value)}
                   </text>
                 </g>
@@ -267,7 +274,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
                   textAnchor="end"
                   transform={`rotate(-45, ${centerX}, ${labelY})`}
                   className="fill-foreground"
-                  style={{ fontSize: '11px', fontWeight: 'bold', fontFamily: 'Arial, Helvetica, sans-serif' }}
+                  style={{ fontSize: '11px', fontWeight: 'bold', ...fontStyle }}
                 >
                   {sample.name.length > 20 ? sample.name.slice(0, 17) + '...' : sample.name}
                 </text>
@@ -277,7 +284,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
                   textAnchor="end"
                   transform={`rotate(-45, ${centerX}, ${labelY + 18})`}
                   className="fill-muted-foreground"
-                  style={{ fontSize: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+                  style={{ fontSize: '10px', ...fontStyle }}
                 >
                   n={stats.n}
                 </text>
@@ -287,21 +294,23 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
         </svg>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mt-4 text-xs font-mono text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-0.5 bg-foreground" />
-          <span>Median</span>
+      {/* Legend - hide in export mode */}
+      {!isExport && (
+        <div className="flex items-center justify-center gap-6 mt-4 text-xs text-muted-foreground" style={fontStyle}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-0.5 bg-foreground" />
+            <span>Median</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-foreground rotate-45" />
+            <span>Mean</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-3 bg-foreground/20 border border-foreground" />
+            <span>IQR</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-foreground rotate-45" />
-          <span>Mean</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-3 bg-foreground/20 border border-foreground" />
-          <span>IQR</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

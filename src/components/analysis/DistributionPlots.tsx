@@ -29,14 +29,17 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
     return { globalMin: min, globalMax: max, range: max - min || 1 };
   }, [data]);
 
-  // Generate histograms
+  // Use fixed bin count for export (no slider)
+  const effectiveBinCount = isExport ? 20 : binCount;
+
+  // Generate histograms using effective bin count
   const histograms = useMemo(() => {
-    const binWidth = range / binCount;
+    const binWidth = range / effectiveBinCount;
     
     return data.map(d => {
-      const bins = Array(binCount).fill(0);
+      const bins = Array(effectiveBinCount).fill(0);
       d.values.forEach(v => {
-        const binIndex = Math.min(Math.floor((v - globalMin) / binWidth), binCount - 1);
+        const binIndex = Math.min(Math.floor((v - globalMin) / binWidth), effectiveBinCount - 1);
         if (binIndex >= 0) bins[binIndex]++;
       });
       
@@ -73,10 +76,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
         stats: d.stats,
       };
     });
-  }, [data, binCount, globalMin, range]);
-
-  // Use fixed bin count for export (no slider)
-  const effectiveBinCount = isExport ? 20 : binCount;
+  }, [data, effectiveBinCount, globalMin, range]);
 
   const svgWidth = isExport ? 550 : 400;
   const svgHeight = 200;
@@ -94,12 +94,12 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
     <div className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
       {!isExport && (
         <div className="flex items-center justify-between mb-4">
-          <h4 className="font-mono text-sm font-bold uppercase tracking-wider">
+          <h4 className="text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
             Distribution Analysis
             {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
           </h4>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-muted-foreground">Bins:</span>
+            <span className="text-xs text-muted-foreground" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>Bins:</span>
             <Slider
               value={[binCount]}
               onValueChange={([v]) => setBinCount(v)}
@@ -108,7 +108,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
               step={1}
               className="w-24"
             />
-            <span className="font-mono text-xs w-6">{binCount}</span>
+            <span className="text-xs w-6" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>{binCount}</span>
           </div>
         </div>
       )}
@@ -120,8 +120,8 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded" style={{ backgroundColor: hist.color }} />
-                <span className="font-mono text-sm font-bold">{hist.name}</span>
-                <span className="font-mono text-xs text-muted-foreground">n={hist.stats.n}</span>
+                <span className="text-sm font-bold" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>{hist.name}</span>
+                <span className="text-xs text-muted-foreground" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>n={hist.stats.n}</span>
               </div>
               <Badge variant={hist.normality.isNormal ? 'secondary' : 'outline'} className="text-xs">
                 {hist.normality.isNormal ? 'Normal' : 'Non-normal'}
@@ -136,7 +136,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
                 {[0, 0.5, 1].map(frac => (
                   <g key={frac}>
                     <line x1={-5} y1={plotHeight * (1 - frac)} x2={0} y2={plotHeight * (1 - frac)} stroke="currentColor" strokeOpacity={0.5} />
-                    <text x={-8} y={plotHeight * (1 - frac) + 4} textAnchor="end" className="fill-muted-foreground font-mono text-xs">
+                    <text x={-8} y={plotHeight * (1 - frac) + 4} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                       {(frac * hist.maxDensity).toFixed(2)}
                     </text>
                   </g>
@@ -147,7 +147,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
                 {[0, 0.25, 0.5, 0.75, 1].map(frac => (
                   <g key={frac}>
                     <line x1={frac * plotWidth} y1={plotHeight} x2={frac * plotWidth} y2={plotHeight + 5} stroke="currentColor" strokeOpacity={0.5} />
-                    <text x={frac * plotWidth} y={plotHeight + 18} textAnchor="middle" className="fill-muted-foreground font-mono text-xs">
+                    <text x={frac * plotWidth} y={plotHeight + 18} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: '11px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                       {formatValue(globalMin + frac * range)}
                     </text>
                   </g>
@@ -209,7 +209,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
             </svg>
 
             {/* Stats summary */}
-            <div className="grid grid-cols-4 gap-2 mt-2 text-xs font-mono">
+            <div className="grid grid-cols-4 gap-2 mt-2 text-xs" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
               <div>
                 <span className="text-muted-foreground block">Mean</span>
                 <span>{formatValue(hist.stats.mean)}</span>
@@ -233,7 +233,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
 
       {/* Legend - hide in export mode */}
       {!isExport && (
-        <div className="flex items-center justify-center gap-6 mt-4 text-xs font-mono text-muted-foreground">
+        <div className="flex items-center justify-center gap-6 mt-4 text-xs text-muted-foreground" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
           <div className="flex items-center gap-2">
             <div className="w-6 h-0.5 border-t-2 border-dashed border-foreground" />
             <span>Mean</span>
