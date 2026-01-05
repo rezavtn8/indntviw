@@ -21,6 +21,7 @@ export interface BatchExportOptions {
     crossSampleTests: boolean;
     treatmentGroups: boolean;
     smartZones: boolean;
+    smartZonesPooled: boolean;        // NEW: Zone 1 pooled vs Zone 2 pooled
     smartZonesCrossComparison: boolean;
     smartZonesPerZone: boolean;
     smartZonesTests: boolean;
@@ -29,7 +30,7 @@ export interface BatchExportOptions {
 
 export interface ChartCapture {
   id: string;
-  category: 'per_sample' | 'cross_sample' | 'treatment_groups' | 'smart_zones';
+  category: 'per_sample' | 'cross_sample' | 'treatment_groups' | 'smart_zones' | 'pooled_zones';
   subcategory: string;
   sampleName?: string;
   zoneName?: string;
@@ -91,7 +92,8 @@ export async function generateBatchZIP(
     '01_per_sample': captures.filter(c => c.category === 'per_sample'),
     '02_cross_sample': captures.filter(c => c.category === 'cross_sample'),
     '03_treatment_groups': captures.filter(c => c.category === 'treatment_groups'),
-    '04_smart_zones': captures.filter(c => c.category === 'smart_zones')
+    '04_pooled_zones': captures.filter(c => c.category === 'pooled_zones'),
+    '05_smart_zones': captures.filter(c => c.category === 'smart_zones')
   };
 
   for (const [folderName, categoryCaptures] of Object.entries(categories)) {
@@ -186,7 +188,8 @@ export async function generateBatchPDF(
   const perSampleCount = captures.filter(c => c.category === 'per_sample').length;
   const crossSampleCount = captures.filter(c => c.category === 'cross_sample').length;
   const groupCount = captures.filter(c => c.category === 'treatment_groups').length;
-  const zoneCount = captures.filter(c => c.category === 'smart_zones').length;
+  const pooledZoneCount = captures.filter(c => c.category === 'pooled_zones').length;
+  const smartZoneCount = captures.filter(c => c.category === 'smart_zones').length;
   
   let yPos = 130;
   pdf.setFontSize(14);
@@ -209,8 +212,12 @@ export async function generateBatchPDF(
     pdf.text(`• Treatment Groups: ${groupCount} charts`, margin + 5, yPos);
     yPos += 7;
   }
-  if (zoneCount > 0) {
-    pdf.text(`• Smart Zone Analysis: ${zoneCount} charts`, margin + 5, yPos);
+  if (pooledZoneCount > 0) {
+    pdf.text(`• Pooled Zone Analysis: ${pooledZoneCount} charts`, margin + 5, yPos);
+    yPos += 7;
+  }
+  if (smartZoneCount > 0) {
+    pdf.text(`• Smart Zone Analysis: ${smartZoneCount} charts`, margin + 5, yPos);
     yPos += 7;
   }
 
@@ -223,12 +230,13 @@ export async function generateBatchPDF(
   addPageNumber(currentPage);
 
   // ============ CHARTS BY CATEGORY ============
-  const categoryOrder = ['per_sample', 'cross_sample', 'treatment_groups', 'smart_zones'] as const;
+  const categoryOrder = ['per_sample', 'cross_sample', 'treatment_groups', 'pooled_zones', 'smart_zones'] as const;
   const categoryTitles: Record<string, string> = {
     per_sample: 'Section 1: Per-Sample Analysis',
     cross_sample: 'Section 2: Cross-Sample Comparison',
     treatment_groups: 'Section 3: Treatment Group Analysis',
-    smart_zones: 'Section 4: Smart Zone Analysis'
+    pooled_zones: 'Section 4: Pooled Zone Comparison',
+    smart_zones: 'Section 5: Smart Zone Analysis'
   };
 
   let figureNum = 1;
@@ -363,10 +371,13 @@ function generateCaption(capture: ChartCapture): string {
   const subcategoryLabels: Record<string, string> = {
     distribution: 'Distribution Plot',
     zones_boxplot: 'Zone Comparison',
+    comparison: 'Sample Comparison',
     sample_comparison: 'Sample Comparison',
     statistical_tests: 'Statistical Tests',
     group_comparison: 'Group Comparison',
+    pooled_comparison: 'Pooled Zone Comparison',
     cross_zone: 'Cross-Zone Comparison',
+    across_samples: 'Across Samples',
     zone_across_samples: 'Zone Across Samples'
   };
   

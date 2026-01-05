@@ -62,7 +62,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
         .filter(d => d.values.length > 0);
     }, [fileSessions, selectedProperty]);
 
-    // Calculate per-sample zone data
+    // Calculate per-sample zone data (ALL zones within each sample)
     const perSampleZoneData = useMemo(() => {
       return fileSessions
         .filter(session => session.data && session.zones.length > 0)
@@ -92,7 +92,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
             sessionId: session.id,
             sessionName: session.fileName.replace(/\.[^/.]+$/, ''),
             data: [
-              { name: 'All Data', color: 'hsl(var(--muted-foreground))', values: allValues, stats: calculateDescriptiveStats(allValues) },
+              { name: 'All Data', color: '#888888', values: allValues, stats: calculateDescriptiveStats(allValues) },
               ...zoneData
             ]
           };
@@ -100,7 +100,43 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
         .filter(s => s.data.length > 1);
     }, [fileSessions, selectedProperty]);
 
-    // Calculate smart zone data (same-named zones across samples)
+    // Calculate POOLED zone data (same-named zones combined from all samples)
+    const pooledZoneData = useMemo(() => {
+      const zoneNameMap = new Map<string, { name: string; color: string; values: number[] }>();
+      
+      for (const session of fileSessions) {
+        if (!session.data) continue;
+        
+        for (const zone of session.zones) {
+          const values = session.data.points
+            .filter(p => zone.memberPointIds.includes(p.id))
+            .map(p => {
+              const val = p[selectedProperty as keyof typeof p] ?? p.properties[selectedProperty];
+              return typeof val === 'number' ? val : NaN;
+            })
+            .filter(v => !isNaN(v));
+          
+          if (values.length === 0) continue;
+          
+          const existing = zoneNameMap.get(zone.name);
+          if (existing) {
+            existing.values.push(...values);
+          } else {
+            zoneNameMap.set(zone.name, { name: zone.name, color: zone.color, values: [...values] });
+          }
+        }
+      }
+      
+      // Return all zones that have data (regardless of how many samples they appear in)
+      return Array.from(zoneNameMap.values())
+        .filter(z => z.values.length > 0)
+        .map(z => ({
+          ...z,
+          stats: calculateDescriptiveStats(z.values)
+        }));
+    }, [fileSessions, selectedProperty]);
+
+    // Calculate smart zone data (same-named zones across samples - for per-zone-across-samples view)
     const smartZoneData = useMemo(() => {
       const zoneNameMap = new Map<string, { sessionId: string; sessionName: string; zone: typeof fileSessions[0]['zones'][0]; values: number[] }[]>();
       
@@ -199,7 +235,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
             if (category === 'per_sample') {
               capture.sampleName = rest[0];
               capture.subcategory = rest[1] || 'chart';
-            } else if (category === 'smart_zones') {
+            } else if (category === 'smart_zones' || category === 'pooled_zones') {
               capture.zoneName = rest[0];
               capture.subcategory = rest[1] || 'chart';
             }
@@ -216,12 +252,14 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
 
     const { includeSections } = options;
 
-    // Common chart wrapper style for publication-ready output
+    // Dynamic chart wrapper - fits content, with minimum width
     const chartWrapperStyle: React.CSSProperties = {
       fontFamily: 'Arial, Helvetica, sans-serif',
       backgroundColor: '#ffffff',
       padding: '24px',
-      width: '800px'
+      minWidth: '600px',
+      width: 'fit-content',
+      maxWidth: '1600px'
     };
 
     const chartTitleStyle: React.CSSProperties = {
@@ -241,7 +279,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
 
     return (
       <div className="absolute left-[-9999px] top-0" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        {/* Per-Sample Distribution Charts */}
+        {/* ===== SECTION 1: Per-Sample Distribution Charts ===== */}
         {includeSections.perSample && includeSections.perSampleDistribution && 
           sampleData.map(sample => (
             <div
@@ -268,7 +306,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
           ))
         }
 
-        {/* Per-Sample Zone Comparison Charts */}
+        {/* ===== SECTION 2: Per-Sample Zone Comparison (ALL zones within each sample) ===== */}
         {includeSections.perSample && includeSections.perSampleZones &&
           perSampleZoneData.map(({ sessionName, data }) => (
             <div
@@ -286,16 +324,17 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
                 data={data}
                 showViolin={true}
                 showJitter={true}
+                showPValueAsterisks={true}
                 selectedProperty={selectedProperty}
               />
             </div>
           ))
         }
 
-        {/* Cross-Sample Comparison */}
+        {/* ===== SECTION 3: Cross-Sample Comparison (all samples) ===== */}
         {includeSections.crossSample && includeSections.crossSamplePlots && sampleData.length >= 2 && (
           <div
-            ref={el => setChartRef('cross_sample__sample_comparison', el)}
+            ref={el => setChartRef('cross_sample__all_samples__comparison', el)}
             style={chartWrapperStyle}
           >
             <div style={chartTitleStyle}>
@@ -313,10 +352,10 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
           </div>
         )}
 
-        {/* Treatment Group Comparison */}
+        {/* ===== SECTION 4: Treatment Group Comparison ===== */}
         {includeSections.treatmentGroups && groupData.length >= 2 && (
           <div
-            ref={el => setChartRef('treatment_groups__group_comparison', el)}
+            ref={el => setChartRef('treatment_groups__all__comparison', el)}
             style={chartWrapperStyle}
           >
             <div style={chartTitleStyle}>
@@ -329,22 +368,45 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
               data={groupData}
               showViolin={true}
               showJitter={true}
+              showPValueAsterisks={true}
               selectedProperty={selectedProperty}
             />
           </div>
         )}
 
-        {/* Smart Zone: Cross-zone comparison */}
-        {includeSections.smartZones && includeSections.smartZonesCrossComparison && smartZoneData.size >= 2 && (
+        {/* ===== SECTION 5: Pooled Zone Comparison (Zone 1 pooled vs Zone 2 pooled) ===== */}
+        {includeSections.smartZones && includeSections.smartZonesPooled && pooledZoneData.length >= 2 && (
           <div
-            ref={el => setChartRef('smart_zones__all__cross_zone', el)}
+            ref={el => setChartRef('pooled_zones__all__pooled_comparison', el)}
             style={chartWrapperStyle}
           >
             <div style={chartTitleStyle}>
-              Cross-Zone Comparison (Aggregated)
+              Pooled Zone Comparison
             </div>
             <div style={chartSubtitleStyle}>
-              {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {smartZoneData.size} zone types across all samples
+              {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {pooledZoneData.length} zone types (combined from all samples)
+            </div>
+            <BoxViolinPlots
+              data={pooledZoneData}
+              showViolin={true}
+              showJitter={true}
+              showPValueAsterisks={true}
+              selectedProperty={selectedProperty}
+            />
+          </div>
+        )}
+
+        {/* ===== SECTION 6: Smart Zone Cross-Comparison (multi-sample zones aggregated) ===== */}
+        {includeSections.smartZones && includeSections.smartZonesCrossComparison && smartZoneData.size >= 2 && (
+          <div
+            ref={el => setChartRef('smart_zones__multi_sample__cross_zone', el)}
+            style={chartWrapperStyle}
+          >
+            <div style={chartTitleStyle}>
+              Cross-Zone Comparison (Multi-Sample Zones)
+            </div>
+            <div style={chartSubtitleStyle}>
+              {propertyLabel} {propertyUnit && `(${propertyUnit})`} • {smartZoneData.size} zone types appearing in 2+ samples
             </div>
             <BoxViolinPlots
               data={Array.from(smartZoneData.entries()).map(([zoneName, entries]) => {
@@ -358,24 +420,25 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
               })}
               showViolin={true}
               showJitter={true}
+              showPValueAsterisks={true}
               selectedProperty={selectedProperty}
             />
           </div>
         )}
 
-        {/* Smart Zone: Per-zone across samples */}
+        {/* ===== SECTION 7: Same Zone Across Different Samples ===== */}
         {includeSections.smartZones && includeSections.smartZonesPerZone &&
           Array.from(smartZoneData.entries()).map(([zoneName, entries]) => (
             <div
-              key={`smart_zones__${zoneName}__zone_across_samples`}
-              ref={el => setChartRef(`smart_zones__${zoneName}__zone_across_samples`, el)}
+              key={`smart_zones__${zoneName}__across_samples`}
+              ref={el => setChartRef(`smart_zones__${zoneName}__across_samples`, el)}
               style={chartWrapperStyle}
             >
               <div style={chartTitleStyle}>
-                Zone: {zoneName}
+                Zone: {zoneName} — Across Samples
               </div>
               <div style={chartSubtitleStyle}>
-                {propertyLabel} {propertyUnit && `(${propertyUnit})`} • Across {entries.length} samples
+                {propertyLabel} {propertyUnit && `(${propertyUnit})`} • Comparing across {entries.length} samples
               </div>
               <BoxViolinPlots
                 data={entries.map(e => ({
@@ -386,6 +449,7 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
                 }))}
                 showViolin={true}
                 showJitter={true}
+                showPValueAsterisks={true}
                 selectedProperty={selectedProperty}
               />
             </div>
