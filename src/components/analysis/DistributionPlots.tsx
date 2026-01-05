@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 interface DistributionPlotsProps {
   data: { name: string; color: string; values: number[]; stats: DescriptiveStats }[];
   selectedProperty: string;
+  isExport?: boolean;
 }
 
-export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, selectedProperty }) => {
+export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, selectedProperty, isExport = false }) => {
   const [binCount, setBinCount] = useState(20);
 
   const getPropertyUnit = (key: string): string => {
@@ -74,7 +75,10 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
     });
   }, [data, binCount, globalMin, range]);
 
-  const svgWidth = 400;
+  // Use fixed bin count for export (no slider)
+  const effectiveBinCount = isExport ? 20 : binCount;
+
+  const svgWidth = isExport ? 550 : 400;
   const svgHeight = 200;
   const margin = { top: 20, right: 20, bottom: 40, left: 50 };
   const plotWidth = svgWidth - margin.left - margin.right;
@@ -87,27 +91,29 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
   };
 
   return (
-    <div className="border-2 border-border rounded-lg p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="font-mono text-sm font-bold uppercase tracking-wider">
-          Distribution Analysis
-          {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
-        </h4>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-muted-foreground">Bins:</span>
-          <Slider
-            value={[binCount]}
-            onValueChange={([v]) => setBinCount(v)}
-            min={5}
-            max={50}
-            step={1}
-            className="w-24"
-          />
-          <span className="font-mono text-xs w-6">{binCount}</span>
+    <div className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      {!isExport && (
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="font-mono text-sm font-bold uppercase tracking-wider">
+            Distribution Analysis
+            {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
+          </h4>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-muted-foreground">Bins:</span>
+            <Slider
+              value={[binCount]}
+              onValueChange={([v]) => setBinCount(v)}
+              min={5}
+              max={50}
+              step={1}
+              className="w-24"
+            />
+            <span className="font-mono text-xs w-6">{binCount}</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={isExport ? 'flex flex-col gap-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}>
         {histograms.map((hist, idx) => (
           <div key={hist.name} className="p-3 bg-muted/30 rounded-lg">
             {/* Header */}
@@ -149,7 +155,7 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
 
                 {/* Histogram bars */}
                 {hist.bins.map((count, i) => {
-                  const barWidth = plotWidth / binCount;
+                  const barWidth = plotWidth / effectiveBinCount;
                   const barHeight = (hist.densities[i] / hist.maxDensity) * plotHeight;
                   return (
                     <rect
@@ -225,21 +231,23 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
         ))}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mt-4 text-xs font-mono text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-0.5 border-t-2 border-dashed border-foreground" />
-          <span>Mean</span>
+      {/* Legend - hide in export mode */}
+      {!isExport && (
+        <div className="flex items-center justify-center gap-6 mt-4 text-xs font-mono text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-0.5 border-t-2 border-dashed border-foreground" />
+            <span>Mean</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-0.5 border-t-2 border-dotted border-foreground" />
+            <span>Median</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-0.5 bg-foreground" />
+            <span>KDE</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-0.5 border-t-2 border-dotted border-foreground" />
-          <span>Median</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-0.5 bg-foreground" />
-          <span>KDE</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
