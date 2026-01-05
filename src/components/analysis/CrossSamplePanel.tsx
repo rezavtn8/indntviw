@@ -35,6 +35,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [blackAndWhite, setBlackAndWhite] = useState(false);
   const [groups, setGroups] = useState<SampleGroup[]>([]);
   const [groupingOpen, setGroupingOpen] = useState(false);
 
@@ -82,7 +83,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   return (
     <div className="h-full flex">
       {/* Left Sidebar - Sample Selection */}
-      <div className="w-72 border-r-2 border-border bg-card flex flex-col">
+      <div className="w-72 min-w-72 border-r-2 border-border bg-card flex flex-col overflow-hidden">
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-4">
             <h3 className="font-mono text-sm font-bold uppercase tracking-wider">
@@ -95,8 +96,8 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                 Property
               </Label>
               <Select value={selectedProperty} onValueChange={onPropertyChange}>
-                <SelectTrigger className="font-mono text-sm">
-                  <SelectValue />
+                <SelectTrigger className="font-mono text-sm w-full truncate">
+                  <SelectValue className="truncate" />
                 </SelectTrigger>
                 <SelectContent>
                   {propertyNames.map(prop => (
@@ -150,6 +151,10 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
               <div className="flex items-center justify-between">
                 <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
                 <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="font-mono text-xs cursor-pointer">B&W Mode</Label>
+                <Switch checked={blackAndWhite} onCheckedChange={setBlackAndWhite} />
               </div>
             </div>
           </div>
@@ -207,6 +212,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                       selectedProperty={selectedProperty}
                       showViolin={showViolin}
                       showJitter={showJitter}
+                      blackAndWhite={blackAndWhite}
                     />
                   </>
                 )}

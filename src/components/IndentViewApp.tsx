@@ -25,7 +25,8 @@ import { FileTabs } from '@/components/FileTabs';
 import { AppLayout, ViewSidebar, ContextPanel, AppToolbar } from '@/components/layout';
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
-import { Edit3, Plus, Undo2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Edit3, Plus, Undo2, ChevronDown } from 'lucide-react';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
@@ -136,7 +137,15 @@ export const IndentViewApp: React.FC = () => {
               />
             )}
             
-            <ColorLegend selectedProperty={selectedProperty} unit={getPropertyUnit(selectedProperty)} colorScheme={colorScheme} minValue={currentMin} maxValue={currentMax} />
+            <Collapsible defaultOpen={false}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                <span className="font-mono text-xs uppercase font-medium">Color Scale</span>
+                <ChevronDown className="w-4 h-4" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-3">
+                <ColorLegend selectedProperty={selectedProperty} unit={getPropertyUnit(selectedProperty)} colorScheme={colorScheme} minValue={currentMin} maxValue={currentMax} />
+              </CollapsibleContent>
+            </Collapsible>
             
             {isEditing && (
               <OutlierDetector points={data.points} selectedProperty={selectedProperty} onRemoveOutliers={handleRemoveOutliers} onHighlightOutliers={handleHighlightOutliers} />
