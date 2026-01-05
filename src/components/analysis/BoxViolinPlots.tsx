@@ -9,7 +9,18 @@ interface BoxViolinPlotsProps {
   showJitter?: boolean;
   showPValueAsterisks?: boolean;
   isExport?: boolean;
+  blackAndWhite?: boolean;
 }
+
+// B&W patterns for grayscale printing
+const BW_STYLES = [
+  { fill: '#000000', fillOpacity: 0.1, stroke: '#000000', pattern: 'none' },
+  { fill: '#000000', fillOpacity: 0.3, stroke: '#000000', pattern: 'none' },
+  { fill: '#000000', fillOpacity: 0.5, stroke: '#000000', pattern: 'none' },
+  { fill: '#ffffff', fillOpacity: 1, stroke: '#000000', pattern: 'stripe' },
+  { fill: '#ffffff', fillOpacity: 1, stroke: '#000000', pattern: 'dots' },
+  { fill: '#000000', fillOpacity: 0.7, stroke: '#000000', pattern: 'none' },
+];
 
 // Get p-value significance asterisks
 const getPValueAsterisks = (pValue: number): string => {
@@ -19,6 +30,9 @@ const getPValueAsterisks = (pValue: number): string => {
   return 'ns';
 };
 
+// Get B&W style for a given index
+const getBWStyle = (idx: number) => BW_STYLES[idx % BW_STYLES.length];
+
 export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   data,
   selectedProperty,
@@ -26,6 +40,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   showJitter = true,
   showPValueAsterisks = false,
   isExport = false,
+  blackAndWhite = false,
 }) => {
   const getPropertyUnit = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -206,6 +221,15 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
       <div className={isExport ? '' : 'overflow-x-auto'}>
         <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={fontStyle}>
+          {/* SVG Pattern definitions for B&W mode */}
+          <defs>
+            <pattern id="bw-stripe" patternUnits="userSpaceOnUse" width="4" height="4">
+              <path d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2" stroke="#000" strokeWidth="0.5"/>
+            </pattern>
+            <pattern id="bw-dots" patternUnits="userSpaceOnUse" width="4" height="4">
+              <circle cx="2" cy="2" r="1" fill="#000"/>
+            </pattern>
+          </defs>
           {/* Y-axis with nice ticks */}
           <g>
             {niceTicks.map(value => {
@@ -268,7 +292,16 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
             const meanY = valueToY(stats.mean);
             const whiskerLow = valueToY(Math.max(stats.min, stats.q1 - 1.5 * stats.iqr));
             const whiskerHigh = valueToY(Math.min(stats.max, stats.q3 + 1.5 * stats.iqr));
-            const labelY = topMargin + plotHeight + 25; // Position labels below plot area
+            const labelY = topMargin + plotHeight + 25;
+
+            // Get colors based on B&W mode
+            const bwStyle = getBWStyle(idx);
+            const boxFill = blackAndWhite 
+              ? (bwStyle.pattern === 'stripe' ? 'url(#bw-stripe)' : bwStyle.pattern === 'dots' ? 'url(#bw-dots)' : bwStyle.fill)
+              : color;
+            const boxFillOpacity = blackAndWhite ? bwStyle.fillOpacity : 0.3;
+            const strokeColor = blackAndWhite ? '#000000' : color;
+            const pointColor = blackAndWhite ? '#333333' : color;
 
             return (
               <g key={name}>
@@ -276,9 +309,9 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                 {showViolin && (
                   <path
                     d={getViolinPath(values, centerX, boxWidth * 1.5)}
-                    fill={color}
-                    fillOpacity={0.15}
-                    stroke={color}
+                    fill={blackAndWhite ? '#888888' : color}
+                    fillOpacity={blackAndWhite ? 0.1 : 0.15}
+                    stroke={strokeColor}
                     strokeOpacity={0.3}
                   />
                 )}
@@ -290,16 +323,16 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                     cx={pt.x}
                     cy={pt.y}
                     r={2}
-                    fill={color}
-                    fillOpacity={0.4}
+                    fill={pointColor}
+                    fillOpacity={blackAndWhite ? 0.5 : 0.4}
                   />
                 ))}
 
                 {/* Whiskers */}
-                <line x1={centerX} y1={whiskerHigh} x2={centerX} y2={q3Y} stroke={color} strokeWidth={1.5} />
-                <line x1={centerX} y1={q1Y} x2={centerX} y2={whiskerLow} stroke={color} strokeWidth={1.5} />
-                <line x1={centerX - 10} y1={whiskerHigh} x2={centerX + 10} y2={whiskerHigh} stroke={color} strokeWidth={1.5} />
-                <line x1={centerX - 10} y1={whiskerLow} x2={centerX + 10} y2={whiskerLow} stroke={color} strokeWidth={1.5} />
+                <line x1={centerX} y1={whiskerHigh} x2={centerX} y2={q3Y} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={centerX} y1={q1Y} x2={centerX} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={centerX - 10} y1={whiskerHigh} x2={centerX + 10} y2={whiskerHigh} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={centerX - 10} y1={whiskerLow} x2={centerX + 10} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
 
                 {/* Box */}
                 <rect
@@ -307,9 +340,9 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                   y={q3Y}
                   width={boxWidth}
                   height={q1Y - q3Y}
-                  fill={color}
-                  fillOpacity={0.3}
-                  stroke={color}
+                  fill={boxFill}
+                  fillOpacity={boxFillOpacity}
+                  stroke={strokeColor}
                   strokeWidth={2}
                 />
 
@@ -319,15 +352,15 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                   y1={medianY}
                   x2={centerX + boxWidth / 2}
                   y2={medianY}
-                  stroke={color}
+                  stroke={strokeColor}
                   strokeWidth={3}
                 />
 
                 {/* Mean diamond */}
                 <polygon
                   points={`${centerX},${meanY - 4} ${centerX + 4},${meanY} ${centerX},${meanY + 4} ${centerX - 4},${meanY}`}
-                  fill="hsl(var(--background))"
-                  stroke={color}
+                  fill={blackAndWhite ? '#ffffff' : 'hsl(var(--background))'}
+                  stroke={strokeColor}
                   strokeWidth={2}
                 />
 
