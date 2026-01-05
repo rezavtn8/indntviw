@@ -134,21 +134,23 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   }, [globalMin, range]);
 
   const boxWidth = 40;
-  const groupWidth = 80;
-  const svgWidth = Math.max(400, data.length * groupWidth + 80);
-  const svgHeight = showPValueAsterisks && pairwiseResults.length > 0 ? 360 : 320;
+  const groupWidth = 100; // Increased for better spacing
+  const leftPadding = 70;
+  const rightPadding = 60;
+  const svgWidth = Math.max(450, data.length * groupWidth + leftPadding + rightPadding);
+  const svgHeight = showPValueAsterisks && pairwiseResults.length > 0 ? 380 : 340;
 
   return (
-    <div className="border-2 border-border rounded-lg p-4">
+    <div className="border-2 border-border rounded-lg p-4" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <div className="mb-4">
-        <h4 className="font-mono text-sm font-bold uppercase tracking-wider">
+        <h4 className="font-mono text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
           Box Plot Comparison
           {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
         </h4>
       </div>
 
       <div className="overflow-x-auto">
-        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
           {/* Y-axis */}
           <g>
             {[0, 0.25, 0.5, 0.75, 1].map(frac => {
@@ -167,8 +169,8 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
           {/* P-value brackets and asterisks */}
           {showPValueAsterisks && pairwiseResults.map((result, idx) => {
-            const centerX1 = 80 + result.i * groupWidth + groupWidth / 2;
-            const centerX2 = 80 + result.j * groupWidth + groupWidth / 2;
+            const centerX1 = leftPadding + result.i * groupWidth + groupWidth / 2;
+            const centerX2 = leftPadding + result.j * groupWidth + groupWidth / 2;
             const bracketY = 8 - idx * 18; // Stack multiple brackets
             const midX = (centerX1 + centerX2) / 2;
             
@@ -199,7 +201,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
           {/* Box plots */}
           {data.map((d, idx) => {
-            const centerX = 80 + idx * groupWidth + groupWidth / 2;
+            const centerX = leftPadding + idx * groupWidth + groupWidth / 2;
             const { stats, values, color, name } = d;
             
             if (values.length === 0) return null;
@@ -275,21 +277,21 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                 {/* Label */}
                 <text
                   x={centerX}
-                  y={240}
+                  y={250}
                   textAnchor="end"
-                  transform={`rotate(-45, ${centerX}, 240)`}
+                  transform={`rotate(-45, ${centerX}, 250)`}
                   className="fill-foreground"
-                  style={{ fontSize: '11px', fontWeight: 'bold' }}
+                  style={{ fontSize: '11px', fontWeight: 'bold', fontFamily: 'Arial, Helvetica, sans-serif' }}
                 >
-                  {name}
+                  {name.length > 20 ? name.slice(0, 17) + '...' : name}
                 </text>
                 <text
                   x={centerX}
-                  y={260}
+                  y={270}
                   textAnchor="end"
-                  transform={`rotate(-45, ${centerX}, 260)`}
+                  transform={`rotate(-45, ${centerX}, 270)`}
                   className="fill-muted-foreground"
-                  style={{ fontSize: '10px' }}
+                  style={{ fontSize: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}
                 >
                   n={stats.n}
                 </text>

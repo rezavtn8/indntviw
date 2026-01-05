@@ -66,6 +66,7 @@ export const ComprehensiveBatchExport: React.FC<ComprehensiveBatchExportProps> =
       crossSampleTests: true,
       treatmentGroups: groups.length >= 2,
       smartZones: true,
+      smartZonesPooled: true,
       smartZonesCrossComparison: true,
       smartZonesPerZone: true,
       smartZonesTests: true
@@ -89,23 +90,27 @@ export const ComprehensiveBatchExport: React.FC<ComprehensiveBatchExportProps> =
     
     // Smart zones: zones that appear in multiple samples with same name
     const zoneNameCounts = new Map<string, number>();
+    const allZoneNames = new Set<string>();
     for (const session of fileSessions) {
       for (const zone of session.zones) {
         zoneNameCounts.set(zone.name, (zoneNameCounts.get(zone.name) || 0) + 1);
+        allZoneNames.add(zone.name);
       }
     }
     const smartZoneNames = Array.from(zoneNameCounts.entries()).filter(([, c]) => c >= 2).map(([name]) => name);
+    const uniqueZoneCount = allZoneNames.size;
 
     return {
       sampleCount: samplesWithData.length,
       samplesWithZonesCount: samplesWithZones.length,
       totalZones,
+      uniqueZoneCount,
       groupCount: groups.length,
       smartZoneNames,
       smartZoneCount: smartZoneNames.length,
       canCrossSample: samplesWithData.length >= 2,
       canTreatmentGroups: groups.length >= 2,
-      canSmartZones: smartZoneNames.length >= 1
+      canSmartZones: uniqueZoneCount >= 1 // At least 1 zone exists anywhere
     };
   }, [fileSessions, groups]);
 
@@ -125,6 +130,7 @@ export const ComprehensiveBatchExport: React.FC<ComprehensiveBatchExportProps> =
       count += 1;
     }
     if (includeSections.smartZones && availability.canSmartZones) {
+      if (includeSections.smartZonesPooled) count += 1;
       if (includeSections.smartZonesCrossComparison) count += 1;
       if (includeSections.smartZonesPerZone) count += availability.smartZoneCount;
     }
@@ -473,8 +479,10 @@ export const ComprehensiveBatchExport: React.FC<ComprehensiveBatchExportProps> =
                       </CardTitle>
                       <CardDescription>
                         {availability.canSmartZones 
-                          ? `${availability.smartZoneCount} zones appear in multiple samples: ${availability.smartZoneNames.slice(0, 3).join(', ')}${availability.smartZoneNames.length > 3 ? '...' : ''}`
-                          : 'No matching zone names found across samples'}
+                          ? availability.smartZoneCount >= 1
+                            ? `${availability.smartZoneCount} zones in multiple samples, ${availability.uniqueZoneCount} unique zones total`
+                            : `${availability.uniqueZoneCount} unique zone(s) available for pooled comparison`
+                          : 'No zones defined in any sample'}
                       </CardDescription>
                     </div>
                   </div>
@@ -484,10 +492,17 @@ export const ComprehensiveBatchExport: React.FC<ComprehensiveBatchExportProps> =
                     <div className="space-y-2">
                       <label className="flex items-center space-x-2 cursor-pointer">
                         <Checkbox
+                          checked={options.includeSections.smartZonesPooled}
+                          onCheckedChange={v => updateSection('smartZonesPooled', !!v)}
+                        />
+                        <span className="text-sm">Pooled zone comparison (Zone 1 vs Zone 2 combined)</span>
+                      </label>
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <Checkbox
                           checked={options.includeSections.smartZonesCrossComparison}
                           onCheckedChange={v => updateSection('smartZonesCrossComparison', !!v)}
                         />
-                        <span className="text-sm">Cross-zone comparison (all zones aggregated)</span>
+                        <span className="text-sm">Cross-zone comparison (multi-sample zones)</span>
                       </label>
                       <label className="flex items-center space-x-2 cursor-pointer">
                         <Checkbox
