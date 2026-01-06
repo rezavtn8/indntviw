@@ -187,8 +187,8 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
         </div>
       )}
 
-      <div className={isExport ? '' : 'overflow-x-auto'}>
-        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={fontStyle}>
+      <div className={isExport ? '' : 'overflow-x-auto'} style={isExport ? { width: svgWidth } : undefined}>
+        <svg width={svgWidth} height={svgHeight} className="block" style={{ ...fontStyle, display: 'block' }}>
           {/* SVG Pattern definitions for B&W mode */}
           <defs>
             <pattern id="bw-stripe-cs" patternUnits="userSpaceOnUse" width="4" height="4">

@@ -193,7 +193,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
       x: centerX + (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
       y: valueToY(v),
     }));
-  }, [niceMin, niceRange, topMargin]);
+  }, [niceMin, niceMax, niceRange, topMargin, plotHeight]);
 
   const boxWidth = 40;
   const groupWidth = 100;
@@ -219,8 +219,8 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
         </div>
       )}
 
-      <div className={isExport ? '' : 'overflow-x-auto'}>
-        <svg width={svgWidth} height={svgHeight} className="block mx-auto" style={fontStyle}>
+      <div className={isExport ? '' : 'overflow-x-auto'} style={isExport ? { width: svgWidth } : undefined}>
+        <svg width={svgWidth} height={svgHeight} className="block" style={{ ...fontStyle, display: 'block' }}>
           {/* SVG Pattern definitions for B&W mode */}
           <defs>
             <pattern id="bw-stripe" patternUnits="userSpaceOnUse" width="4" height="4">

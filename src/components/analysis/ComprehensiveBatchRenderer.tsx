@@ -252,14 +252,13 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
 
     const { includeSections } = options;
 
-    // Dynamic chart wrapper - fits content, with minimum width
+    // Dynamic chart wrapper - inline-block ensures proper sizing for html2canvas
     const chartWrapperStyle: React.CSSProperties = {
       fontFamily: 'Arial, Helvetica, sans-serif',
       backgroundColor: '#ffffff',
       padding: '24px',
-      minWidth: '600px',
-      width: 'fit-content',
-      maxWidth: '1600px'
+      display: 'inline-block',
+      minWidth: '600px'
     };
 
     const chartTitleStyle: React.CSSProperties = {
