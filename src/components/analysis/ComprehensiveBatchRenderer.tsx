@@ -277,7 +277,16 @@ export const ComprehensiveBatchRenderer = forwardRef<ComprehensiveBatchRendererR
     };
 
     return (
-      <div className="absolute left-[-9999px] top-0" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      <div 
+        className="fixed left-0 top-0 pointer-events-none" 
+        style={{ 
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          opacity: 0,
+          zIndex: -1,
+          width: 'max-content',
+          overflow: 'visible'
+        }}
+      >
         {/* ===== SECTION 1: Per-Sample Distribution Charts ===== */}
         {includeSections.perSample && includeSections.perSampleDistribution && 
           sampleData.map(sample => (
