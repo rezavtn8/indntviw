@@ -186,14 +186,14 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     return x - Math.floor(x);
   };
 
-  // Generate jittered points with stable positions
-  const getJitteredPoints = useMemo(() => (values: number[], centerX: number, width: number, groupIndex: number): { x: number; y: number }[] => {
-    const maxJitter = width * 0.3;
+  // Generate jittered points - computed inline to ensure consistent positioning
+  const getJitteredPoints = (values: number[], centerX: number, jitterWidth: number, groupIndex: number): { x: number; y: number }[] => {
+    const maxJitter = jitterWidth * 0.3;
     return values.slice(0, 100).map((v, i) => ({
       x: centerX + (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
       y: valueToY(v),
     }));
-  }, [niceMin, niceMax, niceRange, topMargin, plotHeight]);
+  };
 
   const boxWidth = 40;
   const groupWidth = 100;
