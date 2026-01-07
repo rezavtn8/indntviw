@@ -205,6 +205,9 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
   const fontStyle: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
 
+  // Single source of truth for x-coordinate per group - ALL layers must use this
+  const getCenterX = (idx: number): number => leftPadding + idx * groupWidth + groupWidth / 2;
+
   return (
     <div 
       className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} 
@@ -247,8 +250,8 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
           {/* P-value brackets and asterisks - positioned in bracket area */}
           {showPValueAsterisks && pairwiseResults.map((result, idx) => {
-            const centerX1 = leftPadding + result.i * groupWidth + groupWidth / 2;
-            const centerX2 = leftPadding + result.j * groupWidth + groupWidth / 2;
+            const centerX1 = getCenterX(result.i);
+            const centerX2 = getCenterX(result.j);
             // Position brackets within the bracket area, from top down
             const bracketY = bracketTopPadding + idx * bracketRowHeight;
             const midX = (centerX1 + centerX2) / 2;
@@ -281,7 +284,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
           {/* Box plots */}
           {data.map((d, idx) => {
-            const centerX = leftPadding + idx * groupWidth + groupWidth / 2;
+            const centerX = getCenterX(idx);
             const { stats, values, color, name } = d;
             
             if (values.length === 0) return null;

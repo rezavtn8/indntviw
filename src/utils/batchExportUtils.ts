@@ -66,7 +66,11 @@ export async function captureChartElement(
     logging: false,
     useCORS: true,
     allowTaint: false,
-    imageTimeout: 0
+    imageTimeout: 0,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: document.documentElement.clientWidth,
+    windowHeight: document.documentElement.clientHeight
   });
   
   return {
