@@ -11,14 +11,14 @@ import { DistributionPlots } from '@/components/analysis/DistributionPlots';
 import { CorrelationAnalysis } from '@/components/analysis/CorrelationAnalysis';
 import { AnalysisExport } from '@/components/analysis/AnalysisExport';
 import { CrossSamplePanel } from '@/components/analysis/CrossSamplePanel';
-import { ComprehensiveBatchExport } from '@/components/analysis/ComprehensiveBatchExport';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart3, TrendingUp, Layers, GitCompare, Download, FileStack, Package } from 'lucide-react';
+import { BarChart3, TrendingUp, Layers, GitCompare, Download, FileStack } from 'lucide-react';
 
 interface AnalysisPanelProps {
   zones: Zone[];
@@ -96,8 +96,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
     setSelectedZoneIds([]);
   };
 
-  const [analysisMode, setAnalysisMode] = useState<'single' | 'cross' | 'batch'>('single');
-  const [groups, setGroups] = useState<{ id: string; name: string; color: string; sessionIds: string[] }[]>([]);
+  const [analysisMode, setAnalysisMode] = useState<'single' | 'cross'>('single');
 
   // Show cross-sample tab only if multiple files
   const showCrossSample = fileSessions.length > 1;
@@ -131,33 +130,11 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
               Cross-Sample
             </button>
           )}
-          <button
-            onClick={() => setAnalysisMode('batch')}
-            className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
-              analysisMode === 'batch'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            Batch Export
-          </button>
         </div>
       </div>
 
-      {/* Batch Export Mode */}
-      {analysisMode === 'batch' ? (
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ComprehensiveBatchExport
-            fileSessions={fileSessions}
-            selectedProperty={selectedProperty}
-            propertyNames={propertyNames}
-            onPropertyChange={onPropertyChange}
-            groups={groups}
-          />
-        </div>
-      ) : /* Cross-Sample Analysis */
-      analysisMode === 'cross' && showCrossSample ? (
+      {/* Cross-Sample Analysis */}
+      {analysisMode === 'cross' && showCrossSample ? (
         <div className="flex-1 min-h-0 overflow-hidden">
           <CrossSamplePanel
             fileSessions={fileSessions}

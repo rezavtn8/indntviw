@@ -21,15 +21,17 @@ import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
 import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
 import { Spatial3DPanel } from '@/components/analysis/Spatial3DPanel';
+import { ComprehensiveBatchExport } from '@/components/analysis/ComprehensiveBatchExport';
 import { FileTabs } from '@/components/FileTabs';
 import { AppLayout, ViewSidebar, ContextPanel, AppToolbar } from '@/components/layout';
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Edit3, Plus, Undo2, ChevronDown } from 'lucide-react';
+import { Edit3, Plus, Undo2, ChevronDown, Image, Package } from 'lucide-react';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
+  const [exportMode, setExportMode] = useState<'figure' | 'batch'>('figure');
   const visualizationRef = useRef<HTMLDivElement>(null);
 
   // Context hooks
@@ -97,7 +99,12 @@ export const IndentViewApp: React.FC = () => {
 
   // Render sidebar controls based on active view
   const renderSidebarControls = () => {
-    if (activeView === 'analysis') return null; // Analysis has its own controls
+    if (activeView === 'analysis') return null;
+    
+    // For export view with batch mode, show minimal controls
+    if (activeView === 'export' && exportMode === 'batch') {
+      return null; // Batch export has its own full-screen interface
+    }
     
     return (
       <>
@@ -130,7 +137,7 @@ export const IndentViewApp: React.FC = () => {
               />
             )}
 
-            {activeView === 'export' && (
+            {activeView === 'export' && exportMode === 'figure' && (
               <ExportOptionsPanel 
                 settings={exportSettings} onSettingsChange={setExportSettings}
                 onExport={handleExport} isExporting={isExporting} dataBounds={dataBounds} 
@@ -182,7 +189,7 @@ export const IndentViewApp: React.FC = () => {
       );
     }
     
-    if (activeView === 'export') {
+    if (activeView === 'export' && exportMode === 'figure') {
       return (
         <AppToolbar>
           <ZoneToolbar 
@@ -198,6 +205,40 @@ export const IndentViewApp: React.FC = () => {
     }
     
     return null;
+  };
+
+  // Render export mode tabs
+  const renderExportModeTabs = () => {
+    if (activeView !== 'export') return null;
+    
+    return (
+      <div className="border-b-2 border-border bg-card px-4 py-2">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setExportMode('figure')}
+            className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
+              exportMode === 'figure'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            <Image className="w-4 h-4" />
+            Figure Export
+          </button>
+          <button
+            onClick={() => setExportMode('batch')}
+            className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
+              exportMode === 'batch'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Batch Export
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // Render context panel based on active view
@@ -221,7 +262,7 @@ export const IndentViewApp: React.FC = () => {
       );
     }
     
-    if (activeView === 'export') {
+    if (activeView === 'export' && exportMode === 'figure') {
       return (
         <ContextPanel title="Zones">
           <ZonePanel 
@@ -250,6 +291,20 @@ export const IndentViewApp: React.FC = () => {
     }
     
     if (activeView === 'export') {
+      if (exportMode === 'batch') {
+        return (
+          <div className="h-full border border-border bg-card overflow-hidden">
+            <ComprehensiveBatchExport
+              fileSessions={fileSessions}
+              selectedProperty={selectedProperty}
+              propertyNames={data?.propertyNames || []}
+              onPropertyChange={handlePropertyChange}
+              groups={[]}
+            />
+          </div>
+        );
+      }
+      
       return (
         <div className="h-full overflow-hidden">
           <ExportCanvas 
@@ -333,6 +388,7 @@ export const IndentViewApp: React.FC = () => {
           {renderSidebarControls()}
         </ViewSidebar>
       }
+      modeTabs={renderExportModeTabs()}
       toolbar={renderToolbar()}
       contextPanel={renderContextPanel()}
       footer={
