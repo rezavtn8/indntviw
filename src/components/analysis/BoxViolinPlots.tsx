@@ -286,7 +286,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           {data.map((d, idx) => {
             const centerX = getCenterX(idx);
             const { stats, values, color, name } = d;
-            
+
             if (values.length === 0) return null;
 
             const q1Y = valueToY(stats.q1);
@@ -299,19 +299,25 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
             // Get colors based on B&W mode
             const bwStyle = getBWStyle(idx);
-            const boxFill = blackAndWhite 
-              ? (bwStyle.pattern === 'stripe' ? 'url(#bw-stripe)' : bwStyle.pattern === 'dots' ? 'url(#bw-dots)' : bwStyle.fill)
+            const boxFill = blackAndWhite
+              ? (bwStyle.pattern === 'stripe'
+                  ? 'url(#bw-stripe)'
+                  : bwStyle.pattern === 'dots'
+                    ? 'url(#bw-dots)'
+                    : bwStyle.fill)
               : color;
             const boxFillOpacity = blackAndWhite ? bwStyle.fillOpacity : 0.3;
             const strokeColor = blackAndWhite ? '#000000' : color;
             const pointColor = blackAndWhite ? '#333333' : color;
 
+            // IMPORTANT: Apply a single translate() transform per group so html2canvas
+            // cannot introduce layer-specific x-offset rounding across primitives.
             return (
-              <g key={name}>
+              <g key={name} transform={`translate(${centerX} 0)`}>
                 {/* Violin (if enabled) */}
                 {showViolin && (
                   <path
-                    d={getViolinPath(values, centerX, boxWidth * 1.5)}
+                    d={getViolinPath(values, 0, boxWidth * 1.5)}
                     fill={blackAndWhite ? '#888888' : color}
                     fillOpacity={blackAndWhite ? 0.1 : 0.15}
                     stroke={strokeColor}
@@ -320,26 +326,27 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
                 )}
 
                 {/* Jittered points (if enabled) */}
-                {showJitter && getJitteredPoints(values, centerX, boxWidth, idx).map((pt, i) => (
-                  <circle
-                    key={i}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={2}
-                    fill={pointColor}
-                    fillOpacity={blackAndWhite ? 0.5 : 0.4}
-                  />
-                ))}
+                {showJitter &&
+                  getJitteredPoints(values, 0, boxWidth, idx).map((pt, i) => (
+                    <circle
+                      key={i}
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={2}
+                      fill={pointColor}
+                      fillOpacity={blackAndWhite ? 0.5 : 0.4}
+                    />
+                  ))}
 
                 {/* Whiskers */}
-                <line x1={centerX} y1={whiskerHigh} x2={centerX} y2={q3Y} stroke={strokeColor} strokeWidth={1.5} />
-                <line x1={centerX} y1={q1Y} x2={centerX} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
-                <line x1={centerX - 10} y1={whiskerHigh} x2={centerX + 10} y2={whiskerHigh} stroke={strokeColor} strokeWidth={1.5} />
-                <line x1={centerX - 10} y1={whiskerLow} x2={centerX + 10} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={0} y1={whiskerHigh} x2={0} y2={q3Y} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={0} y1={q1Y} x2={0} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={-10} y1={whiskerHigh} x2={10} y2={whiskerHigh} stroke={strokeColor} strokeWidth={1.5} />
+                <line x1={-10} y1={whiskerLow} x2={10} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
 
                 {/* Box */}
                 <rect
-                  x={centerX - boxWidth / 2}
+                  x={-boxWidth / 2}
                   y={q3Y}
                   width={boxWidth}
                   height={q1Y - q3Y}
@@ -351,9 +358,9 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
                 {/* Median line */}
                 <line
-                  x1={centerX - boxWidth / 2}
+                  x1={-boxWidth / 2}
                   y1={medianY}
-                  x2={centerX + boxWidth / 2}
+                  x2={boxWidth / 2}
                   y2={medianY}
                   stroke={strokeColor}
                   strokeWidth={3}
@@ -361,7 +368,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
                 {/* Mean diamond */}
                 <polygon
-                  points={`${centerX},${meanY - 4} ${centerX + 4},${meanY} ${centerX},${meanY + 4} ${centerX - 4},${meanY}`}
+                  points={`0,${meanY - 4} 4,${meanY} 0,${meanY + 4} -4,${meanY}`}
                   fill={blackAndWhite ? '#ffffff' : 'hsl(var(--background))'}
                   stroke={strokeColor}
                   strokeWidth={2}
@@ -369,20 +376,20 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
 
                 {/* Label */}
                 <text
-                  x={centerX}
+                  x={0}
                   y={labelY}
                   textAnchor="end"
-                  transform={`rotate(-45, ${centerX}, ${labelY})`}
+                  transform={`rotate(-45, 0, ${labelY})`}
                   className="fill-foreground"
                   style={{ fontSize: '11px', fontWeight: 'bold', ...fontStyle }}
                 >
                   {name.length > 20 ? name.slice(0, 17) + '...' : name}
                 </text>
                 <text
-                  x={centerX}
+                  x={0}
                   y={labelY + 18}
                   textAnchor="end"
-                  transform={`rotate(-45, ${centerX}, ${labelY + 18})`}
+                  transform={`rotate(-45, 0, ${labelY + 18})`}
                   className="fill-muted-foreground"
                   style={{ fontSize: '10px', ...fontStyle }}
                 >
