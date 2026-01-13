@@ -6,6 +6,7 @@ interface AppLayoutProps {
   fileTabs: React.ReactNode;
   sidebar: React.ReactNode;
   toolbar?: React.ReactNode;
+  modeTabs?: React.ReactNode;
   contextPanel?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -18,6 +19,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   fileTabs,
   sidebar,
   toolbar,
+  modeTabs,
   contextPanel,
   children,
   footer,
@@ -52,6 +54,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
+          {/* Mode Tabs (e.g., Figure/Batch export toggle) */}
+          {modeTabs}
+
           {/* Toolbar */}
           {toolbar}
 
