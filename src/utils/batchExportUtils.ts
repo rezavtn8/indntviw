@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import { FileSession } from '@/types/fileSession';
 import { getPropertyValues } from '@/utils/advancedStatistics';
+import { replaceSvgsWithImages } from '@/utils/svgRasterize';
 
 export interface BatchExportOptions {
   title: string;
@@ -21,7 +22,7 @@ export interface BatchExportOptions {
     crossSampleTests: boolean;
     treatmentGroups: boolean;
     smartZones: boolean;
-    smartZonesPooled: boolean;        // NEW: Zone 1 pooled vs Zone 2 pooled
+    smartZonesPooled: boolean;
     smartZonesCrossComparison: boolean;
     smartZonesPerZone: boolean;
     smartZonesTests: boolean;
@@ -54,30 +55,71 @@ const QUALITY_SCALE: Record<string, number> = {
   publication: 4.17  // ~300 DPI
 };
 
+/**
+ * Capture a chart element by first rasterizing all SVGs to images,
+ * then using html2canvas on the resulting DOM.
+ * 
+ * This eliminates html2canvas SVG rendering inconsistencies that cause
+ * layer misalignment at high DPI scales.
+ */
 export async function captureChartElement(
   element: HTMLElement,
   quality: 'screen' | 'print' | 'publication' = 'publication'
 ): Promise<{ dataUrl: string; width: number; height: number }> {
   const scale = QUALITY_SCALE[quality] || QUALITY_SCALE.publication;
   
-  const canvas = await html2canvas(element, {
-    scale,
-    backgroundColor: '#ffffff',
-    logging: false,
-    useCORS: true,
-    allowTaint: false,
-    imageTimeout: 0,
-    scrollX: 0,
-    scrollY: 0,
-    windowWidth: document.documentElement.clientWidth,
-    windowHeight: document.documentElement.clientHeight
-  });
+  // Create a temporary off-screen container
+  const tempContainer = document.createElement('div');
+  tempContainer.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: #ffffff;
+  `;
+  document.body.appendChild(tempContainer);
   
-  return {
-    dataUrl: canvas.toDataURL('image/png', 1.0),
-    width: canvas.width,
-    height: canvas.height
-  };
+  try {
+    // Clone the element into the temp container
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.style.display = 'inline-block';
+    clone.style.minWidth = '600px';
+    clone.style.background = '#ffffff';
+    tempContainer.appendChild(clone);
+    
+    // Wait for layout to settle
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    
+    // Pre-rasterize all SVG elements to images at the target scale
+    // This ensures all SVG layers are baked into single images with consistent alignment
+    await replaceSvgsWithImages(clone, scale);
+    
+    // Wait for images to load
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Now capture with html2canvas - it only sees IMG elements, no SVG interpretation
+    const canvas = await html2canvas(clone, {
+      scale: 1, // Already scaled in SVG rasterization
+      backgroundColor: '#ffffff',
+      logging: false,
+      useCORS: true,
+      allowTaint: false,
+      imageTimeout: 0,
+      scrollX: 0,
+      scrollY: 0,
+    });
+    
+    return {
+      dataUrl: canvas.toDataURL('image/png', 1.0),
+      width: canvas.width,
+      height: canvas.height
+    };
+  } finally {
+    // Cleanup
+    document.body.removeChild(tempContainer);
+  }
 }
 
 export async function generateBatchZIP(
