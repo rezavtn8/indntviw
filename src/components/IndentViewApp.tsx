@@ -62,7 +62,7 @@ export const IndentViewApp: React.FC = () => {
     isEditing, setIsEditing, editingPoint, setEditingPoint, isAddingPoint, setIsAddingPoint,
     selectedPoint, setSelectedPoint, hoveredPoint, setHoveredPoint,
     selectedPoints, hasChanges,
-    handleSavePoint, handleDeletePoint, handleAddNewPoint,
+    handleSavePoint, handleDeletePoint, handleQuickDelete, handleAddNewPoint,
     handleRemoveOutliers, handleResetData, handleExportSelected,
     handleSelectedPointIds, handleExportSelectedPointIds, handleHighlightOutliers,
   } = useEditor();
@@ -332,12 +332,18 @@ export const IndentViewApp: React.FC = () => {
     
     // Default: 2D view
     return (
-      <div ref={visualizationRef} className="w-full h-full max-h-[calc(100vh-180px)] border border-border bg-card">
+      <div ref={visualizationRef} className="w-full h-full max-h-[calc(100vh-180px)] border border-border bg-card relative">
+        {isEditing && (
+          <div className="absolute top-2 left-2 z-20 bg-destructive/90 text-destructive-foreground px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wide">
+            Edit Mode — Click point to delete
+          </div>
+        )}
         <Heatmap2D 
           points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
           minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} highlightedPoints={highlightedOutliers}
           selectedPointIds={selectedPointIds} showContours={showContours} showInterpolation={showInterpolation}
           drawingTool={heatmapDrawingTool} zones={zones} selectedZoneId={selectedZoneId}
+          isEditing={isEditing} onQuickDelete={handleQuickDelete}
           onPointSelect={setSelectedPoint} onPointHover={setHoveredPoint} onPointsSelected={handleSelectedPointIds} onZoneSelect={handleSelectZone} 
         />
       </div>

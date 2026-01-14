@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Download, Camera, FileText, FileSpreadsheet } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Camera, FileText, FileSpreadsheet, FileType } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { IndentationData } from '@/types/indentation';
 import { downloadCSV, downloadExcel, captureScreenshot, generatePDFReport } from '@/utils/exportUtils';
+import { exportToOriginalTxtFormat } from '@/utils/txtExport';
 import { toast } from 'sonner';
 
 interface ExportControlsProps {
@@ -24,6 +25,16 @@ export const ExportControls: React.FC<ExportControlsProps> = ({
   selectedProperty,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportTxt = () => {
+    if (!data) return;
+    try {
+      exportToOriginalTxtFormat(data, `indentation_data_${Date.now()}.txt`);
+      toast.success('TXT exported (original format)');
+    } catch (error) {
+      toast.error('Failed to export TXT');
+    }
+  };
 
   const handleExportCSV = () => {
     if (!data) return;
@@ -84,7 +95,12 @@ export const ExportControls: React.FC<ExportControlsProps> = ({
           Export
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={handleExportTxt} className="gap-2 cursor-pointer">
+          <FileType className="w-4 h-4" />
+          Save as TXT (Original Format)
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
           <FileText className="w-4 h-4" />
           Export as CSV

@@ -22,10 +22,12 @@ interface Heatmap2DProps {
   drawingTool?: DrawingTool;
   zones?: Zone[];
   selectedZoneId?: string | null;
+  isEditing?: boolean;
   onPointSelect: (point: IndentationPoint | null) => void;
   onPointHover: (point: IndentationPoint | null) => void;
   onPointsSelected?: (pointIds: number[]) => void;
   onZoneSelect?: (zoneId: string | null) => void;
+  onQuickDelete?: (pointId: number) => void;
 }
 
 interface ViewState {
@@ -48,10 +50,12 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   drawingTool = 'select',
   zones = [],
   selectedZoneId = null,
+  isEditing = false,
   onPointSelect,
   onPointHover,
   onPointsSelected,
   onZoneSelect,
+  onQuickDelete,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -148,6 +152,12 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   const handlePointClick = useCallback((e: React.MouseEvent, point: IndentationPoint) => {
     e.stopPropagation();
     
+    // In edit mode, click deletes the point
+    if (isEditing && onQuickDelete) {
+      onQuickDelete(point.id);
+      return;
+    }
+    
     // Never open point details when lasso or box tool is active
     if (drawingTool === 'lasso' || drawingTool === 'box') {
       return;
@@ -160,7 +170,7 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
         onPointSelect(selectedPoint?.id === point.id ? null : point);
       }
     }
-  }, [selectedPoint, onPointSelect, drawingTool, selectedPointIds]);
+  }, [selectedPoint, onPointSelect, drawingTool, selectedPointIds, isEditing, onQuickDelete]);
 
   // Transform contour coordinates to SVG space (using centered offsets)
   const transformPoint = useCallback((x: number, y: number) => ({
@@ -441,10 +451,10 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
 
   const transformStr = `translate(${viewState.translateX}, ${viewState.translateY}) scale(${viewState.scale})`;
   const zoomPercent = Math.round(viewState.scale * 100);
-  const cursor = drawingTool === 'select' ? 'cursor-default' : 'cursor-crosshair';
+  const cursor = isEditing ? 'cursor-crosshair' : drawingTool === 'select' ? 'cursor-default' : 'cursor-crosshair';
 
   return (
-    <div className="relative w-full h-full overflow-hidden flex items-center justify-center bg-card select-none">
+    <div className={`relative w-full h-full overflow-hidden flex items-center justify-center bg-card select-none ${isEditing ? 'ring-2 ring-destructive/50 ring-inset' : ''}`}>
       {/* Enhanced zoom controls */}
       <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-card/90 border border-border rounded p-1">
         <button
@@ -665,6 +675,20 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
             const isDrawingMode = drawingTool === 'lasso' || drawingTool === 'box';
             return (
               <g key={point.id}>
+                {/* Edit mode delete indicator */}
+                {isEditing && (
+                  <circle
+                    cx={point.cx}
+                    cy={point.cy}
+                    r={pointRadius + 4}
+                    fill="none"
+                    stroke="hsl(var(--destructive))"
+                    strokeWidth="1.5"
+                    strokeDasharray="2 2"
+                    opacity="0.6"
+                    className="pointer-events-none"
+                  />
+                )}
                 {/* Highlight ring for outliers */}
                 {point.isHighlighted && (
                   <circle
@@ -694,22 +718,24 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                   r={isPointSelected ? pointRadius * 1.3 : pointRadius}
                   fill={point.color}
                   stroke={
-                    point.isHighlighted 
-                      ? 'hsl(var(--destructive))' 
-                      : isPointSelected
-                        ? '#3b82f6'
-                        : selectedPoint?.id === point.id 
-                          ? 'hsl(var(--foreground))' 
-                          : '#374151'
+                    isEditing
+                      ? 'hsl(var(--destructive))'
+                      : point.isHighlighted 
+                        ? 'hsl(var(--destructive))' 
+                        : isPointSelected
+                          ? '#3b82f6'
+                          : selectedPoint?.id === point.id 
+                            ? 'hsl(var(--foreground))' 
+                            : '#374151'
                   }
-                  strokeWidth={selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5}
-                  style={{ pointerEvents: isDrawingMode ? 'none' : 'auto' }}
-                  className={isDrawingMode ? '' : 'cursor-pointer transition-all duration-150 hover:opacity-80'}
+                  strokeWidth={isEditing ? 1.5 : selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5}
+                  style={{ pointerEvents: isDrawingMode && !isEditing ? 'none' : 'auto' }}
+                  className={`${isEditing ? 'cursor-pointer hover:opacity-60' : isDrawingMode ? '' : 'cursor-pointer transition-all duration-150 hover:opacity-80'}`}
                   onClick={(e) => handlePointClick(e, point)}
                   onMouseEnter={() => !isDrawingMode && onPointHover(point)}
                   onMouseLeave={() => !isDrawingMode && onPointHover(null)}
                 />
-                {selectedPoint?.id === point.id && (
+                {selectedPoint?.id === point.id && !isEditing && (
                   <circle
                     cx={point.cx}
                     cy={point.cy}
