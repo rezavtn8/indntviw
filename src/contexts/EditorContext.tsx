@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { IndentationData, IndentationPoint } from '@/types/indentation';
 import { useSession } from './SessionContext';
 import { toast } from 'sonner';
+
+const MAX_UNDO_STACK = 30;
+
+interface HistoryEntry {
+  data: IndentationData;
+  description: string;
+}
 
 interface EditorContextValue {
   // State
@@ -20,11 +27,18 @@ interface EditorContextValue {
   selectedPoints: IndentationPoint[];
   hasChanges: boolean;
   
+  // Undo/Redo
+  canUndo: boolean;
+  canRedo: boolean;
+  handleUndo: () => void;
+  handleRedo: () => void;
+  
   // Actions
   handlePointEdit: (point: IndentationPoint) => void;
   handleSavePoint: (point: IndentationPoint) => void;
   handleDeletePoint: (pointId: number) => void;
   handleQuickDelete: (pointId: number) => void;
+  handleBulkDelete: (pointIds: number[]) => void;
   handleAddNewPoint: () => void;
   handleRemoveOutliers: (pointIds: number[]) => void;
   handleResetData: () => void;
@@ -38,13 +52,28 @@ interface EditorContextValue {
 const EditorContext = createContext<EditorContextValue | null>(null);
 
 export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data, originalData, selectedPointIds, exportSelectedPointIds, updateActiveSession } = useSession();
+  const { data, originalData, selectedPointIds, activeSessionId, updateActiveSession } = useSession();
   
   const [isEditing, setIsEditing] = useState(false);
   const [editingPoint, setEditingPoint] = useState<IndentationPoint | null>(null);
   const [isAddingPoint, setIsAddingPoint] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<IndentationPoint | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<IndentationPoint | null>(null);
+  
+  // Undo/Redo stacks - keyed by session ID
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const isUndoRedoAction = useRef(false);
+  const lastSessionId = useRef<string | null>(null);
+  
+  // Clear stacks when switching sessions
+  useEffect(() => {
+    if (activeSessionId !== lastSessionId.current) {
+      setUndoStack([]);
+      setRedoStack([]);
+      lastSessionId.current = activeSessionId;
+    }
+  }, [activeSessionId]);
 
   // Get selected points
   const selectedPoints = useMemo(() => {
@@ -58,6 +87,62 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (data.points.length !== originalData.points.length) return true;
     return data.points !== originalData.points;
   }, [data, originalData]);
+  
+  // Undo/Redo availability
+  const canUndo = undoStack.length > 0;
+  const canRedo = redoStack.length > 0;
+
+  // Push current state to undo stack before making changes
+  const pushToUndoStack = useCallback((description: string) => {
+    if (!data) return;
+    setUndoStack(prev => {
+      const newStack = [...prev, { data, description }];
+      return newStack.slice(-MAX_UNDO_STACK); // Limit stack size
+    });
+    setRedoStack([]); // Clear redo stack on new action
+  }, [data]);
+  
+  // Undo handler
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0 || !data) return;
+    
+    const lastEntry = undoStack[undoStack.length - 1];
+    isUndoRedoAction.current = true;
+    
+    // Push current state to redo stack
+    setRedoStack(prev => [...prev, { data, description: 'Redo' }]);
+    
+    // Pop from undo stack
+    setUndoStack(prev => prev.slice(0, -1));
+    
+    // Restore previous state
+    updateActiveSession({ data: lastEntry.data });
+    setSelectedPoint(null);
+    toast.success(`Undo: ${lastEntry.description}`);
+    
+    setTimeout(() => { isUndoRedoAction.current = false; }, 50);
+  }, [undoStack, data, updateActiveSession]);
+  
+  // Redo handler
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0 || !data) return;
+    
+    const lastEntry = redoStack[redoStack.length - 1];
+    isUndoRedoAction.current = true;
+    
+    // Push current state to undo stack
+    setUndoStack(prev => [...prev, { data, description: 'Redo action' }]);
+    
+    // Pop from redo stack
+    setRedoStack(prev => prev.slice(0, -1));
+    
+    // Restore redo state
+    updateActiveSession({ data: lastEntry.data });
+    setSelectedPoint(null);
+    toast.success('Redo applied');
+    
+    setTimeout(() => { isUndoRedoAction.current = false; }, 50);
+  }, [redoStack, data, updateActiveSession]);
 
   // Recalculate statistics
   const recalculateStatistics = useCallback((points: IndentationPoint[], propertyNames: string[]): IndentationData['statistics'] => {
@@ -106,6 +191,8 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleSavePoint = useCallback((updatedPoint: IndentationPoint) => {
     if (!data) return;
 
+    pushToUndoStack(isAddingPoint ? 'Add point' : 'Edit point');
+
     let newPoints: IndentationPoint[];
     
     if (isAddingPoint) {
@@ -124,10 +211,12 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSelectedPoint(updatedPoint);
     setEditingPoint(null);
     setIsAddingPoint(false);
-  }, [data, isAddingPoint, recalculateStatistics, updateActiveSession]);
+  }, [data, isAddingPoint, recalculateStatistics, updateActiveSession, pushToUndoStack]);
 
   const handleDeletePoint = useCallback((pointId: number) => {
     if (!data) return;
+
+    pushToUndoStack('Delete point');
 
     const newPoints = data.points
       .filter(p => p.id !== pointId)
@@ -142,7 +231,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateActiveSession({ data: newData });
     setSelectedPoint(null);
     setEditingPoint(null);
-  }, [data, recalculateStatistics, updateActiveSession]);
+  }, [data, recalculateStatistics, updateActiveSession, pushToUndoStack]);
 
   // Quick delete with toast feedback (for edit mode click-to-delete)
   const handleQuickDelete = useCallback((pointId: number) => {
@@ -150,6 +239,8 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const pointToDelete = data.points.find(p => p.id === pointId);
     if (!pointToDelete) return;
+
+    pushToUndoStack('Delete point');
 
     const newPoints = data.points
       .filter(p => p.id !== pointId)
@@ -164,7 +255,28 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateActiveSession({ data: newData, selectedPointIds: selectedPointIds.filter(id => id !== pointId) });
     setSelectedPoint(null);
     toast.success(`Point deleted (${pointToDelete.x.toFixed(2)}, ${pointToDelete.y.toFixed(2)})`);
-  }, [data, recalculateStatistics, updateActiveSession, selectedPointIds]);
+  }, [data, recalculateStatistics, updateActiveSession, selectedPointIds, pushToUndoStack]);
+
+  // Bulk delete multiple points at once
+  const handleBulkDelete = useCallback((pointIds: number[]) => {
+    if (!data || pointIds.length === 0) return;
+
+    pushToUndoStack(`Delete ${pointIds.length} points`);
+
+    const newPoints = data.points
+      .filter(p => !pointIds.includes(p.id))
+      .map((p, i) => ({ ...p, id: i }));
+
+    const newData: IndentationData = {
+      ...data,
+      points: newPoints,
+      statistics: recalculateStatistics(newPoints, data.propertyNames),
+    };
+
+    updateActiveSession({ data: newData, selectedPointIds: [] });
+    setSelectedPoint(null);
+    toast.success(`Deleted ${pointIds.length} points`);
+  }, [data, recalculateStatistics, updateActiveSession, pushToUndoStack]);
 
   const handleAddNewPoint = useCallback(() => {
     if (!data) return;
@@ -191,7 +303,9 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [data]);
 
   const handleRemoveOutliers = useCallback((pointIds: number[]) => {
-    if (!data) return;
+    if (!data || pointIds.length === 0) return;
+
+    pushToUndoStack(`Remove ${pointIds.length} outliers`);
 
     const newPoints = data.points
       .filter(p => !pointIds.includes(p.id))
@@ -205,7 +319,8 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     updateActiveSession({ data: newData, highlightedOutliers: [] });
     setSelectedPoint(null);
-  }, [data, recalculateStatistics, updateActiveSession]);
+    toast.success(`Removed ${pointIds.length} outliers`);
+  }, [data, recalculateStatistics, updateActiveSession, pushToUndoStack]);
 
   const handleResetData = useCallback(() => {
     if (originalData) {
@@ -272,10 +387,15 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setHoveredPoint,
     selectedPoints,
     hasChanges,
+    canUndo,
+    canRedo,
+    handleUndo,
+    handleRedo,
     handlePointEdit,
     handleSavePoint,
     handleDeletePoint,
     handleQuickDelete,
+    handleBulkDelete,
     handleAddNewPoint,
     handleRemoveOutliers,
     handleResetData,
