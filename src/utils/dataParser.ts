@@ -76,24 +76,40 @@ export function parseTabSeparatedData(content: string): IndentationData {
 
   // Find data rows (skip summary rows like Min, Max, Mean, etc.)
   const points: IndentationPoint[] = [];
-  const skipKeywords = ['Min', 'Max', 'Mean', 'Std dev', 'Median', 'N', 'Oliver', '3rd try'];
+  const skipKeywords = ['Min', 'Max', 'Mean', 'Std dev', 'Median', 'N', 'Oliver', '3rd try', 'Setting'];
   
   let id = 0;
   for (let i = headerLineIndex + 1; i < lines.length; i++) {
     const cells = lines[i].split('\t').map(c => c.trim());
-    const firstCell = cells[0] || cells[1] || '';
     
-    // Skip summary rows
-    if (skipKeywords.some(keyword => firstCell.includes(keyword))) {
+    // Get the first non-empty cell for checking
+    const firstCell = cells[0] || '';
+    const secondCell = cells[1] || '';
+    const checkCell = firstCell || secondCell;
+    
+    // Skip summary rows and metadata rows
+    if (skipKeywords.some(keyword => checkCell.includes(keyword))) {
       continue;
     }
     
-    // Check if this is a measurement row
-    if (firstCell.includes('Measurement') || !isNaN(parseFloat(cells[1]))) {
+    // Skip empty rows
+    if (cells.every(c => c === '')) {
+      continue;
+    }
+    
+    // Check if this is a measurement row - must start with "Measurement" 
+    // OR have the first cell be a number (row index)
+    // Also verify we have valid X and Y coordinates
+    const isMeasurementRow = firstCell.includes('Measurement') || 
+                              /^\d+$/.test(firstCell) ||
+                              (firstCell === '' && !isNaN(parseFloat(secondCell)) && !secondCell.includes('Setting'));
+    
+    if (isMeasurementRow) {
       const x = parseFloat(cells[xIdx]);
       const y = parseFloat(cells[yIdx]);
       const z = zIdx !== -1 ? parseFloat(cells[zIdx]) : 0;
       
+      // Skip if X or Y are not valid numbers
       if (isNaN(x) || isNaN(y)) continue;
       
       const properties: Record<string, number> = {};
