@@ -75,6 +75,13 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [activeSessionId]);
 
+  // Clear highlighted outliers when exiting edit mode
+  useEffect(() => {
+    if (!isEditing) {
+      updateActiveSession({ highlightedOutliers: [] });
+    }
+  }, [isEditing, updateActiveSession]);
+
   // Get selected points
   const selectedPoints = useMemo(() => {
     if (!data) return [];
