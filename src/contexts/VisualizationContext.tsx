@@ -63,7 +63,7 @@ interface VisualizationContextValue {
 const VisualizationContext = createContext<VisualizationContextValue | null>(null);
 
 export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data, selectedProperty, customMin, customMax, updateActiveSession } = useSession();
+  const { data, selectedProperty, customMin, customMax, setGlobalSelectedProperty, updateActiveSession } = useSession();
   
   // 2D Options
   const [showContours, setShowContours] = useState(true);
@@ -134,12 +134,14 @@ export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [data, dataBounds]);
 
   const handlePropertyChange = useCallback((property: string) => {
+    // Update global property (affects all tabs)
+    setGlobalSelectedProperty(property);
+    // Reset custom range for active session when property changes
     updateActiveSession({ 
-      selectedProperty: property, 
       customMin: null, 
       customMax: null 
     });
-  }, [updateActiveSession]);
+  }, [setGlobalSelectedProperty, updateActiveSession]);
 
   const handleColorSchemeChange = useCallback((scheme: ColorScheme) => {
     updateActiveSession({ colorScheme: scheme });
