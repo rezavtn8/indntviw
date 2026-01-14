@@ -12,10 +12,14 @@ interface SessionContextValue {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   
+  // Global settings (shared across all sessions)
+  globalSelectedProperty: string;
+  setGlobalSelectedProperty: (property: string) => void;
+  
   // Derived data
   data: IndentationData | null;
   originalData: IndentationData | null;
-  selectedProperty: string;
+  selectedProperty: string; // Now uses global
   colorScheme: FileSession['colorScheme'];
   customMin: number | null;
   customMax: number | null;
@@ -39,6 +43,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [fileSessions, setFileSessions] = useState<FileSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Global selected property (shared across all sessions)
+  const [globalSelectedProperty, setGlobalSelectedProperty] = useState<string>('HIT');
 
   // Get active session
   const activeSession = useMemo(() => 
@@ -49,7 +56,18 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Derived data from active session
   const data = activeSession?.data || null;
   const originalData = activeSession?.originalData || null;
-  const selectedProperty = activeSession?.selectedProperty || 'HIT';
+  
+  // Use global property, but fall back to first available if current property doesn't exist in this file
+  const selectedProperty = useMemo(() => {
+    if (!data) return globalSelectedProperty;
+    // Check if the global property exists in this file's data
+    if (data.propertyNames.includes(globalSelectedProperty)) {
+      return globalSelectedProperty;
+    }
+    // Fall back to first available property
+    return data.propertyNames[0] || 'HIT';
+  }, [data, globalSelectedProperty]);
+  
   const colorScheme = activeSession?.colorScheme || 'viridis';
   const customMin = activeSession?.customMin ?? null;
   const customMax = activeSession?.customMax ?? null;
@@ -118,6 +136,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     activeSession,
     isLoading,
     setIsLoading,
+    globalSelectedProperty,
+    setGlobalSelectedProperty,
     data,
     originalData,
     selectedProperty,
