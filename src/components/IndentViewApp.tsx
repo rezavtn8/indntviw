@@ -27,7 +27,7 @@ import { AppLayout, ViewSidebar, ContextPanel, AppToolbar } from '@/components/l
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Edit3, Plus, Undo2, ChevronDown, Image, Package } from 'lucide-react';
+import { Edit3, Plus, Undo2, Redo2, ChevronDown, Image, Package, Trash2 } from 'lucide-react';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
@@ -61,8 +61,8 @@ export const IndentViewApp: React.FC = () => {
   const {
     isEditing, setIsEditing, editingPoint, setEditingPoint, isAddingPoint, setIsAddingPoint,
     selectedPoint, setSelectedPoint, hoveredPoint, setHoveredPoint,
-    selectedPoints, hasChanges,
-    handleSavePoint, handleDeletePoint, handleQuickDelete, handleAddNewPoint,
+    selectedPoints, hasChanges, canUndo, canRedo, handleUndo, handleRedo,
+    handleSavePoint, handleDeletePoint, handleQuickDelete, handleBulkDelete, handleAddNewPoint,
     handleRemoveOutliers, handleResetData, handleExportSelected,
     handleSelectedPointIds, handleExportSelectedPointIds, handleHighlightOutliers,
   } = useEditor();
@@ -73,6 +73,37 @@ export const IndentViewApp: React.FC = () => {
     isLoading,
     setIsLoading,
   });
+
+  // Global keyboard shortcuts (undo/redo, delete)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      // Undo: Ctrl+Z / Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      
+      // Redo: Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y
+      if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+      
+      // Delete selected points in edit mode
+      if (isEditing && (e.key === 'Delete' || e.key === 'Backspace') && selectedPointIds.length > 0) {
+        e.preventDefault();
+        handleBulkDelete(selectedPointIds);
+        return;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo, isEditing, selectedPointIds, handleBulkDelete]);
 
   // Keyboard shortcuts for Export Studio
   useEffect(() => {
@@ -373,9 +404,43 @@ export const IndentViewApp: React.FC = () => {
                   <Edit3 className="w-4 h-4" />{isEditing ? 'Done Editing' : 'Edit Mode'}
                 </Button>
                 {isEditing && (
-                  <Button variant="outline" size="sm" onClick={handleAddNewPoint} className="gap-1">
-                    <Plus className="w-4 h-4" />Add Point
-                  </Button>
+                  <>
+                    <div className="flex items-center gap-1 border-l border-border pl-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleUndo} 
+                        disabled={!canUndo}
+                        className="gap-1"
+                        title="Undo (Ctrl+Z)"
+                      >
+                        <Undo2 className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRedo} 
+                        disabled={!canRedo}
+                        className="gap-1"
+                        title="Redo (Ctrl+Shift+Z)"
+                      >
+                        <Redo2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleAddNewPoint} className="gap-1">
+                      <Plus className="w-4 h-4" />Add Point
+                    </Button>
+                    {selectedPointIds.length > 0 && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => handleBulkDelete(selectedPointIds)} 
+                        className="gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />Delete {selectedPointIds.length}
+                      </Button>
+                    )}
+                  </>
                 )}
                 <ExportControls data={data} visualizationRef={visualizationRef} selectedProperty={selectedProperty} />
               </>
