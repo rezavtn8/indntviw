@@ -24,6 +24,7 @@ interface EditorContextValue {
   handlePointEdit: (point: IndentationPoint) => void;
   handleSavePoint: (point: IndentationPoint) => void;
   handleDeletePoint: (pointId: number) => void;
+  handleQuickDelete: (pointId: number) => void;
   handleAddNewPoint: () => void;
   handleRemoveOutliers: (pointIds: number[]) => void;
   handleResetData: () => void;
@@ -143,6 +144,28 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setEditingPoint(null);
   }, [data, recalculateStatistics, updateActiveSession]);
 
+  // Quick delete with toast feedback (for edit mode click-to-delete)
+  const handleQuickDelete = useCallback((pointId: number) => {
+    if (!data) return;
+
+    const pointToDelete = data.points.find(p => p.id === pointId);
+    if (!pointToDelete) return;
+
+    const newPoints = data.points
+      .filter(p => p.id !== pointId)
+      .map((p, i) => ({ ...p, id: i }));
+
+    const newData: IndentationData = {
+      ...data,
+      points: newPoints,
+      statistics: recalculateStatistics(newPoints, data.propertyNames),
+    };
+
+    updateActiveSession({ data: newData, selectedPointIds: selectedPointIds.filter(id => id !== pointId) });
+    setSelectedPoint(null);
+    toast.success(`Point deleted (${pointToDelete.x.toFixed(2)}, ${pointToDelete.y.toFixed(2)})`);
+  }, [data, recalculateStatistics, updateActiveSession, selectedPointIds]);
+
   const handleAddNewPoint = useCallback(() => {
     if (!data) return;
     
@@ -252,6 +275,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     handlePointEdit,
     handleSavePoint,
     handleDeletePoint,
+    handleQuickDelete,
     handleAddNewPoint,
     handleRemoveOutliers,
     handleResetData,
