@@ -83,9 +83,17 @@ export function calculateNiceAxisBounds(values: number[]): { niceMin: number; ni
   
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
-  const padding = (rawMax - rawMin) * 0.15;
-  const paddedMin = rawMin - padding;
-  const paddedMax = rawMax + padding;
+  const dataRange = rawMax - rawMin || 1;
+  
+  // Use 10% padding (reduced from 15%)
+  const padding = dataRange * 0.10;
+  let paddedMin = rawMin - padding;
+  let paddedMax = rawMax + padding;
+  
+  // CRITICAL: If all values are non-negative, don't let min go below 0
+  if (rawMin >= 0) {
+    paddedMin = Math.max(0, paddedMin);
+  }
   
   // Calculate nice step
   const range = paddedMax - paddedMin;
@@ -101,13 +109,19 @@ export function calculateNiceAxisBounds(values: number[]): { niceMin: number; ni
   else niceStep = 10 * magnitude;
   
   // Round min DOWN and max UP to nice values
-  const niceMin = Math.floor(paddedMin / niceStep) * niceStep;
+  // BUT: if rawMin >= 0, ensure niceMin doesn't go negative
+  let niceMin = Math.floor(paddedMin / niceStep) * niceStep;
+  if (rawMin >= 0 && niceMin < 0) {
+    niceMin = 0;
+  }
   const niceMax = Math.ceil(paddedMax / niceStep) * niceStep;
   
   // Generate ticks
   const ticks: number[] = [];
   for (let v = niceMin; v <= niceMax + niceStep * 0.001; v += niceStep) {
-    ticks.push(Math.round(v / niceStep) * niceStep);
+    // Round to avoid floating point artifacts
+    const roundedTick = Math.round(v / niceStep) * niceStep;
+    ticks.push(roundedTick);
   }
   
   return { 
@@ -129,11 +143,15 @@ export function valueToY(value: number, niceMin: number, niceMax: number, topMar
  * Format axis tick value for display
  */
 export function formatValue(val: number): string {
+  // Handle exact zero or near-zero values first
+  if (val === 0 || Math.abs(val) < 1e-10) return '0';
+  
   const absVal = Math.abs(val);
   if (absVal >= 1000) return val.toFixed(0);
   if (absVal >= 100) return val.toFixed(1);
   if (absVal >= 10) return val.toFixed(1);
   if (absVal >= 1) return val.toFixed(2);
   if (absVal >= 0.01) return val.toFixed(3);
+  if (absVal >= 0.001) return val.toFixed(4);
   return val.toExponential(1);
 }

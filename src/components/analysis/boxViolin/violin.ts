@@ -1,8 +1,47 @@
 /**
  * Violin Plot Path Generation (Kernel Density Estimation)
+ * Uses Silverman's rule of thumb for bandwidth selection
  */
 
 import { valueToY, PLOT_HEIGHT } from './layout';
+
+/**
+ * Calculate standard deviation
+ */
+function calculateSD(values: number[]): number {
+  const n = values.length;
+  if (n === 0) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
+  return Math.sqrt(variance);
+}
+
+/**
+ * Calculate bandwidth using Silverman's rule of thumb
+ * h = 0.9 * min(sd, IQR/1.34) * n^(-1/5)
+ */
+function calculateSilvermanBandwidth(values: number[]): number {
+  const n = values.length;
+  if (n < 2) return 1;
+  
+  const sorted = [...values].sort((a, b) => a - b);
+  const sd = calculateSD(values);
+  
+  // Calculate IQR
+  const q1Idx = Math.floor(n * 0.25);
+  const q3Idx = Math.floor(n * 0.75);
+  const iqr = sorted[q3Idx] - sorted[q1Idx];
+  
+  // Silverman's rule
+  const silvermanFactor = 0.9 * Math.min(sd, iqr / 1.34) * Math.pow(n, -0.2);
+  
+  // Fallback if silverman gives 0 or negative
+  if (silvermanFactor <= 0) {
+    return (sorted[n - 1] - sorted[0]) / 10 || 1;
+  }
+  
+  return silvermanFactor;
+}
 
 /**
  * Generate SVG path for a violin shape using kernel density estimation.
@@ -17,9 +56,11 @@ export function getViolinPath(
 ): string {
   if (values.length < 2) return '';
   
-  const sorted = [...values].sort((a, b) => a - b);
-  const bandwidth = (sorted[sorted.length - 1] - sorted[0]) / 10 || 1;
-  const steps = 30;
+  // Use Silverman's rule for bandwidth
+  const bandwidth = calculateSilvermanBandwidth(values);
+  
+  // More steps for smoother curves
+  const steps = 50;
   const niceRange = niceMax - niceMin;
   
   const densities: { y: number; density: number }[] = [];

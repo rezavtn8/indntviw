@@ -32,6 +32,25 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
   // Use fixed bin count for export (no slider)
   const effectiveBinCount = isExport ? 20 : binCount;
 
+  // Calculate Silverman bandwidth for a dataset
+  const calculateSilvermanBandwidth = (values: number[]): number => {
+    const n = values.length;
+    if (n < 2) return range / 15;
+    
+    const mean = values.reduce((a, b) => a + b, 0) / n;
+    const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
+    const sd = Math.sqrt(variance);
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const q1Idx = Math.floor(n * 0.25);
+    const q3Idx = Math.floor(n * 0.75);
+    const iqr = sorted[q3Idx] - sorted[q1Idx];
+    
+    const silvermanFactor = 0.9 * Math.min(sd, iqr / 1.34) * Math.pow(n, -0.2);
+    
+    return silvermanFactor > 0 ? silvermanFactor : range / 15;
+  };
+
   // Generate histograms using effective bin count
   const histograms = useMemo(() => {
     const binWidth = range / effectiveBinCount;
@@ -48,9 +67,9 @@ export const DistributionPlots: React.FC<DistributionPlotsProps> = ({ data, sele
       const densities = bins.map(b => b / d.values.length);
       const maxDensity = Math.max(...densities, 0.001);
       
-      // Calculate KDE
+      // Calculate KDE with Silverman's rule bandwidth
       const kdePoints: { x: number; y: number }[] = [];
-      const bandwidth = range / 15;
+      const bandwidth = calculateSilvermanBandwidth(d.values);
       for (let i = 0; i <= 50; i++) {
         const x = globalMin + (i / 50) * range;
         let density = 0;
