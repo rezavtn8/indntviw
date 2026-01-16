@@ -50,13 +50,13 @@ export function parseTabSeparatedData(content: string): IndentationData {
   
   // Find header line (contains column names)
   let headerLineIndex = -1;
-  let headers: string[] = [];
+  let rawHeaders: string[] = [];
   
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
     const cells = lines[i].split('\t').map(c => c.trim());
     if (cells.some(c => c.includes('X position') || c.includes('HIT'))) {
       headerLineIndex = i;
-      headers = cells.map(normalizeHeader);
+      rawHeaders = cells;
       break;
     }
   }
@@ -65,7 +65,62 @@ export function parseTabSeparatedData(content: string): IndentationData {
     throw new Error('Could not find header row in data file');
   }
 
-  // Find column indices
+  // Detect if this is a "Calibration/Matrix" paired column format
+  // Check the row after header for "Calibration" and "Matrix" labels
+  let isPairedFormat = false;
+  let pairedLabelRowIndex = -1;
+  
+  for (let i = headerLineIndex + 1; i < Math.min(lines.length, headerLineIndex + 5); i++) {
+    const cells = lines[i].split('\t').map(c => c.trim());
+    if (cells.some(c => c === 'Calibration') && cells.some(c => c === 'Matrix')) {
+      isPairedFormat = true;
+      pairedLabelRowIndex = i;
+      break;
+    }
+  }
+
+  // Build effective column mapping
+  // For paired format: find which column index contains "Matrix" data for each property
+  let headers: string[] = [];
+  let columnIndexMap: number[] = []; // Maps effective column index to actual cell index
+  
+  if (isPairedFormat) {
+    const labelRow = lines[pairedLabelRowIndex].split('\t').map(c => c.trim());
+    
+    // For paired format, we want the "Matrix" columns (second of each pair)
+    // Headers are duplicated, so we take every unique header with its Matrix column
+    const seenHeaders = new Set<string>();
+    
+    for (let i = 0; i < rawHeaders.length; i++) {
+      const header = normalizeHeader(rawHeaders[i]);
+      const label = labelRow[i] || '';
+      
+      // For X, Y, Z position columns, they might not have Calibration/Matrix labels
+      // Check if this is a Matrix column OR if it's a position column without pairs
+      const isMatrix = label === 'Matrix' || label === '';
+      
+      if (header && !seenHeaders.has(header) && isMatrix) {
+        seenHeaders.add(header);
+        headers.push(header);
+        columnIndexMap.push(i);
+      } else if (header && !seenHeaders.has(header) && i + 1 < rawHeaders.length) {
+        // If we haven't seen this header yet and it's not a Matrix column,
+        // check if the next column is the Matrix version
+        const nextLabel = labelRow[i + 1] || '';
+        if (nextLabel === 'Matrix') {
+          seenHeaders.add(header);
+          headers.push(header);
+          columnIndexMap.push(i + 1); // Use the Matrix column
+        }
+      }
+    }
+  } else {
+    // Standard format - use headers as-is
+    headers = rawHeaders.map(normalizeHeader);
+    columnIndexMap = headers.map((_, i) => i);
+  }
+
+  // Find column indices in our effective headers
   const xIdx = headers.findIndex(h => h === 'X');
   const yIdx = headers.findIndex(h => h === 'Y');
   const zIdx = headers.findIndex(h => h === 'Z');
@@ -76,10 +131,13 @@ export function parseTabSeparatedData(content: string): IndentationData {
 
   // Find data rows (skip summary rows like Min, Max, Mean, etc.)
   const points: IndentationPoint[] = [];
-  const skipKeywords = ['Min', 'Max', 'Mean', 'Std dev', 'Median', 'N', 'Oliver', '3rd try', 'Setting'];
+  const skipKeywords = ['Min', 'Max', 'Mean', 'Std dev', 'Median', 'N', 'Oliver', '3rd try', 'Setting', 'Calibration', 'Matrix'];
+  
+  // Start after paired label row if it exists
+  const dataStartIndex = isPairedFormat ? pairedLabelRowIndex + 1 : headerLineIndex + 1;
   
   let id = 0;
-  for (let i = headerLineIndex + 1; i < lines.length; i++) {
+  for (let i = dataStartIndex; i < lines.length; i++) {
     const cells = lines[i].split('\t').map(c => c.trim());
     
     // Get the first non-empty cell for checking
@@ -97,25 +155,29 @@ export function parseTabSeparatedData(content: string): IndentationData {
       continue;
     }
     
-    // Check if this is a measurement row - must start with "Measurement" 
-    // OR have the first cell be a number (row index)
-    // Also verify we have valid X and Y coordinates
+    // Check if this is a measurement row
     const isMeasurementRow = firstCell.includes('Measurement') || 
                               /^\d+$/.test(firstCell) ||
                               (firstCell === '' && !isNaN(parseFloat(secondCell)) && !secondCell.includes('Setting'));
     
     if (isMeasurementRow) {
-      const x = parseFloat(cells[xIdx]);
-      const y = parseFloat(cells[yIdx]);
-      const z = zIdx !== -1 ? parseFloat(cells[zIdx]) : 0;
+      // Get X, Y, Z using the column index map
+      const xCellIdx = columnIndexMap[xIdx];
+      const yCellIdx = columnIndexMap[yIdx];
+      const zCellIdx = zIdx !== -1 ? columnIndexMap[zIdx] : -1;
+      
+      const x = parseFloat(cells[xCellIdx]);
+      const y = parseFloat(cells[yCellIdx]);
+      const z = zCellIdx !== -1 ? parseFloat(cells[zCellIdx]) : 0;
       
       // Skip if X or Y are not valid numbers
       if (isNaN(x) || isNaN(y)) continue;
       
       const properties: Record<string, number> = {};
-      headers.forEach((header, idx) => {
+      headers.forEach((header, effectiveIdx) => {
         if (header && !['X', 'Y', 'Z', ''].includes(header)) {
-          const val = parseFloat(cells[idx]);
+          const cellIdx = columnIndexMap[effectiveIdx];
+          const val = parseFloat(cells[cellIdx]);
           if (!isNaN(val)) {
             properties[header] = val;
           }
@@ -126,13 +188,13 @@ export function parseTabSeparatedData(content: string): IndentationData {
     }
   }
 
-  // Calculate statistics
-  const propertyNames = headers.filter(h => h && !['X', 'Y', 'Z', ''].includes(h));
+  // Get unique property names (excluding coordinates)
+  const propertyNames = [...new Set(headers.filter(h => h && !['X', 'Y', 'Z', ''].includes(h)))];
   const statistics = calculateStatistics(points, propertyNames);
 
   return {
     points,
-    headers,
+    headers: [...new Set(headers)], // Deduplicate headers
     propertyNames,
     statistics,
   };
