@@ -2,6 +2,12 @@ import React, { useMemo } from 'react';
 import { DescriptiveStats } from '@/utils/advancedStatistics';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { getSampleColor } from './SampleSelector';
+import { 
+  calculateNiceAxisBounds, 
+  formatValue as sharedFormatValue,
+  getBWStyle,
+  BW_STYLES
+} from './boxViolin/layout';
 
 interface SampleData {
   id: string;
@@ -20,17 +26,39 @@ interface CrossSamplePlotsProps {
   blackAndWhite?: boolean;
 }
 
-// B&W patterns for grayscale printing
-const BW_STYLES = [
-  { fill: '#000000', fillOpacity: 0.1, stroke: '#000000', pattern: 'none' },
-  { fill: '#000000', fillOpacity: 0.3, stroke: '#000000', pattern: 'none' },
-  { fill: '#000000', fillOpacity: 0.5, stroke: '#000000', pattern: 'none' },
-  { fill: '#ffffff', fillOpacity: 1, stroke: '#000000', pattern: 'stripe' },
-  { fill: '#ffffff', fillOpacity: 1, stroke: '#000000', pattern: 'dots' },
-  { fill: '#000000', fillOpacity: 0.7, stroke: '#000000', pattern: 'none' },
-];
+/**
+ * Calculate standard deviation
+ */
+function calculateSD(values: number[]): number {
+  const n = values.length;
+  if (n === 0) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
+  return Math.sqrt(variance);
+}
 
-const getBWStyle = (idx: number) => BW_STYLES[idx % BW_STYLES.length];
+/**
+ * Calculate bandwidth using Silverman's rule of thumb
+ */
+function calculateSilvermanBandwidth(values: number[]): number {
+  const n = values.length;
+  if (n < 2) return 1;
+  
+  const sorted = [...values].sort((a, b) => a - b);
+  const sd = calculateSD(values);
+  
+  const q1Idx = Math.floor(n * 0.25);
+  const q3Idx = Math.floor(n * 0.75);
+  const iqr = sorted[q3Idx] - sorted[q1Idx];
+  
+  const silvermanFactor = 0.9 * Math.min(sd, iqr / 1.34) * Math.pow(n, -0.2);
+  
+  if (silvermanFactor <= 0) {
+    return (sorted[n - 1] - sorted[0]) / 10 || 1;
+  }
+  
+  return silvermanFactor;
+}
 
 export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   samples,
@@ -47,41 +75,10 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
 
   const unit = getPropertyUnit(selectedProperty);
 
-  // Calculate nice axis boundaries FIRST, then use for all scaling
+  // Use shared axis bounds calculation
   const { niceMin, niceMax, niceTicks } = useMemo(() => {
     const allValues = samples.flatMap(s => s.values);
-    if (allValues.length === 0) return { niceMin: 0, niceMax: 100, niceTicks: [0, 25, 50, 75, 100] };
-    
-    const rawMin = Math.min(...allValues);
-    const rawMax = Math.max(...allValues);
-    const padding = (rawMax - rawMin) * 0.1;
-    const paddedMin = rawMin - padding;
-    const paddedMax = rawMax + padding;
-    
-    // Calculate nice step
-    const range = paddedMax - paddedMin;
-    const targetCount = 5;
-    const roughStep = range / (targetCount - 1);
-    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-    const residual = roughStep / magnitude;
-    
-    let niceStep: number;
-    if (residual <= 1.5) niceStep = magnitude;
-    else if (residual <= 3) niceStep = 2 * magnitude;
-    else if (residual <= 7) niceStep = 5 * magnitude;
-    else niceStep = 10 * magnitude;
-    
-    // Round min DOWN and max UP to nice values
-    const computedNiceMin = Math.floor(paddedMin / niceStep) * niceStep;
-    const computedNiceMax = Math.ceil(paddedMax / niceStep) * niceStep;
-    
-    // Generate ticks
-    const ticks: number[] = [];
-    for (let v = computedNiceMin; v <= computedNiceMax + niceStep * 0.001; v += niceStep) {
-      ticks.push(Math.round(v / niceStep) * niceStep);
-    }
-    
-    return { niceMin: computedNiceMin, niceMax: computedNiceMax, niceTicks: ticks.length > 0 ? ticks : [computedNiceMin, computedNiceMax] };
+    return calculateNiceAxisBounds(allValues);
   }, [samples]);
 
   const niceRange = niceMax - niceMin;
@@ -93,23 +90,16 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
     return topMargin + ((niceMax - value) / niceRange) * plotHeight;
   };
 
-  const formatValue = (val: number): string => {
-    const absVal = Math.abs(val);
-    if (absVal >= 1000) return val.toFixed(0);
-    if (absVal >= 100) return val.toFixed(1);
-    if (absVal >= 10) return val.toFixed(1);
-    if (absVal >= 1) return val.toFixed(2);
-    if (absVal >= 0.01) return val.toFixed(3);
-    return val.toExponential(1);
-  };
+  // Use shared format function
+  const formatValue = sharedFormatValue;
 
-  // Generate violin path
+  // Generate violin path with Silverman's rule bandwidth
   const getViolinPath = (values: number[], centerX: number, width: number): string => {
     if (values.length < 2) return '';
     
-    const sorted = [...values].sort((a, b) => a - b);
-    const bandwidth = (sorted[sorted.length - 1] - sorted[0]) / 10 || 1;
-    const steps = 30;
+    // Use Silverman's rule for bandwidth
+    const bandwidth = calculateSilvermanBandwidth(values);
+    const steps = 50; // More steps for smoother curves
     
     const densities: { y: number; density: number }[] = [];
     let maxDensity = 0;
@@ -159,12 +149,15 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   const boxWidth = 40;
   const groupWidth = 100;
   const leftPadding = 70;
-  const rightPadding = 60; // Increased for violins
+  const rightPadding = 60;
   const svgWidth = Math.max(450, samples.length * groupWidth + leftPadding + rightPadding);
   const labelAreaHeight = 80;
   const svgHeight = topMargin + plotHeight + labelAreaHeight;
 
   const fontStyle: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
+
+  // Use shared B&W style getter
+  const getStyle = (idx: number) => getBWStyle(idx);
 
   if (samples.length === 0) {
     return (
@@ -230,7 +223,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
             const labelY = topMargin + plotHeight + 25;
 
             // Get colors based on B&W mode
-            const bwStyle = getBWStyle(idx);
+            const bwStyle = getStyle(idx);
             const boxFill = blackAndWhite 
               ? (bwStyle.pattern === 'stripe' ? 'url(#bw-stripe-cs)' : bwStyle.pattern === 'dots' ? 'url(#bw-dots-cs)' : bwStyle.fill)
               : color;
