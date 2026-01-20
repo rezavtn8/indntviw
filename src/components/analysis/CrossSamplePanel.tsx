@@ -8,6 +8,7 @@ import { CrossSampleStats } from './CrossSampleStats';
 import { CrossSamplePlots } from './CrossSamplePlots';
 import { CrossSampleTests } from './CrossSampleTests';
 import { GroupComparison } from './GroupComparison';
+import { IntraGroupAnalysis } from './IntraGroupAnalysis';
 import { GroupZoneAnalysis } from './GroupZoneAnalysis';
 import { ZoneBetweenGroupsAnalysis } from './ZoneBetweenGroupsAnalysis';
 import { ZoneAcrossSamplesPanel } from './ZoneAcrossSamplesPanel';
@@ -226,11 +227,28 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
               </TabsContent>
 
               <TabsContent value="groups" className="mt-0 space-y-4">
-                <GroupComparison
-                  fileSessions={fileSessions}
-                  groups={groups}
-                  selectedProperty={selectedProperty}
-                />
+                {/* Intra-Group Analysis - Within Group */}
+                {groups.length > 0 && (
+                  <div>
+                    <h4 className="font-mono text-sm font-bold uppercase mb-3">Within-Group Analysis</h4>
+                    <IntraGroupAnalysis
+                      fileSessions={fileSessions}
+                      groups={groups}
+                      selectedProperty={selectedProperty}
+                    />
+                  </div>
+                )}
+
+                {/* Between-Group Comparison */}
+                <div className={groups.length > 0 ? "pt-4 border-t border-border" : ""}>
+                  <h4 className="font-mono text-sm font-bold uppercase mb-3">Between-Group Comparison</h4>
+                  <GroupComparison
+                    fileSessions={fileSessions}
+                    groups={groups}
+                    selectedProperty={selectedProperty}
+                  />
+                </div>
+
                 {groups.length >= 2 && (
                   <div className="pt-4 border-t border-border">
                     <h4 className="font-mono text-sm font-bold uppercase mb-3">Zone Comparison Between Groups</h4>
