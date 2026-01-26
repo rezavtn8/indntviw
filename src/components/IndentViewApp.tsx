@@ -27,7 +27,18 @@ import { AppLayout, ViewSidebar, ContextPanel, AppToolbar } from '@/components/l
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Edit3, Plus, Undo2, Redo2, ChevronDown, Image, Package, Trash2 } from 'lucide-react';
+import { Edit3, Plus, Undo2, Redo2, ChevronDown, Image, Package, Trash2, RotateCcw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
@@ -38,7 +49,7 @@ export const IndentViewApp: React.FC = () => {
   const {
     fileSessions, activeSessionId, data, selectedProperty, colorScheme,
     selectedPointIds, highlightedOutliers, exportSelectedPointIds,
-    isLoading, setIsLoading,
+    isLoading, setIsLoading, clearWorkspace,
     handleDataLoaded, handleSelectSession, handleCloseSession, updateActiveSession,
   } = useSession();
 
@@ -392,6 +403,30 @@ export const IndentViewApp: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            {fileSessions.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive gap-1">
+                    <RotateCcw className="w-4 h-4" />
+                    Clear
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear Workspace?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove all open files, zones, and treatment groups. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={clearWorkspace} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Clear All
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             {data && (
               <>
                 <span className="font-mono text-sm text-muted-foreground">{data.points.length} points</span>
