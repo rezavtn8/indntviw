@@ -43,9 +43,18 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
   groups,
   selectedProperty,
 }) => {
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(groups[0]?.id || '');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+
+  // Ensure selectedGroupId is always valid - sync with groups
+  const effectiveGroupId = useMemo(() => {
+    if (groups.length === 0) return '';
+    if (selectedGroupId && groups.find(g => g.id === selectedGroupId)) {
+      return selectedGroupId;
+    }
+    return groups[0].id;
+  }, [groups, selectedGroupId]);
 
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
@@ -55,10 +64,10 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
   };
   const getPropertyLabel = (key: string): string => PROPERTY_CONFIGS.find(c => c.key === key)?.label || key;
 
-  // Get the selected group
+  // Get the selected group using effective ID
   const selectedGroup = useMemo(() => {
-    return groups.find(g => g.id === selectedGroupId) || null;
-  }, [groups, selectedGroupId]);
+    return groups.find(g => g.id === effectiveGroupId) || null;
+  }, [groups, effectiveGroupId]);
 
   // Get sessions that belong to the selected group
   const groupSessions = useMemo(() => {
@@ -122,13 +131,6 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
     };
   }, [sampleData]);
 
-  // Update selected group if current one becomes invalid
-  React.useEffect(() => {
-    if (groups.length > 0 && !groups.find(g => g.id === selectedGroupId)) {
-      setSelectedGroupId(groups[0].id);
-    }
-  }, [groups, selectedGroupId]);
-
   if (groups.length === 0) {
     return (
       <div className="border border-border rounded p-4 text-center">
@@ -147,9 +149,9 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
           <Label className="font-mono text-xs uppercase text-muted-foreground whitespace-nowrap">
             Analyze Group:
           </Label>
-          <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+          <Select value={effectiveGroupId} onValueChange={setSelectedGroupId}>
             <SelectTrigger className="font-mono text-sm flex-1 max-w-[200px]">
-              <SelectValue />
+              <SelectValue placeholder="Select group..." />
             </SelectTrigger>
             <SelectContent>
               {groups.map(group => (
