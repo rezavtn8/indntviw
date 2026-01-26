@@ -75,20 +75,48 @@ export function calculateBracketAreaHeight(comparisonsCount: number, showBracket
 
 /**
  * Calculate nice axis boundaries and ticks for data range
+ * Uses whisker-based bounds (Q1 - 1.5*IQR to Q3 + 1.5*IQR) to avoid extreme outliers
+ * stretching the axis unnecessarily
  */
 export function calculateNiceAxisBounds(values: number[]): { niceMin: number; niceMax: number; niceTicks: number[] } {
   if (values.length === 0) {
     return { niceMin: 0, niceMax: 100, niceTicks: [0, 25, 50, 75, 100] };
   }
   
+  // Sort values for percentile calculation
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  
+  // Calculate quartiles
+  const q1Idx = Math.floor(n * 0.25);
+  const q3Idx = Math.floor(n * 0.75);
+  const q1 = sorted[q1Idx];
+  const q3 = sorted[q3Idx];
+  const iqr = q3 - q1;
+  
+  // Use whisker bounds (1.5*IQR rule) to determine display range
+  // This prevents extreme outliers from stretching the axis
+  const whiskerMin = q1 - 1.5 * iqr;
+  const whiskerMax = q3 + 1.5 * iqr;
+  
+  // Find actual data bounds within whisker range
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
-  const dataRange = rawMax - rawMin || 1;
   
-  // Use 10% padding (reduced from 15%)
+  // Use the more conservative bound: actual data or whisker limit
+  // But always show at least to the whiskers
+  const displayMin = Math.min(rawMin, whiskerMin);
+  const displayMax = Math.max(
+    Math.min(rawMax, whiskerMax * 1.1), // Limit max to just above whisker
+    q3 + iqr * 0.5 // But always show at least some space above Q3
+  );
+  
+  const dataRange = displayMax - displayMin || 1;
+  
+  // Use 10% padding
   const padding = dataRange * 0.10;
-  let paddedMin = rawMin - padding;
-  let paddedMax = rawMax + padding;
+  let paddedMin = displayMin - padding;
+  let paddedMax = displayMax + padding;
   
   // CRITICAL: If all values are non-negative, don't let min go below 0
   if (rawMin >= 0) {
