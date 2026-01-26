@@ -31,11 +31,15 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   isExport = false,
   blackAndWhite = false,
 }) => {
-  // Get property unit for display
-  const unit = useMemo(() => {
-    const config = PROPERTY_CONFIGS.find(c => c.key === selectedProperty);
-    return config?.unit || '';
+  // Get property config for display
+  const propertyConfig = useMemo(() => {
+    return PROPERTY_CONFIGS.find(c => c.key === selectedProperty);
   }, [selectedProperty]);
+
+  const unit = propertyConfig?.unit || '';
+  const yAxisLabel = propertyConfig 
+    ? `${propertyConfig.label}${unit ? ` (${unit})` : ''}` 
+    : selectedProperty;
 
   // Calculate pairwise p-values for significance asterisks
   const pairwiseResults = useMemo((): PairwiseResult[] => {
@@ -98,6 +102,8 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           showJitter={showJitter}
           showPValueAsterisks={showPValueAsterisks}
           blackAndWhite={blackAndWhite}
+          yAxisLabel={yAxisLabel}
+          xAxisLabel="Samples"
         />
       </div>
 
