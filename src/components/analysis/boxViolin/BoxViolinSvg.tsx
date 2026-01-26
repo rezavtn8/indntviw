@@ -47,9 +47,15 @@ export interface BoxViolinSvgProps {
   showJitter: boolean;
   showPValueAsterisks: boolean;
   blackAndWhite: boolean;
+  yAxisLabel?: string;
+  xAxisLabel?: string;
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
+
+// Layout constants for axis labels
+const Y_AXIS_LABEL_WIDTH = 20;
+const X_AXIS_LABEL_HEIGHT = 20;
 
 export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   data,
@@ -58,6 +64,8 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   showJitter,
   showPValueAsterisks,
   blackAndWhite,
+  yAxisLabel,
+  xAxisLabel,
 }) => {
   // Calculate axis bounds from all values
   const allValues = data.flatMap(d => d.values);
@@ -70,9 +78,10 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   );
   const topMargin = BASE_TOP_MARGIN + bracketAreaHeight;
   
-  // Calculate SVG dimensions
-  const svgWidth = calculateSvgWidth(data.length);
-  const svgHeight = topMargin + PLOT_HEIGHT + LABEL_AREA_HEIGHT;
+  // Calculate SVG dimensions with space for axis labels
+  const svgWidth = calculateSvgWidth(data.length) + (yAxisLabel ? Y_AXIS_LABEL_WIDTH : 0);
+  const svgHeight = topMargin + PLOT_HEIGHT + LABEL_AREA_HEIGHT + (xAxisLabel ? X_AXIS_LABEL_HEIGHT : 0);
+  const leftOffset = yAxisLabel ? Y_AXIS_LABEL_WIDTH : 0;
   
   // Y-coordinate helper bound to current axis
   const getY = (value: number) => valueToY(value, niceMin, niceMax, topMargin);
@@ -93,8 +102,22 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
         </pattern>
       </defs>
       
+      {/* Y-axis label (rotated) */}
+      {yAxisLabel && (
+        <text
+          x={14}
+          y={topMargin + PLOT_HEIGHT / 2}
+          textAnchor="middle"
+          fill="#111111"
+          transform={`rotate(-90, 14, ${topMargin + PLOT_HEIGHT / 2})`}
+          style={{ fontSize: '12px', fontWeight: 'bold', ...FONT_STYLE }}
+        >
+          {yAxisLabel}
+        </text>
+      )}
+
       {/* Y-axis with nice ticks */}
-      <g>
+      <g transform={`translate(${leftOffset}, 0)`}>
         {niceTicks.map(value => {
           const y = getY(value);
           return (
@@ -102,7 +125,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
               <line 
                 x1={50} 
                 y1={y} 
-                x2={svgWidth - 20} 
+                x2={svgWidth - leftOffset - 20} 
                 y2={y} 
                 stroke="#111111" 
                 strokeOpacity={0.1} 
@@ -123,8 +146,8 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
 
       {/* P-value brackets and asterisks */}
       {showPValueAsterisks && pairwiseResults.map((result, idx) => {
-        const centerX1 = getCenterX(result.i);
-        const centerX2 = getCenterX(result.j);
+        const centerX1 = getCenterX(result.i) + leftOffset;
+        const centerX2 = getCenterX(result.j) + leftOffset;
         const bracketY = BRACKET_TOP_PADDING + idx * BRACKET_ROW_HEIGHT;
         const midX = (centerX1 + centerX2) / 2;
         
@@ -154,7 +177,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
 
       {/* Box plots - each group uses a single transform for all layers */}
       {data.map((d, idx) => {
-        const centerX = getCenterX(idx);
+        const centerX = getCenterX(idx) + leftOffset;
         const { stats, values, color, name } = d;
 
         if (values.length === 0) return null;
@@ -267,6 +290,19 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
           </g>
         );
       })}
+
+      {/* X-axis label */}
+      {xAxisLabel && (
+        <text
+          x={(svgWidth + leftOffset) / 2}
+          y={svgHeight - 6}
+          textAnchor="middle"
+          fill="#111111"
+          style={{ fontSize: '12px', fontWeight: 'bold', ...FONT_STYLE }}
+        >
+          {xAxisLabel}
+        </text>
+      )}
     </svg>
   );
 };
