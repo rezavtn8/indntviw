@@ -18,6 +18,8 @@ export interface BoxViolinPlotsProps {
   showPValueAsterisks?: boolean;
   isExport?: boolean;
   blackAndWhite?: boolean;
+  /** X-axis label - defaults to "Samples" */
+  xAxisLabel?: string;
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -30,6 +32,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   showPValueAsterisks = false,
   isExport = false,
   blackAndWhite = false,
+  xAxisLabel = 'Samples',
 }) => {
   // Get property config for display
   const propertyConfig = useMemo(() => {
@@ -103,7 +106,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           showPValueAsterisks={showPValueAsterisks}
           blackAndWhite={blackAndWhite}
           yAxisLabel={yAxisLabel}
-          xAxisLabel="Samples"
+          xAxisLabel={xAxisLabel}
         />
       </div>
 

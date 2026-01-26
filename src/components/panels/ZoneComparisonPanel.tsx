@@ -149,6 +149,7 @@ export const ZoneComparisonPanel: React.FC<ZoneComparisonPanelProps> = ({
               selectedProperty={selectedProperty}
               showViolin={showViolin}
               showJitter={showJitter}
+              xAxisLabel="Zones"
             />
           )}
 

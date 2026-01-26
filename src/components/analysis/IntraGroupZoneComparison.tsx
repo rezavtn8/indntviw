@@ -205,6 +205,7 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
         showViolin={showViolin}
         showJitter={showJitter}
         showPValueAsterisks={true}
+        xAxisLabel="Zones (pooled within Group)"
       />
 
       {/* Statistics Table */}

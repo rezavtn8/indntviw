@@ -235,6 +235,7 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
                 selectedProperty={selectedProperty}
                 showViolin={showViolin}
                 showJitter={showJitter}
+                xAxisLabel="Samples (within Group)"
               />
             )}
 

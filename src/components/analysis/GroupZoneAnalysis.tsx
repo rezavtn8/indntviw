@@ -318,6 +318,7 @@ export const GroupZoneAnalysis: React.FC<GroupZoneAnalysisProps> = ({
             selectedProperty={selectedProperty}
             showViolin={showViolin}
             showJitter={showJitter}
+            xAxisLabel="Zones (by Group)"
           />
         </>
       )}
