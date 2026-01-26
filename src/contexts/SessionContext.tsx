@@ -1,7 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
 import { IndentationData } from '@/types/indentation';
 import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
+import { SampleGroup } from '@/components/analysis/SampleGrouping';
 import { parseTabSeparatedData } from '@/utils/dataParser';
+import { useWorkspacePersistence } from '@/hooks/useWorkspacePersistence';
+import { PersistedWorkspace } from '@/utils/storageService';
+import { storageService } from '@/utils/storageService';
 import { toast } from 'sonner';
 
 interface SessionContextValue {
@@ -16,10 +20,14 @@ interface SessionContextValue {
   globalSelectedProperty: string;
   setGlobalSelectedProperty: (property: string) => void;
   
+  // Treatment groups (lifted from CrossSamplePanel for persistence)
+  groups: SampleGroup[];
+  setGroups: (groups: SampleGroup[]) => void;
+  
   // Derived data
   data: IndentationData | null;
   originalData: IndentationData | null;
-  selectedProperty: string; // Now uses global
+  selectedProperty: string;
   colorScheme: FileSession['colorScheme'];
   customMin: number | null;
   customMax: number | null;
@@ -35,6 +43,7 @@ interface SessionContextValue {
   handleSelectSession: (sessionId: string) => void;
   handleCloseSession: (sessionId: string) => void;
   updateActiveSession: (updates: Partial<FileSession>) => void;
+  clearWorkspace: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -43,9 +52,13 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [fileSessions, setFileSessions] = useState<FileSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Global selected property (shared across all sessions)
   const [globalSelectedProperty, setGlobalSelectedProperty] = useState<string>('HIT');
+  
+  // Treatment groups (lifted from CrossSamplePanel for persistence)
+  const [groups, setGroups] = useState<SampleGroup[]>([]);
 
   // Get active session
   const activeSession = useMemo(() => 
@@ -60,11 +73,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Use global property, but fall back to first available if current property doesn't exist in this file
   const selectedProperty = useMemo(() => {
     if (!data) return globalSelectedProperty;
-    // Check if the global property exists in this file's data
     if (data.propertyNames.includes(globalSelectedProperty)) {
       return globalSelectedProperty;
     }
-    // Fall back to first available property
     return data.propertyNames[0] || 'HIT';
   }, [data, globalSelectedProperty]);
   
@@ -78,9 +89,50 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const highlightedOutliers = activeSession?.highlightedOutliers || [];
   const exportSelectedPointIds = activeSession?.exportSelectedPointIds || [];
 
-  // Load sample data on mount
-  useEffect(() => {
-    const loadSampleData = async () => {
+  // Handle workspace loaded from persistence
+  const handleWorkspaceLoaded = useCallback((workspace: PersistedWorkspace) => {
+    // Convert persisted sessions back to full FileSession objects
+    const sessions: FileSession[] = workspace.sessions.map(ps => ({
+      ...ps,
+      selectedProperty: ps.data.propertyNames.includes(workspace.globalSelectedProperty) 
+        ? workspace.globalSelectedProperty 
+        : ps.data.propertyNames[0] || 'HIT',
+      selectedZoneId: null,
+      comparedZoneIds: [],
+      selectedPointIds: [],
+      highlightedOutliers: [],
+      exportSelectedPointIds: [],
+    }));
+
+    setFileSessions(sessions);
+    setActiveSessionId(workspace.activeSessionId);
+    setGroups(workspace.groups || []);
+    setGlobalSelectedProperty(workspace.globalSelectedProperty || 'HIT');
+    setIsInitialized(true);
+    
+    toast.success(`Restored ${sessions.length} file${sessions.length > 1 ? 's' : ''} from last session`);
+  }, []);
+
+  // Load sample data only if no persisted data
+  const hasAttemptedLoad = useRef(false);
+  
+  React.useEffect(() => {
+    if (hasAttemptedLoad.current) return;
+    hasAttemptedLoad.current = true;
+
+    const loadInitialData = async () => {
+      // Check if we have persisted data first
+      try {
+        const workspace = await storageService.loadWorkspace();
+        if (workspace && workspace.sessions.length > 0) {
+          handleWorkspaceLoaded(workspace);
+          return;
+        }
+      } catch (error) {
+        console.log('No persisted workspace, loading sample data');
+      }
+
+      // No persisted data, load sample
       try {
         const response = await fetch('/sample-data/sample_indentation.txt');
         if (response.ok) {
@@ -90,14 +142,27 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const session = createFileSession(sessionId, 'sample_indentation.txt', parsed);
           setFileSessions([session]);
           setActiveSessionId(sessionId);
+          setIsInitialized(true);
           toast.success(`Loaded sample data: ${parsed.points.length} points`);
         }
       } catch (error) {
         console.log('No sample data found, ready for file upload');
+        setIsInitialized(true);
       }
     };
-    loadSampleData();
-  }, []);
+
+    loadInitialData();
+  }, [handleWorkspaceLoaded]);
+
+  // Use persistence hook
+  useWorkspacePersistence({
+    fileSessions,
+    activeSessionId,
+    groups,
+    globalSelectedProperty,
+    onWorkspaceLoaded: handleWorkspaceLoaded,
+    isInitialized,
+  });
 
   // Helper to update active session
   const updateActiveSession = useCallback((updates: Partial<FileSession>) => {
@@ -130,6 +195,15 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [activeSessionId]);
 
+  const clearWorkspace = useCallback(async () => {
+    await storageService.clearWorkspace();
+    setFileSessions([]);
+    setActiveSessionId(null);
+    setGroups([]);
+    setGlobalSelectedProperty('HIT');
+    toast.success('Workspace cleared');
+  }, []);
+
   const value: SessionContextValue = {
     fileSessions,
     activeSessionId,
@@ -138,6 +212,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsLoading,
     globalSelectedProperty,
     setGlobalSelectedProperty,
+    groups,
+    setGroups,
     data,
     originalData,
     selectedProperty,
@@ -154,6 +230,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     handleSelectSession,
     handleCloseSession,
     updateActiveSession,
+    clearWorkspace,
   };
 
   return (

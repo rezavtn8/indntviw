@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { FileSession } from '@/types/fileSession';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { calculateDescriptiveStats, getPropertyValues } from '@/utils/advancedStatistics';
+import { useSession } from '@/contexts/SessionContext';
 import { SampleSelector, getSampleColor } from './SampleSelector';
 import { SampleGrouping, SampleGroup } from './SampleGrouping';
 import { CrossSampleStats } from './CrossSampleStats';
@@ -34,11 +35,13 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   propertyNames,
   onPropertyChange,
 }) => {
+  // Get groups from context (persisted)
+  const { groups, setGroups } = useSession();
+  
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
   const [blackAndWhite, setBlackAndWhite] = useState(false);
-  const [groups, setGroups] = useState<SampleGroup[]>([]);
   const [groupingOpen, setGroupingOpen] = useState(false);
 
   const getPropertyLabel = (key: string): string => {
