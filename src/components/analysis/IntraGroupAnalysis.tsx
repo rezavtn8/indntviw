@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { BoxViolinPlots } from './BoxViolinPlots';
 import { SmartZoneAnalysis } from './SmartZoneAnalysis';
+import { IntraGroupZoneComparison } from './IntraGroupZoneComparison';
 import { CheckCircle, XCircle, BarChart3, FlaskConical, MapPin } from 'lucide-react';
 
 interface SampleData {
@@ -387,14 +388,38 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
           </TabsContent>
 
           {/* Zones Tab */}
-          <TabsContent value="zones" className="space-y-3 mt-0">
-            <p className="text-muted-foreground font-mono text-[10px] mb-2">
-              Analyzing zones within samples of "{selectedGroup?.name}" group only
-            </p>
-            <SmartZoneAnalysis
-              fileSessions={groupSessions}
-              selectedProperty={selectedProperty}
-            />
+          <TabsContent value="zones" className="space-y-4 mt-0">
+            {/* Zone Comparison Within Group */}
+            <div className="border border-border rounded p-3">
+              <h5 className="font-mono text-xs font-bold uppercase mb-3 flex items-center gap-2">
+                <BarChart3 className="w-3.5 h-3.5" />
+                Compare Zones Within Group
+              </h5>
+              <p className="text-muted-foreground font-mono text-[10px] mb-3">
+                Comparing different zone types (pooled across all "{selectedGroup?.name}" samples)
+              </p>
+              <IntraGroupZoneComparison
+                groupSessions={groupSessions}
+                selectedProperty={selectedProperty}
+                showViolin={showViolin}
+                showJitter={showJitter}
+              />
+            </div>
+
+            {/* Per-Zone Across Samples */}
+            <div className="border border-border rounded p-3">
+              <h5 className="font-mono text-xs font-bold uppercase mb-3 flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5" />
+                Same Zone Across Samples
+              </h5>
+              <p className="text-muted-foreground font-mono text-[10px] mb-3">
+                Comparing same-named zones between different samples in "{selectedGroup?.name}"
+              </p>
+              <SmartZoneAnalysis
+                fileSessions={groupSessions}
+                selectedProperty={selectedProperty}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       )}
