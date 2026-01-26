@@ -270,6 +270,7 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
             selectedProperty={selectedProperty}
             showViolin={showViolin}
             showJitter={showJitter}
+            xAxisLabel="Zones (across Samples)"
           />
         </>
       )}
