@@ -3,6 +3,7 @@ import { ExportSettings } from '@/types/zones';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Slider } from '@/components/ui/slider';
 
 interface DisplaySectionProps {
   settings: ExportSettings;
@@ -117,6 +118,29 @@ export const DisplaySection: React.FC<DisplaySectionProps> = ({ settings, onSett
             )}
           </div>
         )}
+      </div>
+
+      {/* Point Size */}
+      <div className="pt-2 border-t border-border/50 space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">Point Size</Label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {(settings.pointSize ?? 1.0).toFixed(1)}×
+          </span>
+        </div>
+        <Slider
+          value={[settings.pointSize ?? 1.0]}
+          onValueChange={([value]) => onSettingsChange({ ...settings, pointSize: value })}
+          min={0.3}
+          max={3.0}
+          step={0.1}
+          className="w-full"
+        />
+        <div className="flex justify-between text-[10px] text-muted-foreground">
+          <span>Smaller</span>
+          <span>Auto (1.0×)</span>
+          <span>Larger</span>
+        </div>
       </div>
 
       {/* Background */}
