@@ -89,8 +89,8 @@ export function calculateNiceAxisBounds(values: number[]): { niceMin: number; ni
   
   const dataRange = rawMax - rawMin || 1;
   
-  // Use 10% padding to give breathing room above/below data
-  const padding = dataRange * 0.10;
+  // Use 8% padding to give breathing room above/below data
+  const padding = dataRange * 0.08;
   let paddedMin = rawMin - padding;
   let paddedMax = rawMax + padding;
   
@@ -99,9 +99,9 @@ export function calculateNiceAxisBounds(values: number[]): { niceMin: number; ni
     paddedMin = Math.max(0, paddedMin);
   }
   
-  // Calculate nice step
+  // Calculate nice step - aim for fewer ticks to keep axis tight
   const range = paddedMax - paddedMin;
-  const targetCount = 5;
+  const targetCount = 4; // Fewer ticks = tighter axis
   const roughStep = range / (targetCount - 1);
   const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
   const residual = roughStep / magnitude;
@@ -113,12 +113,24 @@ export function calculateNiceAxisBounds(values: number[]): { niceMin: number; ni
   else niceStep = 10 * magnitude;
   
   // Round min DOWN and max UP to nice values
-  // BUT: if rawMin >= 0, ensure niceMin doesn't go negative
+  // BUT limit how far we extend beyond actual data (max 15% extension each side)
+  const maxExtension = dataRange * 0.15;
+  
   let niceMin = Math.floor(paddedMin / niceStep) * niceStep;
+  // Limit min extension
+  if (niceMin < rawMin - maxExtension) {
+    niceMin = Math.floor((rawMin - maxExtension) / niceStep) * niceStep;
+  }
+  // If rawMin >= 0, ensure niceMin doesn't go negative
   if (rawMin >= 0 && niceMin < 0) {
     niceMin = 0;
   }
-  const niceMax = Math.ceil(paddedMax / niceStep) * niceStep;
+  
+  let niceMax = Math.ceil(paddedMax / niceStep) * niceStep;
+  // Limit max extension
+  if (niceMax > rawMax + maxExtension) {
+    niceMax = Math.ceil((rawMax + maxExtension) / niceStep) * niceStep;
+  }
   
   // Generate ticks
   const ticks: number[] = [];
