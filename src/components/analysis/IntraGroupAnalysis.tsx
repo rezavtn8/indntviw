@@ -240,31 +240,33 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
             )}
 
             {/* Statistics Table */}
-            <div className="border border-border rounded p-2">
-              <h5 className="font-mono text-xs font-bold uppercase mb-2">
-                Sample Statistics ({getPropertyLabel(selectedProperty)})
-              </h5>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="bg-muted/40 px-3 py-2 border-b border-border">
+                <h5 className="font-mono text-xs font-bold uppercase tracking-wide">
+                  Sample Statistics ({getPropertyLabel(selectedProperty)})
+                </h5>
+              </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-[10px] font-mono">
+                <table className="text-xs font-mono" style={{ minWidth: 'auto' }}>
                   <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left p-1">Sample</th>
-                      <th className="text-right p-1">N</th>
-                      <th className="text-right p-1">Mean</th>
-                      <th className="text-right p-1">SD</th>
-                      <th className="text-right p-1">Median</th>
-                      <th className="text-right p-1">IQR</th>
+                    <tr className="bg-muted/20 border-b border-border">
+                      <th className="text-left px-3 py-2 font-semibold text-muted-foreground w-[160px] max-w-[200px]">Sample</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-16">N</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">Mean</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">SD</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">Median</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">IQR</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/50">
                     {sampleData.map((s, idx) => (
-                      <tr key={s.id} className="border-b border-border/50">
-                        <td className="p-1 truncate max-w-[120px]">{s.name}</td>
-                        <td className="text-right p-1">{s.stats.n}</td>
-                        <td className="text-right p-1">{formatValue(s.stats.mean)}</td>
-                        <td className="text-right p-1">{formatValue(s.stats.sd)}</td>
-                        <td className="text-right p-1">{formatValue(s.stats.median)}</td>
-                        <td className="text-right p-1">{formatValue(s.stats.iqr)}</td>
+                      <tr key={s.id} className="hover:bg-muted/10 transition-colors">
+                        <td className="px-3 py-2 truncate max-w-[200px] font-medium" title={s.name}>{s.name}</td>
+                        <td className="text-right px-3 py-2 text-muted-foreground">{s.stats.n}</td>
+                        <td className="text-right px-3 py-2 tabular-nums">{formatValue(s.stats.mean)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">{formatValue(s.stats.sd)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums">{formatValue(s.stats.median)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">{formatValue(s.stats.iqr)}</td>
                       </tr>
                     ))}
                   </tbody>
