@@ -95,6 +95,8 @@ export interface ExportSettings {
   yStretch: number; // 0.5 to 2.0 (1.0 = normal)
   flipXAxis: boolean; // Mirror data horizontally
   flipYAxis: boolean; // Mirror data vertically
+  // Point size control
+  pointSize: number; // 0.5 to 3.0 multiplier (1.0 = auto)
 }
 
 export const DEFAULT_ZONE_COLORS = [
@@ -146,6 +148,7 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   yStretch: 1.0,
   flipXAxis: false,
   flipYAxis: false,
+  pointSize: 1.0,
 };
 
 export const createDefaultZone = (id: string, colorIndex: number): Zone => ({

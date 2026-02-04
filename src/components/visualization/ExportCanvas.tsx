@@ -244,14 +244,16 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     });
   }, [points, selectedProperty, colorScheme, minValue, maxValue, transformPoint, selectedPointIds]);
 
-  // Point radius based on density
+  // Point radius based on density, with user multiplier
+  const pointSizeMultiplier = settings.pointSize ?? 1.0;
   const pointRadius = useMemo(() => {
-    if (points.length === 0) return 5;
+    if (points.length === 0) return 5 * pointSizeMultiplier;
     const xRange = xMax - xMin || 1;
     const yRange = yMax - yMin || 1;
     const avgDistance = Math.sqrt((xRange * yRange) / points.length);
-    return Math.max(3, Math.min(12, avgDistance * scaleX * 0.35));
-  }, [points.length, xMin, xMax, yMin, yMax, scaleX]);
+    const baseRadius = Math.max(3, Math.min(12, avgDistance * scaleX * 0.35));
+    return baseRadius * pointSizeMultiplier;
+  }, [points.length, xMin, xMax, yMin, yMax, scaleX, pointSizeMultiplier]);
 
   // Point radius in data units
   const pointRadiusDataUnits = useMemo(() => {
