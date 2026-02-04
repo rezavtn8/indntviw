@@ -23,6 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { BoxViolinPlots } from './BoxViolinPlots';
 import { SmartZoneAnalysis } from './SmartZoneAnalysis';
 import { IntraGroupZoneComparison } from './IntraGroupZoneComparison';
+import { StatsTable, StatsTableRow } from './StatsTable';
 import { CheckCircle, XCircle, BarChart3, FlaskConical, MapPin } from 'lucide-react';
 
 interface SampleData {
@@ -240,39 +241,15 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
             )}
 
             {/* Statistics Table */}
-            <div className="border border-border rounded-lg overflow-hidden">
-              <div className="bg-muted/40 px-3 py-2 border-b border-border">
-                <h5 className="font-mono text-xs font-bold uppercase tracking-wide">
-                  Sample Statistics ({getPropertyLabel(selectedProperty)})
-                </h5>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="text-xs font-mono" style={{ minWidth: 'auto' }}>
-                  <thead>
-                    <tr className="bg-muted/20 border-b border-border">
-                      <th className="text-left px-3 py-2 font-semibold text-muted-foreground w-[160px] max-w-[200px]">Sample</th>
-                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-16">N</th>
-                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">Mean</th>
-                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">SD</th>
-                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">Median</th>
-                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground w-20">IQR</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {sampleData.map((s, idx) => (
-                      <tr key={s.id} className="hover:bg-muted/10 transition-colors">
-                        <td className="px-3 py-2 truncate max-w-[200px] font-medium" title={s.name}>{s.name}</td>
-                        <td className="text-right px-3 py-2 text-muted-foreground">{s.stats.n}</td>
-                        <td className="text-right px-3 py-2 tabular-nums">{formatValue(s.stats.mean)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">{formatValue(s.stats.sd)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums">{formatValue(s.stats.median)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">{formatValue(s.stats.iqr)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <StatsTable
+              rows={sampleData.map(s => ({
+                id: s.id,
+                name: s.name,
+                stats: s.stats,
+              }))}
+              title={`Sample Statistics (${getPropertyLabel(selectedProperty)})`}
+              showIQR={true}
+            />
           </TabsContent>
 
           {/* Tests Tab */}

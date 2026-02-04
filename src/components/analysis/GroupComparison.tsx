@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { BoxViolinPlots } from './BoxViolinPlots';
+import { StatsTable } from './StatsTable';
 import { CheckCircle, XCircle, Users } from 'lucide-react';
 
 interface GroupData {
@@ -136,41 +137,18 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
       )}
 
       {/* Group Statistics */}
-      <div className="border border-border rounded p-2">
-        <h4 className="font-mono text-xs font-bold uppercase mb-2">
-          Stats ({getPropertyLabel(selectedProperty)})
-        </h4>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[10px] font-mono">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left p-1">Group</th>
-                <th className="text-right p-1">N</th>
-                <th className="text-right p-1">Mean</th>
-                <th className="text-right p-1">SD</th>
-                <th className="text-right p-1">Med</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupData.map(g => (
-                <tr key={g.group.id} className="border-b border-border/50">
-                  <td className="p-1">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded" style={{ backgroundColor: g.group.color }} />
-                      <span className="truncate max-w-[80px]">{g.group.name}</span>
-                      <span className="text-muted-foreground">({g.sampleCount})</span>
-                    </div>
-                  </td>
-                  <td className="text-right p-1">{g.stats.n}</td>
-                  <td className="text-right p-1">{formatValue(g.stats.mean)}</td>
-                  <td className="text-right p-1">{formatValue(g.stats.sd)}</td>
-                  <td className="text-right p-1">{formatValue(g.stats.median)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <StatsTable
+        rows={groupData.map(g => ({
+          id: g.group.id,
+          name: g.group.name,
+          color: g.group.color,
+          stats: g.stats,
+          sampleCount: g.sampleCount,
+        }))}
+        title={`Stats (${getPropertyLabel(selectedProperty)})`}
+        showSampleCount={true}
+        showIQR={false}
+      />
 
       {/* Two-Group Tests */}
       {twoGroupTests && (
