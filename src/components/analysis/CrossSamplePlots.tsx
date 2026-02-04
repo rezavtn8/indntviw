@@ -140,7 +140,7 @@ export const CrossSamplePlots: React.FC<CrossSamplePlotsProps> = ({
   // Generate jittered points
   const getJitteredPoints = (values: number[], centerX: number, width: number, groupIndex: number): { x: number; y: number }[] => {
     const maxJitter = width * 0.3;
-    return values.slice(0, 100).map((v, i) => ({
+    return values.map((v, i) => ({
       x: centerX + (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
       y: valueToY(v),
     }));
