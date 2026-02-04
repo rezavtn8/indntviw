@@ -35,12 +35,11 @@ export function getJitteredPoints(
   groupIndex: number,
   niceMin: number,
   niceMax: number,
-  topMargin: number,
-  maxPoints: number = 100
+  topMargin: number
 ): JitteredPoint[] {
   const maxJitter = jitterWidth * 0.3;
   
-  return values.slice(0, maxPoints).map((v, i) => ({
+  return values.map((v, i) => ({
     x: (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
     y: valueToY(v, niceMin, niceMax, topMargin),
   }));
