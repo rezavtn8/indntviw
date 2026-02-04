@@ -22,7 +22,7 @@ export const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
   dataBounds,
 }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Format & Size */}
       <FormatSection settings={settings} onSettingsChange={onSettingsChange} />
 

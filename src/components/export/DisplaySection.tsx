@@ -3,7 +3,8 @@ import { ExportSettings } from '@/types/zones';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Slider } from '@/components/ui/slider';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Eye, Layers, ChevronDown, PaintBucket } from 'lucide-react';
 
 interface DisplaySectionProps {
   settings: ExportSettings;
@@ -13,139 +14,118 @@ interface DisplaySectionProps {
 export const DisplaySection: React.FC<DisplaySectionProps> = ({ settings, onSettingsChange }) => {
   return (
     <div className="space-y-3">
-      <Label className="text-xs font-mono uppercase text-muted-foreground">Display</Label>
-      
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm">Axis Labels</Label>
-          <Switch
-            checked={settings.showAxisLabels}
-            onCheckedChange={(checked) => onSettingsChange({ ...settings, showAxisLabels: checked })}
-          />
+      {/* Quick Toggles - Compact Grid */}
+      <div className="rounded-lg border border-border bg-card/50 p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium">Show Elements</span>
         </div>
-        
-        <div className="flex items-center justify-between">
-          <Label className="text-sm">Color Legend</Label>
-          <Switch
-            checked={settings.showColorLegend}
-            onCheckedChange={(checked) => onSettingsChange({ ...settings, showColorLegend: checked })}
-          />
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <Label className="text-sm">Title</Label>
-          <Switch
-            checked={settings.showTitle}
-            onCheckedChange={(checked) => onSettingsChange({ ...settings, showTitle: checked })}
-          />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <Label className="text-sm">Boundary</Label>
-          <Switch
-            checked={settings.showBoundaryContour}
-            onCheckedChange={(checked) => onSettingsChange({ ...settings, showBoundaryContour: checked })}
-          />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {[
+            { key: 'showAxisLabels', label: 'Axis Labels' },
+            { key: 'showColorLegend', label: 'Color Legend' },
+            { key: 'showTitle', label: 'Title' },
+            { key: 'showBoundaryContour', label: 'Boundary' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center justify-between cursor-pointer group">
+              <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors">
+                {label}
+              </span>
+              <Switch
+                checked={settings[key as keyof ExportSettings] as boolean}
+                onCheckedChange={(checked) => onSettingsChange({ ...settings, [key]: checked })}
+                className="scale-90"
+              />
+            </label>
+          ))}
         </div>
       </div>
 
-      {/* Zones section */}
-      <div className="pt-2 border-t border-border/50 space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Zones</Label>
-          <Switch
-            checked={settings.showZones}
-            onCheckedChange={(checked) => onSettingsChange({ ...settings, showZones: checked })}
-          />
-        </div>
+      {/* Zones - Collapsible */}
+      <Collapsible defaultOpen className="rounded-lg border border-border bg-card/50">
+        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 hover:bg-accent/30 transition-colors rounded-lg">
+          <div className="flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">Zones</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={settings.showZones}
+              onCheckedChange={(checked) => onSettingsChange({ ...settings, showZones: checked })}
+              className="scale-90"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          </div>
+        </CollapsibleTrigger>
         
         {settings.showZones && (
-          <div className="pl-4 space-y-3 border-l-2 border-border/50">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Show Labels</Label>
-              <Switch
-                checked={settings.showZoneLabels}
-                onCheckedChange={(checked) => onSettingsChange({ ...settings, showZoneLabels: checked })}
-              />
+          <CollapsibleContent>
+            <div className="px-3 pb-3 space-y-3">
+              {/* Show Labels Toggle */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-[11px] text-muted-foreground">Show Labels</span>
+                <Switch
+                  checked={settings.showZoneLabels}
+                  onCheckedChange={(checked) => onSettingsChange({ ...settings, showZoneLabels: checked })}
+                  className="scale-90"
+                />
+              </label>
+
+              {settings.showZoneLabels && (
+                <div className="space-y-3 pl-2 border-l-2 border-border/50">
+                  {/* Label Position */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Position</Label>
+                    <RadioGroup
+                      value={settings.zoneLabelPosition}
+                      onValueChange={(value: 'center' | 'edge' | 'legend') =>
+                        onSettingsChange({ ...settings, zoneLabelPosition: value })
+                      }
+                      className="flex gap-3"
+                    >
+                      {['center', 'edge', 'legend'].map((pos) => (
+                        <label key={pos} className="flex items-center gap-1.5 cursor-pointer">
+                          <RadioGroupItem value={pos} id={`pos-${pos}`} className="scale-90" />
+                          <span className="text-[10px] capitalize">{pos}</span>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+
+                  {/* Label Color */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Color</Label>
+                    <RadioGroup
+                      value={settings.zoneLabelColor}
+                      onValueChange={(value: 'zone' | 'black') =>
+                        onSettingsChange({ ...settings, zoneLabelColor: value })
+                      }
+                      className="flex gap-3"
+                    >
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <RadioGroupItem value="zone" id="color-zone" className="scale-90" />
+                        <span className="text-[10px]">Match Zone</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <RadioGroupItem value="black" id="color-black" className="scale-90" />
+                        <span className="text-[10px]">Black</span>
+                      </label>
+                    </RadioGroup>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {settings.showZoneLabels && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Position</Label>
-                  <RadioGroup
-                    value={settings.zoneLabelPosition}
-                    onValueChange={(value: 'center' | 'edge' | 'legend') =>
-                      onSettingsChange({ ...settings, zoneLabelPosition: value })
-                    }
-                    className="flex flex-wrap gap-x-4 gap-y-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="center" id="label-pos-center" />
-                      <Label htmlFor="label-pos-center" className="text-sm cursor-pointer">Center</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="edge" id="label-pos-edge" />
-                      <Label htmlFor="label-pos-edge" className="text-sm cursor-pointer">Edge</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="legend" id="label-pos-legend" />
-                      <Label htmlFor="label-pos-legend" className="text-sm cursor-pointer">Legend</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Color</Label>
-                  <RadioGroup
-                    value={settings.zoneLabelColor}
-                    onValueChange={(value: 'zone' | 'black') =>
-                      onSettingsChange({ ...settings, zoneLabelColor: value })
-                    }
-                    className="flex gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="zone" id="label-color-zone" />
-                      <Label htmlFor="label-color-zone" className="text-sm cursor-pointer">Match Zone</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="black" id="label-color-black" />
-                      <Label htmlFor="label-color-black" className="text-sm cursor-pointer">Black</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleContent>
         )}
-      </div>
-
-      {/* Point Size */}
-      <div className="pt-2 border-t border-border/50 space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground">Point Size</Label>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {(settings.pointSize ?? 1.0).toFixed(1)}×
-          </span>
-        </div>
-        <Slider
-          value={[settings.pointSize ?? 1.0]}
-          onValueChange={([value]) => onSettingsChange({ ...settings, pointSize: value })}
-          min={0.3}
-          max={3.0}
-          step={0.1}
-          className="w-full"
-        />
-        <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>Smaller</span>
-          <span>Auto (1.0×)</span>
-          <span>Larger</span>
-        </div>
-      </div>
+      </Collapsible>
 
       {/* Background */}
-      <div className="pt-2 border-t border-border/50 space-y-2">
-        <Label className="text-xs text-muted-foreground">Background</Label>
+      <div className="rounded-lg border border-border bg-card/50 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <PaintBucket className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium">Background</span>
+        </div>
         <RadioGroup
           value={settings.background}
           onValueChange={(value: ExportSettings['background']) =>
@@ -153,14 +133,15 @@ export const DisplaySection: React.FC<DisplaySectionProps> = ({ settings, onSett
           }
           className="flex gap-4"
         >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="white" id="bg-white" />
-            <Label htmlFor="bg-white" className="text-sm cursor-pointer">White</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="transparent" id="bg-transparent" />
-            <Label htmlFor="bg-transparent" className="text-sm cursor-pointer">Transparent</Label>
-          </div>
+          {[
+            { value: 'white', label: 'White' },
+            { value: 'transparent', label: 'Transparent' },
+          ].map(({ value, label }) => (
+            <label key={value} className="flex items-center gap-1.5 cursor-pointer">
+              <RadioGroupItem value={value} id={`bg-${value}`} className="scale-90" />
+              <span className="text-[11px]">{label}</span>
+            </label>
+          ))}
         </RadioGroup>
       </div>
     </div>
