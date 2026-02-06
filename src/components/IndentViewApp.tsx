@@ -326,7 +326,8 @@ export const IndentViewApp: React.FC = () => {
         <div className="h-full border border-border bg-card overflow-hidden">
           <AnalysisPanel 
             zones={zones} points={data?.points || []} selectedProperty={selectedProperty}
-            propertyNames={data?.propertyNames || []} onPropertyChange={handlePropertyChange} fileSessions={fileSessions} 
+            propertyNames={data?.propertyNames || []} onPropertyChange={handlePropertyChange} fileSessions={fileSessions}
+            sampleName={fileSessions.find(s => s.id === activeSessionId)?.fileName || 'Sample'}
           />
         </div>
       );
