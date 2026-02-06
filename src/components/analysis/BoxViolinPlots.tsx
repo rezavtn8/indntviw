@@ -5,10 +5,14 @@
  * the BoxViolinSvg with optional legend.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useCallback } from 'react';
 import { DescriptiveStats, welchTTest, oneWayANOVA } from '@/utils/advancedStatistics';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { BoxViolinSvg, PairwiseResult, getPValueAsterisks } from './boxViolin';
+import { rasterizeSvgToDataUrl } from '@/utils/svgRasterize';
+import { Button } from '@/components/ui/button';
+import { Camera } from 'lucide-react';
+import { toast } from 'sonner';
 
 export interface BoxViolinPlotsProps {
   data: { name: string; color: string; values: number[]; stats: DescriptiveStats }[];
@@ -81,6 +85,23 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     return results;
   }, [data, showPValueAsterisks]);
 
+  const svgContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleSavePng = useCallback(async () => {
+    const svgEl = svgContainerRef.current?.querySelector('svg');
+    if (!svgEl) return;
+    try {
+      const { dataUrl } = await rasterizeSvgToDataUrl(svgEl as SVGElement, 3);
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `boxplot_${selectedProperty}_${Date.now()}.png`;
+      a.click();
+      toast.success('PNG saved (high quality)');
+    } catch {
+      toast.error('Failed to save PNG');
+    }
+  }, [selectedProperty]);
+
   return (
     <div 
       className={isExport ? '' : 'border-2 border-border rounded-lg p-4'} 
@@ -88,16 +109,20 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     >
       {/* Header - hide in export mode */}
       {!isExport && (
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h4 className="text-sm font-bold uppercase tracking-wider" style={FONT_STYLE}>
             Box Plot Comparison
             {unit && <span className="text-muted-foreground ml-2">({unit})</span>}
           </h4>
+          <Button variant="outline" size="sm" onClick={handleSavePng} className="gap-1.5 h-7 text-xs">
+            <Camera className="w-3.5 h-3.5" />
+            Save PNG
+          </Button>
         </div>
       )}
 
       {/* SVG Plot */}
-      <div className={isExport ? '' : 'overflow-x-auto'}>
+      <div ref={svgContainerRef} className={isExport ? '' : 'overflow-x-auto'}>
         <BoxViolinSvg
           data={data}
           pairwiseResults={pairwiseResults}
