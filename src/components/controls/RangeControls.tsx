@@ -1,5 +1,4 @@
-import React from 'react';
-import { Slider } from '@/components/ui/slider';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
@@ -14,6 +13,12 @@ interface RangeControlsProps {
   onReset: () => void;
 }
 
+const formatDisplay = (value: number): string => {
+  if (Math.abs(value) >= 1000) return value.toFixed(0);
+  if (Math.abs(value) >= 1) return value.toFixed(2);
+  return value.toFixed(4);
+};
+
 export const RangeControls: React.FC<RangeControlsProps> = ({
   dataMin,
   dataMax,
@@ -23,27 +28,41 @@ export const RangeControls: React.FC<RangeControlsProps> = ({
   onMaxChange,
   onReset,
 }) => {
-  const formatValue = (value: number) => {
-    if (Math.abs(value) >= 1000) {
-      return value.toFixed(0);
-    } else if (Math.abs(value) >= 1) {
-      return value.toFixed(2);
-    } else {
-      return value.toFixed(4);
-    }
-  };
+  // Local state so the user can type freely without reformatting
+  const [minText, setMinText] = useState(formatDisplay(currentMin));
+  const [maxText, setMaxText] = useState(formatDisplay(currentMax));
 
-  const handleMinInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
+  // Sync local text when external value changes (e.g. reset, property change)
+  useEffect(() => {
+    setMinText(formatDisplay(currentMin));
+  }, [currentMin]);
+
+  useEffect(() => {
+    setMaxText(formatDisplay(currentMax));
+  }, [currentMax]);
+
+  const commitMin = () => {
+    const value = parseFloat(minText);
     if (!isNaN(value)) {
       onMinChange(value);
+    } else {
+      setMinText(formatDisplay(currentMin));
     }
   };
 
-  const handleMaxInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
+  const commitMax = () => {
+    const value = parseFloat(maxText);
     if (!isNaN(value)) {
       onMaxChange(value);
+    } else {
+      setMaxText(formatDisplay(currentMax));
+    }
+  };
+
+  const handleKeyDown = (commit: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      commit();
+      (e.target as HTMLInputElement).blur();
     }
   };
 
@@ -68,9 +87,12 @@ export const RangeControls: React.FC<RangeControlsProps> = ({
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground w-10">Min:</span>
           <Input
-            type="number"
-            value={formatValue(currentMin)}
-            onChange={handleMinInputChange}
+            type="text"
+            inputMode="decimal"
+            value={minText}
+            onChange={(e) => setMinText(e.target.value)}
+            onBlur={commitMin}
+            onKeyDown={handleKeyDown(commitMin)}
             className="h-8 font-mono text-sm"
           />
         </div>
@@ -78,16 +100,19 @@ export const RangeControls: React.FC<RangeControlsProps> = ({
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground w-10">Max:</span>
           <Input
-            type="number"
-            value={formatValue(currentMax)}
-            onChange={handleMaxInputChange}
+            type="text"
+            inputMode="decimal"
+            value={maxText}
+            onChange={(e) => setMaxText(e.target.value)}
+            onBlur={commitMax}
+            onKeyDown={handleKeyDown(commitMax)}
             className="h-8 font-mono text-sm"
           />
         </div>
       </div>
 
       <div className="text-xs font-mono text-muted-foreground">
-        Data range: {formatValue(dataMin)} – {formatValue(dataMax)}
+        Data range: {formatDisplay(dataMin)} – {formatDisplay(dataMax)}
       </div>
     </div>
   );
