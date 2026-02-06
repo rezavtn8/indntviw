@@ -327,7 +327,7 @@ export const IndentViewApp: React.FC = () => {
           <AnalysisPanel 
             zones={zones} points={data?.points || []} selectedProperty={selectedProperty}
             propertyNames={data?.propertyNames || []} onPropertyChange={handlePropertyChange} fileSessions={fileSessions}
-            sampleName={fileSessions.find(s => s.id === activeSessionId)?.fileName || 'Sample'}
+            sampleName={(fileSessions.find(s => s.id === activeSessionId)?.fileName || 'Sample').replace(/\.[^.]+$/, '')}
           />
         </div>
       );
