@@ -27,6 +27,7 @@ interface AnalysisPanelProps {
   propertyNames: string[];
   onPropertyChange: (property: string) => void;
   fileSessions: FileSession[];
+  sampleName?: string;
 }
 
 export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
@@ -36,6 +37,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
   propertyNames,
   onPropertyChange,
   fileSessions,
+  sampleName = 'Sample',
 }) => {
   const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>([]);
   const [includeAllData, setIncludeAllData] = useState(true);
@@ -301,6 +303,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                       showViolin={showViolin}
                       showJitter={showJitter}
                       blackAndWhite={blackAndWhite}
+                      xAxisLabel={sampleName}
                     />
                   </TabsContent>
 
