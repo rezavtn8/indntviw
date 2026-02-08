@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Separator } from '@/components/ui/separator';
 
 interface AppToolbarProps {
   children?: React.ReactNode;
@@ -39,21 +40,26 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({ children, className, sho
     if (file) {
       await loadProjectFile(file);
     }
-    // Reset input so re-selecting the same file works
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   if (!children && !showClearWorkspace) return null;
+
   const hasFiles = fileSessions.length > 0;
 
   return (
-    <div className={cn('px-4 py-2 border-b border-border bg-card flex items-center gap-4', className)}>
+    <div className={cn('px-3 py-1.5 border-b border-border bg-card flex items-center gap-2', className)}>
+      {/* View-specific tools (zone toolbar, etc.) */}
       {children}
-      
+
+      {/* Spacer */}
+      {showClearWorkspace && <div className="flex-1" />}
+
+      {/* Project actions — compact icon-only buttons */}
       {showClearWorkspace && (
-        <div className="ml-auto flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -64,33 +70,51 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({ children, className, sho
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={handleOpenProject}>
-                <FolderOpen className="w-4 h-4 mr-1" />
-                Open Project
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={handleOpenProject}
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Load a saved .indentview project file</TooltipContent>
+            <TooltipContent side="bottom">Open Project (.indentview)</TooltipContent>
           </Tooltip>
 
-          {fileSessions.length > 0 && (
+          {hasFiles && (
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={saveProjectFile}>
-                    <Save className="w-4 h-4 mr-1" />
-                    Save Project
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={saveProjectFile}
+                  >
+                    <Save className="w-3.5 h-3.5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Download workspace as .indentview file</TooltipContent>
+                <TooltipContent side="bottom">Save Project</TooltipContent>
               </Tooltip>
 
+              <Separator orientation="vertical" className="h-4 mx-1" />
+
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Clear Workspace
-                  </Button>
-                </AlertDialogTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Clear Workspace</TooltipContent>
+                </Tooltip>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Clear Workspace?</AlertDialogTitle>
