@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+
 import { Heatmap2D } from '@/components/visualization/Heatmap2D';
 import { Scene3D } from '@/components/visualization/Scene3D';
 import { ExportCanvas } from '@/components/visualization/ExportCanvas';
@@ -8,7 +8,7 @@ import { PropertySelector } from '@/components/controls/PropertySelector';
 import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
 import { RangeControls } from '@/components/controls/RangeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
-import { ExportControls } from '@/components/controls/ExportControls';
+
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
 import { View3DControls } from '@/components/controls/View3DControls';
 import { ZoneToolbar } from '@/components/controls/ZoneToolbar';
@@ -27,18 +27,7 @@ import { AppLayout, ViewSidebar, ContextPanel, AppToolbar } from '@/components/l
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Edit3, Plus, Undo2, Redo2, ChevronDown, Image, Package, Trash2, RotateCcw } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { ChevronDown, Image, Package } from 'lucide-react';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
@@ -49,7 +38,7 @@ export const IndentViewApp: React.FC = () => {
   const {
     fileSessions, activeSessionId, data, selectedProperty, colorScheme,
     selectedPointIds, highlightedOutliers, exportSelectedPointIds,
-    isLoading, setIsLoading, clearWorkspace,
+    isLoading, setIsLoading,
     handleDataLoaded, handleSelectSession, handleCloseSession, updateActiveSession,
   } = useSession();
 
@@ -213,12 +202,28 @@ export const IndentViewApp: React.FC = () => {
   };
 
   // Render toolbar based on active view
+  // Common toolbar props for editing & export
+  const toolbarEditProps = {
+    isEditing,
+    onToggleEditing: () => setIsEditing(!isEditing),
+    canUndo,
+    canRedo,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    hasChanges,
+    onReset: handleResetData,
+    onAddPoint: handleAddNewPoint,
+    selectedPointCount: selectedPointIds.length,
+    onBulkDelete: () => handleBulkDelete(selectedPointIds),
+    data,
+    visualizationRef,
+    selectedProperty,
+  };
+
   const renderToolbar = () => {
-    if (!data) return null;
-    
     if (activeView === '2d') {
       return (
-        <AppToolbar showClearWorkspace>
+        <AppToolbar {...toolbarEditProps}>
           <ZoneToolbar 
             activeTool={heatmapDrawingTool} onToolChange={setHeatmapDrawingTool}
             onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
@@ -233,7 +238,7 @@ export const IndentViewApp: React.FC = () => {
     
     if (activeView === 'export' && exportMode === 'figure') {
       return (
-        <AppToolbar showClearWorkspace>
+        <AppToolbar {...toolbarEditProps}>
           <ZoneToolbar 
             activeTool={drawingTool} onToolChange={setDrawingTool}
             onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
@@ -246,7 +251,7 @@ export const IndentViewApp: React.FC = () => {
       );
     }
     
-    return <AppToolbar showClearWorkspace />;
+    return <AppToolbar {...toolbarEditProps} />;
   };
 
   // Render export mode tabs
@@ -397,90 +402,10 @@ export const IndentViewApp: React.FC = () => {
     <AppLayout
       isDraggingOverPage={isDraggingOverPage}
       header={
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center px-6 py-3">
           <div className="flex items-center gap-4">
-            <h1 className="font-mono text-2xl font-bold uppercase tracking-tight">IndentView</h1>
-            <span className="border border-border px-2 py-1 font-mono text-xs uppercase text-muted-foreground">v1.0</span>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {fileSessions.length > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive gap-1">
-                    <RotateCcw className="w-4 h-4" />
-                    Clear
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Clear Workspace?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will remove all open files, zones, and treatment groups. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={clearWorkspace} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Clear All
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            {data && (
-              <>
-                <span className="font-mono text-sm text-muted-foreground">{data.points.length} points</span>
-                {hasChanges && (
-                  <Button variant="outline" size="sm" onClick={handleResetData} className="gap-1">
-                    <Undo2 className="w-4 h-4" />Reset
-                  </Button>
-                )}
-                <Button variant={isEditing ? 'default' : 'outline'} size="sm" onClick={() => setIsEditing(!isEditing)} className="gap-1">
-                  <Edit3 className="w-4 h-4" />{isEditing ? 'Done Editing' : 'Edit Mode'}
-                </Button>
-                {isEditing && (
-                  <>
-                    <div className="flex items-center gap-1 border-l border-border pl-3">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleUndo} 
-                        disabled={!canUndo}
-                        className="gap-1"
-                        title="Undo (Ctrl+Z)"
-                      >
-                        <Undo2 className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleRedo} 
-                        disabled={!canRedo}
-                        className="gap-1"
-                        title="Redo (Ctrl+Shift+Z)"
-                      >
-                        <Redo2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={handleAddNewPoint} className="gap-1">
-                      <Plus className="w-4 h-4" />Add Point
-                    </Button>
-                    {selectedPointIds.length > 0 && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        onClick={() => handleBulkDelete(selectedPointIds)} 
-                        className="gap-1"
-                      >
-                        <Trash2 className="w-4 h-4" />Delete {selectedPointIds.length}
-                      </Button>
-                    )}
-                  </>
-                )}
-                <ExportControls data={data} visualizationRef={visualizationRef} selectedProperty={selectedProperty} />
-              </>
-            )}
+            <h1 className="font-mono text-xl font-bold uppercase tracking-tight">IndentView</h1>
+            <span className="border border-border px-2 py-0.5 font-mono text-xs uppercase text-muted-foreground">v1.0</span>
           </div>
         </div>
       }
