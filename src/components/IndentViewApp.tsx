@@ -23,7 +23,7 @@ import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
 import { Spatial3DPanel } from '@/components/analysis/Spatial3DPanel';
 import { ComprehensiveBatchExport } from '@/components/analysis/ComprehensiveBatchExport';
 import { FileTabs } from '@/components/FileTabs';
-import { AppLayout, ViewSidebar, ContextPanel, AppToolbar } from '@/components/layout';
+import { AppLayout, ViewSidebar, ContextPanel, AppToolbar, ProjectActions } from '@/components/layout';
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -402,11 +402,12 @@ export const IndentViewApp: React.FC = () => {
     <AppLayout
       isDraggingOverPage={isDraggingOverPage}
       header={
-        <div className="flex items-center px-6 py-3">
+        <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-4">
             <h1 className="font-mono text-xl font-bold uppercase tracking-tight">IndentView</h1>
             <span className="border border-border px-2 py-0.5 font-mono text-xs uppercase text-muted-foreground">v1.0</span>
           </div>
+          <ProjectActions />
         </div>
       }
       fileTabs={
