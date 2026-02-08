@@ -40,4 +40,4 @@ export const PROPERTY_CONFIGS: PropertyConfig[] = [
   { key: 'CIT', label: 'Creep (CIT)', unit: '%' },
 ];
 
-export type ColorScheme = 'viridis' | 'plasma' | 'inferno' | 'magma' | 'turbo' | 'jet';
+export type ColorScheme = 'viridis' | 'plasma' | 'inferno' | 'magma' | 'turbo' | 'jet' | 'coolwarm' | 'cividis';

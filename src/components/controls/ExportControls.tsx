@@ -90,8 +90,8 @@ export const ExportControls: React.FC<ExportControlsProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={!data || isExporting} className="gap-2">
-          <Download className="w-4 h-4" />
+        <Button variant="ghost" size="sm" disabled={!data || isExporting} className="h-7 gap-1 text-xs px-2">
+          <Download className="w-3.5 h-3.5" />
           Export
         </Button>
       </DropdownMenuTrigger>

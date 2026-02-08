@@ -15,6 +15,8 @@ const colorSchemes: { value: ColorScheme; label: string }[] = [
   { value: 'magma', label: 'Magma' },
   { value: 'turbo', label: 'Turbo' },
   { value: 'jet', label: 'Jet' },
+  { value: 'coolwarm', label: 'Cool–Warm' },
+  { value: 'cividis', label: 'Cividis' },
 ];
 
 const ColorPreview: React.FC<{ scheme: ColorScheme }> = ({ scheme }) => {
@@ -45,10 +47,7 @@ export const ColorSchemeSelector: React.FC<ColorSchemeSelectorProps> = ({
       </label>
       <Select value={colorScheme} onValueChange={onColorSchemeChange}>
         <SelectTrigger className="w-full font-mono text-sm">
-          <div className="flex items-center gap-2">
-            <ColorPreview scheme={colorScheme} />
-            <SelectValue placeholder="Select scheme" />
-          </div>
+          <SelectValue placeholder="Select scheme" />
         </SelectTrigger>
         <SelectContent>
           {colorSchemes.map(({ value, label }) => (
