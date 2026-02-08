@@ -1,63 +1,44 @@
 
-# Fix: Show All Dots in Box Plot Diagrams
 
-## Problem Identified
-The jitter function in `src/components/analysis/boxViolin/jitter.ts` has a hard limit of **100 points** (`maxPoints: number = 100`). When a dataset contains more than 100 values, only the first 100 dots are rendered, causing missing data points.
+# Save and Load Workspace as a File
 
-## Solution
-Remove or significantly increase the `maxPoints` limit to ensure all data points are displayed. Since performance with SVG circles is generally fine for thousands of points, I'll remove the artificial limit entirely.
+## What This Does
+Adds **Save Project** and **Open Project** buttons to the toolbar so you can download your entire workspace (all open files, zones, treatment groups, settings) as a single `.indentview` file, and later reload it -- even on a different computer or browser.
 
----
+## How It Will Work
 
-## Implementation Details
+1. **Save Project** -- Downloads a `.indentview` file (JSON format compressed with JSZip) containing:
+   - All open file tabs with their full data
+   - Zones you created on each file
+   - Treatment groups and their assignments
+   - Active tab, selected property, color scheme, and range settings
 
-### File: `src/components/analysis/boxViolin/jitter.ts`
+2. **Open Project** -- A file picker lets you select a `.indentview` file and restores the entire workspace exactly as it was when saved.
 
-**Change**: Remove the `maxPoints` parameter and the `.slice()` call that truncates the values array.
-
-**Before:**
-```typescript
-export function getJitteredPoints(
-  values: number[],
-  jitterWidth: number,
-  groupIndex: number,
-  niceMin: number,
-  niceMax: number,
-  topMargin: number,
-  maxPoints: number = 100  // This limits dots!
-): JitteredPoint[] {
-  const maxJitter = jitterWidth * 0.3;
-  
-  return values.slice(0, maxPoints).map((v, i) => ({  // Truncates values!
-    x: (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
-    y: valueToY(v, niceMin, niceMax, topMargin),
-  }));
-}
-```
-
-**After:**
-```typescript
-export function getJitteredPoints(
-  values: number[],
-  jitterWidth: number,
-  groupIndex: number,
-  niceMin: number,
-  niceMax: number,
-  topMargin: number
-): JitteredPoint[] {
-  const maxJitter = jitterWidth * 0.3;
-  
-  return values.map((v, i) => ({  // Render ALL values
-    x: (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
-    y: valueToY(v, niceMin, niceMax, topMargin),
-  }));
-}
-```
+3. Both buttons will appear in the top toolbar alongside the existing "Clear Workspace" button.
 
 ---
 
-## Technical Notes
+## Technical Details
 
-- **Performance**: SVG rendering handles hundreds to a few thousand circles without issue. Modern browsers can easily render 500-2000 small circles.
-- **No breaking changes**: The `maxPoints` parameter was optional and defaulted to 100, so removing it won't break any existing calls (since `BoxViolinSvg.tsx` doesn't pass this parameter).
-- **Alternative considered**: Instead of removing entirely, could increase to 1000 or 5000, but fully removing the limit is cleaner since the real constraint is the data size, not the rendering.
+### 1. New utility: `src/utils/projectFileService.ts`
+- **`saveProjectToFile(workspace)`** -- Serializes the `PersistedWorkspace` object to JSON, compresses it with JSZip (already installed), and triggers a browser download as `MyProject_2026-02-08.indentview`.
+- **`loadProjectFromFile(file)`** -- Reads the uploaded `.indentview` file, decompresses it, validates the JSON structure and version, and returns a `PersistedWorkspace` object.
+- Includes version checking so future format changes remain backward-compatible.
+
+### 2. Update `src/contexts/SessionContext.tsx`
+- Add two new actions to the context:
+  - **`saveProjectFile()`** -- Gathers current state into a `PersistedWorkspace` and calls `saveProjectToFile()`.
+  - **`loadProjectFile(file: File)`** -- Calls `loadProjectFromFile()`, then feeds the result into the existing `handleWorkspaceLoaded()` logic to restore all state.
+- Expose both actions in the context value.
+
+### 3. Update `src/components/layout/AppToolbar.tsx`
+- Add a **Save Project** button (download icon) that calls `saveProjectFile()`.
+- Add an **Open Project** button (folder-open icon) with a hidden file input that accepts `.indentview` files and calls `loadProjectFile()`.
+- Both buttons sit next to the existing "Clear Workspace" button for a clean layout.
+
+### 4. File format
+- Extension: `.indentview`
+- Contents: A ZIP archive containing a single `workspace.json` file (the serialized `PersistedWorkspace`).
+- Compression keeps file sizes manageable even with large datasets (thousands of indentation points across multiple files).
+
