@@ -1,44 +1,49 @@
 
 
-# Save and Load Workspace as a File
+# Unify the Toolbar
 
-## What This Does
-Adds **Save Project** and **Open Project** buttons to the toolbar so you can download your entire workspace (all open files, zones, treatment groups, settings) as a single `.indentview` file, and later reload it -- even on a different computer or browser.
+## The Problem
+Right now there are **two separate bars** with overlapping actions:
+- The **header bar** has: Clear, point count, Reset, Edit Mode, Undo/Redo, Add Point, Delete, and Export
+- The **toolbar below the file tabs** has: zone tools + Open Project, Save Project, and a second Clear Workspace button
 
-## How It Will Work
+This is cluttered and confusing -- two "Clear" buttons, actions scattered across two rows.
 
-1. **Save Project** -- Downloads a `.indentview` file (JSON format compressed with JSZip) containing:
-   - All open file tabs with their full data
-   - Zones you created on each file
-   - Treatment groups and their assignments
-   - Active tab, selected property, color scheme, and range settings
+## The Solution
+Merge everything into **one unified toolbar** below the file tabs, and slim down the header to just the app title and branding. The toolbar will be organized into logical groups separated by subtle dividers:
 
-2. **Open Project** -- A file picker lets you select a `.indentview` file and restores the entire workspace exactly as it was when saved.
+```text
+| [Zone tools...] | [Edit Mode] [Undo] [Redo] [Add] [Delete N] | [Export v] | --- spacer --- | [Open] [Save] | [Clear] |
+```
 
-3. Both buttons will appear in the top toolbar alongside the existing "Clear Workspace" button.
+### Layout groups (left to right):
+1. **View tools** -- zone drawing tools (when in 2D or Export/Figure view)
+2. **Editing tools** -- Edit Mode toggle, Undo/Redo, Add Point, Delete selected, Reset (only when data is loaded)
+3. **Data export** -- the Export dropdown (CSV, Excel, Screenshot, PDF)
+4. **Spacer** pushes project actions to the right
+5. **Project actions** -- Open Project, Save Project (icon-only with tooltips)
+6. **Clear workspace** -- separated by a divider (icon-only, destructive)
+
+### What changes in the header
+The header shrinks to just: **"IndentView" title + version badge + point count**. All action buttons move down to the toolbar.
 
 ---
 
 ## Technical Details
 
-### 1. New utility: `src/utils/projectFileService.ts`
-- **`saveProjectToFile(workspace)`** -- Serializes the `PersistedWorkspace` object to JSON, compresses it with JSZip (already installed), and triggers a browser download as `MyProject_2026-02-08.indentview`.
-- **`loadProjectFromFile(file)`** -- Reads the uploaded `.indentview` file, decompresses it, validates the JSON structure and version, and returns a `PersistedWorkspace` object.
-- Includes version checking so future format changes remain backward-compatible.
+### 1. `src/components/layout/AppToolbar.tsx`
+- Accept new props for editing controls and export:
+  - `isEditing`, `onToggleEditing`, `canUndo`, `canRedo`, `onUndo`, `onRedo`
+  - `hasChanges`, `onReset`, `onAddPoint`
+  - `selectedPointCount`, `onBulkDelete`
+  - `data`, `visualizationRef`, `selectedProperty` (for ExportControls)
+- Render all action groups in one row with vertical `Separator` dividers between logical groups
+- Keep project actions (Open/Save/Clear) on the right as they are now
 
-### 2. Update `src/contexts/SessionContext.tsx`
-- Add two new actions to the context:
-  - **`saveProjectFile()`** -- Gathers current state into a `PersistedWorkspace` and calls `saveProjectToFile()`.
-  - **`loadProjectFile(file: File)`** -- Calls `loadProjectFromFile()`, then feeds the result into the existing `handleWorkspaceLoaded()` logic to restore all state.
-- Expose both actions in the context value.
+### 2. `src/components/IndentViewApp.tsx`
+- **Header** (lines 400-485): Strip out all buttons -- keep only the title, version badge, and point count
+- **`renderToolbar()`**: Pass editing state, undo/redo handlers, export props, etc. into `AppToolbar` so it renders everything in one bar
+- Remove the duplicate `AlertDialog` for Clear Workspace from the header since it already exists in `AppToolbar`
 
-### 3. Update `src/components/layout/AppToolbar.tsx`
-- Add a **Save Project** button (download icon) that calls `saveProjectFile()`.
-- Add an **Open Project** button (folder-open icon) with a hidden file input that accepts `.indentview` files and calls `loadProjectFile()`.
-- Both buttons sit next to the existing "Clear Workspace" button for a clean layout.
-
-### 4. File format
-- Extension: `.indentview`
-- Contents: A ZIP archive containing a single `workspace.json` file (the serialized `PersistedWorkspace`).
-- Compression keeps file sizes manageable even with large datasets (thousands of indentation points across multiple files).
+### 3. No new files or dependencies needed
 
