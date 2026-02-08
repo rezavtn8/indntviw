@@ -46,6 +46,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({ children, className, sho
   };
 
   if (!children && !showClearWorkspace) return null;
+  const hasFiles = fileSessions.length > 0;
 
   return (
     <div className={cn('px-4 py-2 border-b border-border bg-card flex items-center gap-4', className)}>

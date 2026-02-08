@@ -218,7 +218,7 @@ export const IndentViewApp: React.FC = () => {
     
     if (activeView === '2d') {
       return (
-        <AppToolbar>
+        <AppToolbar showClearWorkspace>
           <ZoneToolbar 
             activeTool={heatmapDrawingTool} onToolChange={setHeatmapDrawingTool}
             onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
@@ -233,7 +233,7 @@ export const IndentViewApp: React.FC = () => {
     
     if (activeView === 'export' && exportMode === 'figure') {
       return (
-        <AppToolbar>
+        <AppToolbar showClearWorkspace>
           <ZoneToolbar 
             activeTool={drawingTool} onToolChange={setDrawingTool}
             onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
@@ -246,7 +246,7 @@ export const IndentViewApp: React.FC = () => {
       );
     }
     
-    return null;
+    return <AppToolbar showClearWorkspace />;
   };
 
   // Render export mode tabs
