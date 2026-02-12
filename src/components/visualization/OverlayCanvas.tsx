@@ -216,17 +216,14 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
     if (e.altKey) {
+      e.preventDefault();
       const delta = e.deltaY > 0 ? 0.92 : 1.08;
       viewRef.current.zoom = Math.max(0.1, Math.min(10, viewRef.current.zoom * delta));
       applyViewTransform();
-    } else {
-      const delta = e.deltaY > 0 ? 0.95 : 1.05;
-      const t = transformRef.current;
-      onTransformChangeRef.current({ ...t, scale: Math.max(0.1, Math.min(5, t.scale * delta)) });
     }
-  }, [applyViewTransform]); // no transform dependency!
+    // No scroll-to-scale — image scale is controlled only via sidebar slider
+  }, [applyViewTransform]);
 
   // Image CSS transform
   const imageStyle = useMemo((): React.CSSProperties => {
