@@ -518,6 +518,28 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     centerPoints,
     getCanvasDimensions: () => ({ width, height }),
     exportToDataURL: async (format, dpi) => {
+      // Convert blob/object URL to data URL for export compatibility
+      let imageDataUrl: string | null = null;
+      if (imageUrl && imageDimensions) {
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = reject;
+            img.src = imageUrl;
+          });
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          const cx2 = c.getContext('2d')!;
+          cx2.drawImage(img, 0, 0);
+          imageDataUrl = c.toDataURL('image/png');
+        } catch {
+          // If conversion fails, skip image in export
+        }
+      }
+
       const svgNs = 'http://www.w3.org/2000/svg';
       const svg = document.createElementNS(svgNs, 'svg');
       svg.setAttribute('xmlns', svgNs);
@@ -531,14 +553,14 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       bg.setAttribute('fill', 'white');
       svg.appendChild(bg);
 
-      if (imageUrl && imageDimensions) {
+      if (imageDataUrl && imageDimensions) {
         const g = document.createElementNS(svgNs, 'g');
         const cx = width / 2 + transform.offsetX;
         const cy = height / 2 + transform.offsetY;
         g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${transform.rotation}) scale(${transform.scale}) translate(${-imageDimensions.w / 2}, ${-imageDimensions.h / 2})`);
         g.setAttribute('opacity', String(transform.opacity / 100));
         const img = document.createElementNS(svgNs, 'image');
-        img.setAttribute('href', imageUrl);
+        img.setAttribute('href', imageDataUrl);
         img.setAttribute('width', String(imageDimensions.w));
         img.setAttribute('height', String(imageDimensions.h));
         g.appendChild(img);
