@@ -160,6 +160,8 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
       ) : (
         <div className="space-y-2 pt-1 border-t border-border">
           <Label className="text-xs font-mono uppercase font-medium">Points Controls</Label>
+          <SliderRow label="X Stretch" value={pointsTransform.xStretch ?? 1} min={0.5} max={2} step={0.1} onChange={v => onPointsTransformChange({ ...pointsTransform, xStretch: v })} unit="x" />
+          <SliderRow label="Y Stretch" value={pointsTransform.yStretch ?? 1} min={0.5} max={2} step={0.1} onChange={v => onPointsTransformChange({ ...pointsTransform, yStretch: v })} unit="x" />
           <SliderRow label="Opacity" value={pointsTransform.opacity} min={0} max={100} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, opacity: v })} unit="%" />
           <SliderRow label="Scale" value={pointsTransform.scale} min={0.05} max={5} step={0.01} onChange={v => onPointsTransformChange({ ...pointsTransform, scale: v })} unit="x" />
           <SliderRow label="Size" value={pointSettings.sizeMultiplier} min={0.3} max={3} step={0.1} onChange={v => onPointSettingsChange({ ...pointSettings, sizeMultiplier: v })} unit="x" />
