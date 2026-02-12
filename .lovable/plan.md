@@ -1,49 +1,73 @@
 
 
-# Unify the Toolbar
+# Overlay View — Microscope Image + Data Points
 
-## The Problem
-Right now there are **two separate bars** with overlapping actions:
-- The **header bar** has: Clear, point count, Reset, Edit Mode, Undo/Redo, Add Point, Delete, and Export
-- The **toolbar below the file tabs** has: zone tools + Open Project, Save Project, and a second Clear Workspace button
+## Overview
+Add a new **"Overlay"** view tab (between 3D and Analysis) that lets you upload a microscope image of your sample, then overlay the indentation data points on top. You can pan, scale, and rotate the image to align it with the data, then export the composite figure.
 
-This is cluttered and confusing -- two "Clear" buttons, actions scattered across two rows.
+## How It Works
 
-## The Solution
-Merge everything into **one unified toolbar** below the file tabs, and slim down the header to just the app title and branding. The toolbar will be organized into logical groups separated by subtle dividers:
+1. **Upload** a microscope image (JPG/PNG) via the sidebar or drag-and-drop onto the canvas
+2. The image appears as the background with your colored data points rendered on top
+3. **Transform controls** in the sidebar let you adjust:
+   - Image position (X/Y offset)
+   - Image scale (zoom in/out)
+   - Image rotation (degrees)
+   - Image opacity (so you can see through to data or vice versa)
+4. Point appearance controls: size multiplier, opacity
+5. **Export** the composite as PNG/SVG/PDF — reusing the same format/DPI controls from Export Studio
 
-```text
-| [Zone tools...] | [Edit Mode] [Undo] [Redo] [Add] [Delete N] | [Export v] | --- spacer --- | [Open] [Save] | [Clear] |
-```
+## Architecture
 
-### Layout groups (left to right):
-1. **View tools** -- zone drawing tools (when in 2D or Export/Figure view)
-2. **Editing tools** -- Edit Mode toggle, Undo/Redo, Add Point, Delete selected, Reset (only when data is loaded)
-3. **Data export** -- the Export dropdown (CSV, Excel, Screenshot, PDF)
-4. **Spacer** pushes project actions to the right
-5. **Project actions** -- Open Project, Save Project (icon-only with tooltips)
-6. **Clear workspace** -- separated by a divider (icon-only, destructive)
+### New view tab
+- Add `'overlay'` to the `ViewType` union in `ViewSidebar.tsx` (icon: `Layers`)
+- Wire it into `IndentViewApp.tsx` alongside the existing 2D/3D/Analysis/Export views
 
-### What changes in the header
-The header shrinks to just: **"IndentView" title + version badge + point count**. All action buttons move down to the toolbar.
+### New files
 
----
+**`src/components/visualization/OverlayCanvas.tsx`**
+- SVG-based canvas (similar pattern to ExportCanvas)
+- Renders an `<image>` element for the background photo
+- Renders colored circles for data points on top
+- Supports pan/zoom of the entire view (mouse wheel + drag)
+- Transform controls apply CSS/SVG transforms to the image layer independently
+
+**`src/components/panels/OverlayControlsPanel.tsx`**
+- Sidebar panel with:
+  - **Image upload** button (accepts JPG, PNG, WEBP)
+  - **Transform** section: X offset, Y offset, Scale (0.1x-10x), Rotation (0-360), Opacity (0-100%)
+  - **Points** section: Size multiplier, Opacity
+  - **Export** button: Format (PNG/SVG/PDF), dimensions, DPI
+
+### State management
+- Overlay state (image URL, transforms) stored locally in `IndentViewApp` via `useState` since it's view-specific and doesn't need to persist across sessions
+- Image stored as an object URL from `URL.createObjectURL()` (no database, no base64)
+
+### Changes to existing files
+
+**`src/components/layout/ViewSidebar.tsx`**
+- Add `'overlay'` to `ViewType`
+- Add new nav item with `Layers` icon labeled "Overlay"
+
+**`src/components/IndentViewApp.tsx`**
+- Expand `activeView` state type to include `'overlay'`
+- Add `renderContent()` case for overlay view
+- Add `renderSidebarControls()` case for overlay controls
+- Add overlay-specific state: `overlayImage`, `overlayTransform`
+
+### No changes needed to contexts or types — this is a self-contained view
 
 ## Technical Details
 
-### 1. `src/components/layout/AppToolbar.tsx`
-- Accept new props for editing controls and export:
-  - `isEditing`, `onToggleEditing`, `canUndo`, `canRedo`, `onUndo`, `onRedo`
-  - `hasChanges`, `onReset`, `onAddPoint`
-  - `selectedPointCount`, `onBulkDelete`
-  - `data`, `visualizationRef`, `selectedProperty` (for ExportControls)
-- Render all action groups in one row with vertical `Separator` dividers between logical groups
-- Keep project actions (Open/Save/Clear) on the right as they are now
+### Image handling
+- User selects an image file via `<input type="file" accept="image/*">`
+- Create object URL with `URL.createObjectURL(file)` 
+- Revoke on cleanup or replacement with `URL.revokeObjectURL()`
+- Image is rendered as an SVG `<image>` element with transform attributes
 
-### 2. `src/components/IndentViewApp.tsx`
-- **Header** (lines 400-485): Strip out all buttons -- keep only the title, version badge, and point count
-- **`renderToolbar()`**: Pass editing state, undo/redo handlers, export props, etc. into `AppToolbar` so it renders everything in one bar
-- Remove the duplicate `AlertDialog` for Clear Workspace from the header since it already exists in `AppToolbar`
+### Alignment workflow
+The SVG coordinate system matches the data coordinate system (same as ExportCanvas). The image transform controls (offset, scale, rotation) are applied to the image layer only, so the user drags/scales the photo until it aligns with the fixed data point positions.
 
-### 3. No new files or dependencies needed
+### Export
+The overlay canvas exposes a `exportToDataURL()` method (same pattern as ExportCanvas). The sidebar includes a simple export button that serializes the SVG to PNG/PDF.
 
