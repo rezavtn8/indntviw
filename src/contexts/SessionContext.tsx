@@ -105,6 +105,11 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       selectedPointIds: [],
       highlightedOutliers: [],
       exportSelectedPointIds: [],
+      overlayImageDataUrl: (ps as any).overlayImageDataUrl ?? null,
+      overlayTransform: (ps as any).overlayTransform ?? { offsetX: 0, offsetY: 0, scale: 1, rotation: 0, opacity: 80 },
+      overlayPointSettings: (ps as any).overlayPointSettings ?? { sizeMultiplier: 1, opacity: 90 },
+      overlayPointsTransform: (ps as any).overlayPointsTransform ?? { offsetX: 0, offsetY: 0, scale: 1, opacity: 90, xStretch: 1, yStretch: 1 },
+      overlayActiveLayer: (ps as any).overlayActiveLayer ?? 'points',
     }));
 
     setFileSessions(sessions);

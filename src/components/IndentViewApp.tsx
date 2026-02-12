@@ -57,28 +57,10 @@ export const IndentViewApp: React.FC = () => {
   const [exportMode, setExportMode] = useState<'figure' | 'batch'>('figure');
   const visualizationRef = useRef<HTMLDivElement>(null);
 
-  // Overlay state
-  const [overlayImageUrl, setOverlayImageUrl] = useState<string | null>(null);
-  const [overlayTransform, setOverlayTransform] = useState<OverlayTransform>(DEFAULT_OVERLAY_TRANSFORM);
-  const [overlayPointSettings, setOverlayPointSettings] = useState<OverlayPointSettings>(DEFAULT_OVERLAY_POINT_SETTINGS);
-  const [overlayPointsTransform, setOverlayPointsTransform] = useState<PointsTransform>(DEFAULT_POINTS_TRANSFORM);
-  const [overlayActiveLayer, setOverlayActiveLayer] = useState<OverlayActiveLayer>('points');
+  // Overlay state - derived from active session
   const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
-
-  const handleOverlayImageChange = useCallback((file: File | null) => {
-    if (overlayImageUrl) URL.revokeObjectURL(overlayImageUrl);
-    if (file) {
-      setOverlayImageUrl(URL.createObjectURL(file));
-    } else {
-      setOverlayImageUrl(null);
-    }
-  }, [overlayImageUrl]);
-
-  // Cleanup overlay image URL on unmount
-  useEffect(() => {
-    return () => { if (overlayImageUrl) URL.revokeObjectURL(overlayImageUrl); };
-  }, []);
-
+  const [overlayBlobUrl, setOverlayBlobUrl] = useState<string | null>(null);
+  const prevSessionIdRef = useRef<string | null>(null);
   // Context hooks
   const {
     fileSessions, activeSessionId, data, selectedProperty, colorScheme,
@@ -111,8 +93,61 @@ export const IndentViewApp: React.FC = () => {
     handleRemoveOutliers, handleResetData, handleExportSelected,
     handleSelectedPointIds, handleExportSelectedPointIds, handleHighlightOutliers,
   } = useEditor();
+  // Overlay state derived from active session
+  const activeSession = fileSessions.find(s => s.id === activeSessionId) || null;
+  const overlayTransform = activeSession?.overlayTransform ?? DEFAULT_OVERLAY_TRANSFORM;
+  const overlayPointSettings = activeSession?.overlayPointSettings ?? DEFAULT_OVERLAY_POINT_SETTINGS;
+  const overlayPointsTransform = activeSession?.overlayPointsTransform ?? DEFAULT_POINTS_TRANSFORM;
+  const overlayActiveLayer = activeSession?.overlayActiveLayer ?? 'points';
+  const overlayImageDataUrl = activeSession?.overlayImageDataUrl ?? null;
 
-  // Page-level drag and drop
+  // Create blob URL from stored data URL for rendering (recreate on session switch)
+  useEffect(() => {
+    if (overlayBlobUrl) URL.revokeObjectURL(overlayBlobUrl);
+    if (overlayImageDataUrl) {
+      // Convert data URL back to blob URL for efficient rendering
+      fetch(overlayImageDataUrl)
+        .then(r => r.blob())
+        .then(blob => setOverlayBlobUrl(URL.createObjectURL(blob)))
+        .catch(() => setOverlayBlobUrl(null));
+    } else {
+      setOverlayBlobUrl(null);
+    }
+    return () => { if (overlayBlobUrl) URL.revokeObjectURL(overlayBlobUrl); };
+  }, [activeSessionId, overlayImageDataUrl]);
+
+  const overlayImageUrl = overlayBlobUrl;
+
+  const setOverlayTransform = useCallback((t: OverlayTransform) => {
+    updateActiveSession({ overlayTransform: t });
+  }, [updateActiveSession]);
+
+  const setOverlayPointSettings = useCallback((s: OverlayPointSettings) => {
+    updateActiveSession({ overlayPointSettings: s });
+  }, [updateActiveSession]);
+
+  const setOverlayPointsTransform = useCallback((t: PointsTransform) => {
+    updateActiveSession({ overlayPointsTransform: t });
+  }, [updateActiveSession]);
+
+  const setOverlayActiveLayer = useCallback((l: OverlayActiveLayer) => {
+    updateActiveSession({ overlayActiveLayer: l });
+  }, [updateActiveSession]);
+
+  const handleOverlayImageChange = useCallback(async (file: File | null) => {
+    if (file) {
+      // Convert to data URL for session persistence
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateActiveSession({ overlayImageDataUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      updateActiveSession({ overlayImageDataUrl: null });
+    }
+  }, [updateActiveSession]);
+
+
   const { isDraggingOverPage } = usePageDropZone({
     onDataLoaded: handleDataLoaded,
     isLoading,
