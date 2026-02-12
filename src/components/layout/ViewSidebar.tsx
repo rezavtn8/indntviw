@@ -1,9 +1,9 @@
 import React from 'react';
-import { Grid2X2, Box, BarChart3, FileOutput } from 'lucide-react';
+import { Grid2X2, Box, Layers, BarChart3, FileOutput } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-type ViewType = '2d' | '3d' | 'analysis' | 'export';
+type ViewType = '2d' | '3d' | 'overlay' | 'analysis' | 'export';
 
 interface ViewSidebarProps {
   activeView: ViewType;
@@ -14,6 +14,7 @@ interface ViewSidebarProps {
 const viewItems: { id: ViewType; icon: React.ElementType; label: string }[] = [
   { id: '2d', icon: Grid2X2, label: '2D Heatmap' },
   { id: '3d', icon: Box, label: '3D View' },
+  { id: 'overlay', icon: Layers, label: 'Overlay' },
   { id: 'analysis', icon: BarChart3, label: 'Analysis' },
   { id: 'export', icon: FileOutput, label: 'Export Studio' },
 ];
