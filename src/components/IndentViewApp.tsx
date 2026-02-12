@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 import { Heatmap2D } from '@/components/visualization/Heatmap2D';
 import { Scene3D } from '@/components/visualization/Scene3D';
 import { ExportCanvas } from '@/components/visualization/ExportCanvas';
+import { OverlayCanvas, OverlayCanvasRef, OverlayTransform, OverlayPointSettings, DEFAULT_OVERLAY_TRANSFORM, DEFAULT_OVERLAY_POINT_SETTINGS } from '@/components/visualization/OverlayCanvas';
 import { ColorLegend } from '@/components/visualization/ColorLegend';
 import { PropertySelector } from '@/components/controls/PropertySelector';
 import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
@@ -19,6 +20,7 @@ import { SelectionStatisticsPanel } from '@/components/panels/SelectionStatistic
 import { ZonePanel } from '@/components/panels/ZonePanel';
 import { ZoneEditor } from '@/components/panels/ZoneEditor';
 import { ExportOptionsPanel } from '@/components/panels/ExportOptionsPanel';
+import { OverlayControlsPanel } from '@/components/panels/OverlayControlsPanel';
 import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
 import { Spatial3DPanel } from '@/components/analysis/Spatial3DPanel';
 import { ComprehensiveBatchExport } from '@/components/analysis/ComprehensiveBatchExport';
@@ -30,9 +32,29 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, Image, Package } from 'lucide-react';
 
 export const IndentViewApp: React.FC = () => {
-  const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
+  const [activeView, setActiveView] = useState<'2d' | '3d' | 'overlay' | 'analysis' | 'export'>('2d');
   const [exportMode, setExportMode] = useState<'figure' | 'batch'>('figure');
   const visualizationRef = useRef<HTMLDivElement>(null);
+
+  // Overlay state
+  const [overlayImageUrl, setOverlayImageUrl] = useState<string | null>(null);
+  const [overlayTransform, setOverlayTransform] = useState<OverlayTransform>(DEFAULT_OVERLAY_TRANSFORM);
+  const [overlayPointSettings, setOverlayPointSettings] = useState<OverlayPointSettings>(DEFAULT_OVERLAY_POINT_SETTINGS);
+  const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
+
+  const handleOverlayImageChange = useCallback((file: File | null) => {
+    if (overlayImageUrl) URL.revokeObjectURL(overlayImageUrl);
+    if (file) {
+      setOverlayImageUrl(URL.createObjectURL(file));
+    } else {
+      setOverlayImageUrl(null);
+    }
+  }, [overlayImageUrl]);
+
+  // Cleanup overlay image URL on unmount
+  useEffect(() => {
+    return () => { if (overlayImageUrl) URL.revokeObjectURL(overlayImageUrl); };
+  }, []);
 
   // Context hooks
   const {
@@ -134,7 +156,37 @@ export const IndentViewApp: React.FC = () => {
     
     // For export view with batch mode, show minimal controls
     if (activeView === 'export' && exportMode === 'batch') {
-      return null; // Batch export has its own full-screen interface
+      return null;
+    }
+
+    // Overlay view has its own dedicated controls
+    if (activeView === 'overlay') {
+      return (
+        <>
+          <FileUploader onDataLoaded={handleDataLoaded} isLoading={isLoading} setIsLoading={setIsLoading} />
+          {data && (
+            <>
+              <PropertySelector availableProperties={data.propertyNames} selectedProperty={selectedProperty} onPropertyChange={handlePropertyChange} />
+              <ColorSchemeSelector colorScheme={colorScheme} onColorSchemeChange={handleColorSchemeChange} />
+              <RangeControls 
+                dataMin={dataMin} dataMax={dataMax} currentMin={currentMin} currentMax={currentMax}
+                onMinChange={(val) => updateActiveSession({ customMin: val })}
+                onMaxChange={(val) => updateActiveSession({ customMax: val })}
+                onReset={handleResetRange} 
+              />
+            </>
+          )}
+          <OverlayControlsPanel
+            imageUrl={overlayImageUrl}
+            onImageChange={handleOverlayImageChange}
+            transform={overlayTransform}
+            onTransformChange={setOverlayTransform}
+            pointSettings={overlayPointSettings}
+            onPointSettingsChange={setOverlayPointSettings}
+            canvasRef={overlayCanvasRef}
+          />
+        </>
+      );
     }
     
     return (
@@ -333,6 +385,26 @@ export const IndentViewApp: React.FC = () => {
             zones={zones} points={data?.points || []} selectedProperty={selectedProperty}
             propertyNames={data?.propertyNames || []} onPropertyChange={handlePropertyChange} fileSessions={fileSessions}
             sampleName={(fileSessions.find(s => s.id === activeSessionId)?.fileName || 'Sample').replace(/\.[^.]+$/, '').replace(/[_\s]+(RV|JG)$/i, '')}
+          />
+        </div>
+      );
+    }
+
+    if (activeView === 'overlay') {
+      return (
+        <div className="w-full h-full border border-border bg-card">
+          <OverlayCanvas
+            ref={overlayCanvasRef}
+            points={data?.points || []}
+            selectedProperty={selectedProperty}
+            colorScheme={colorScheme}
+            minValue={currentMin}
+            maxValue={currentMax}
+            imageUrl={overlayImageUrl}
+            transform={overlayTransform}
+            pointSettings={overlayPointSettings}
+            width={800}
+            height={600}
           />
         </div>
       );
