@@ -24,7 +24,7 @@ const OverlayContainer: React.FC<{ children: (w: number, h: number) => React.Rea
 import { Heatmap2D } from '@/components/visualization/Heatmap2D';
 import { Scene3D } from '@/components/visualization/Scene3D';
 import { ExportCanvas } from '@/components/visualization/ExportCanvas';
-import { OverlayCanvas, OverlayCanvasRef, OverlayTransform, OverlayPointSettings, DEFAULT_OVERLAY_TRANSFORM, DEFAULT_OVERLAY_POINT_SETTINGS } from '@/components/visualization/OverlayCanvas';
+import { OverlayCanvas, OverlayCanvasRef, OverlayTransform, OverlayPointSettings, PointsTransform, OverlayActiveLayer, DEFAULT_OVERLAY_TRANSFORM, DEFAULT_OVERLAY_POINT_SETTINGS, DEFAULT_POINTS_TRANSFORM } from '@/components/visualization/OverlayCanvas';
 import { ColorLegend } from '@/components/visualization/ColorLegend';
 import { PropertySelector } from '@/components/controls/PropertySelector';
 import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
@@ -61,6 +61,8 @@ export const IndentViewApp: React.FC = () => {
   const [overlayImageUrl, setOverlayImageUrl] = useState<string | null>(null);
   const [overlayTransform, setOverlayTransform] = useState<OverlayTransform>(DEFAULT_OVERLAY_TRANSFORM);
   const [overlayPointSettings, setOverlayPointSettings] = useState<OverlayPointSettings>(DEFAULT_OVERLAY_POINT_SETTINGS);
+  const [overlayPointsTransform, setOverlayPointsTransform] = useState<PointsTransform>(DEFAULT_POINTS_TRANSFORM);
+  const [overlayActiveLayer, setOverlayActiveLayer] = useState<OverlayActiveLayer>('points');
   const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
 
   const handleOverlayImageChange = useCallback((file: File | null) => {
@@ -190,6 +192,10 @@ export const IndentViewApp: React.FC = () => {
           onTransformChange={setOverlayTransform}
           pointSettings={overlayPointSettings}
           onPointSettingsChange={setOverlayPointSettings}
+          pointsTransform={overlayPointsTransform}
+          onPointsTransformChange={setOverlayPointsTransform}
+          activeLayer={overlayActiveLayer}
+          onActiveLayerChange={setOverlayActiveLayer}
           canvasRef={overlayCanvasRef}
         />
       );
@@ -411,6 +417,10 @@ export const IndentViewApp: React.FC = () => {
               transform={overlayTransform}
               onTransformChange={setOverlayTransform}
               pointSettings={overlayPointSettings}
+              pointsTransform={overlayPointsTransform}
+              onPointsTransformChange={setOverlayPointsTransform}
+              activeLayer={overlayActiveLayer}
+              onActiveLayerChange={setOverlayActiveLayer}
               containerWidth={w}
               containerHeight={h}
             />

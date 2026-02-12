@@ -15,6 +15,15 @@ export interface OverlayPointSettings {
   opacity: number;
 }
 
+export type OverlayActiveLayer = 'image' | 'points';
+
+export interface PointsTransform {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  opacity: number;
+}
+
 export const DEFAULT_OVERLAY_TRANSFORM: OverlayTransform = {
   offsetX: 0,
   offsetY: 0,
@@ -28,6 +37,13 @@ export const DEFAULT_OVERLAY_POINT_SETTINGS: OverlayPointSettings = {
   opacity: 90,
 };
 
+export const DEFAULT_POINTS_TRANSFORM: PointsTransform = {
+  offsetX: 0,
+  offsetY: 0,
+  scale: 1,
+  opacity: 90,
+};
+
 interface OverlayCanvasProps {
   points: IndentationPoint[];
   selectedProperty: string;
@@ -38,6 +54,10 @@ interface OverlayCanvasProps {
   transform: OverlayTransform;
   onTransformChange: (t: OverlayTransform) => void;
   pointSettings: OverlayPointSettings;
+  pointsTransform: PointsTransform;
+  onPointsTransformChange: (t: PointsTransform) => void;
+  activeLayer: OverlayActiveLayer;
+  onActiveLayerChange: (l: OverlayActiveLayer) => void;
   containerWidth: number;
   containerHeight: number;
 }
@@ -46,7 +66,25 @@ export interface OverlayCanvasRef {
   exportToDataURL: (format: 'png' | 'svg', dpi: number) => Promise<string>;
   fitImageToData: () => void;
   centerImage: () => void;
+  centerPoints: () => void;
   getCanvasDimensions: () => { width: number; height: number };
+}
+
+const HANDLE_SIZE = 8;
+const HANDLE_HIT_SIZE = 14;
+
+type DragMode = 'none' | 'move-image' | 'move-points' | 'resize-image' | 'resize-points' | 'pan';
+
+interface DragState {
+  mode: DragMode;
+  startX: number;
+  startY: number;
+  startOffsetX: number;
+  startOffsetY: number;
+  startScale: number;
+  handleCorner: number; // 0=TL 1=TR 2=BR 3=BL
+  anchorX: number;
+  anchorY: number;
 }
 
 export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
@@ -59,6 +97,10 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   transform,
   onTransformChange,
   pointSettings,
+  pointsTransform,
+  onPointsTransformChange,
+  activeLayer,
+  onActiveLayerChange,
   containerWidth,
   containerHeight,
 }, ref) => {
@@ -66,17 +108,20 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const pointsCanvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
   const sceneRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ active: boolean; type: 'pan' | 'image'; startX: number; startY: number; startOffsetX: number; startOffsetY: number } | null>(null);
+  const dragRef = useRef<DragState | null>(null);
   const rafRef = useRef<number>(0);
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null);
   const prevImageUrlRef = useRef<string | null>(null);
 
-  // === STALE CLOSURE FIX: keep transform in a ref ===
+  // Refs to avoid stale closures
   const transformRef = useRef(transform);
   useEffect(() => { transformRef.current = transform; }, [transform]);
-
+  const pointsTransformRef = useRef(pointsTransform);
+  useEffect(() => { pointsTransformRef.current = pointsTransform; }, [pointsTransform]);
   const onTransformChangeRef = useRef(onTransformChange);
   useEffect(() => { onTransformChangeRef.current = onTransformChange; }, [onTransformChange]);
+  const onPointsTransformChangeRef = useRef(onPointsTransformChange);
+  useEffect(() => { onPointsTransformChangeRef.current = onPointsTransformChange; }, [onPointsTransformChange]);
 
   const width = containerWidth || 800;
   const height = containerHeight || 600;
@@ -110,7 +155,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const scaleX = plotWidth / xRange;
   const scaleY = plotHeight / yRange;
 
-  // Compute colored points data (no DOM nodes)
+  // Colored points data
   const coloredPoints = useMemo(() => points.map(p => {
     const val = p.properties[selectedProperty] ?? 0;
     const cx = margin + (p.x - dataBounds.xMin) * scaleX;
@@ -125,6 +170,42 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     return Math.max(2, Math.min(10, avgDist * scaleX * 0.35)) * pointSettings.sizeMultiplier;
   }, [points.length, xRange, yRange, scaleX, pointSettings.sizeMultiplier]);
 
+  // Points bounding box (in canvas coords, before points transform)
+  const pointsBBox = useMemo(() => {
+    if (coloredPoints.length === 0) return { x: margin, y: margin, w: plotWidth, h: plotHeight };
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const p of coloredPoints) {
+      if (p.cx - pointRadius < x1) x1 = p.cx - pointRadius;
+      if (p.cy - pointRadius < y1) y1 = p.cy - pointRadius;
+      if (p.cx + pointRadius > x2) x2 = p.cx + pointRadius;
+      if (p.cy + pointRadius > y2) y2 = p.cy + pointRadius;
+    }
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  }, [coloredPoints, pointRadius, margin, plotWidth, plotHeight]);
+
+  // Image bounding box (in scene coords)
+  const imageBBox = useMemo(() => {
+    if (!imageDimensions) return null;
+    const w = imageDimensions.w * transform.scale;
+    const h = imageDimensions.h * transform.scale;
+    const cx = width / 2 + transform.offsetX;
+    const cy = height / 2 + transform.offsetY;
+    return { x: cx - w / 2, y: cy - h / 2, w, h };
+  }, [imageDimensions, transform.scale, transform.offsetX, transform.offsetY, width, height]);
+
+  // Points layer bounding box (after transform applied)
+  const pointsLayerBBox = useMemo(() => {
+    const s = pointsTransform.scale;
+    const ox = pointsTransform.offsetX;
+    const oy = pointsTransform.offsetY;
+    return {
+      x: pointsBBox.x * s + ox,
+      y: pointsBBox.y * s + oy,
+      w: pointsBBox.w * s,
+      h: pointsBBox.h * s,
+    };
+  }, [pointsBBox, pointsTransform]);
+
   // Fit / Center helpers
   const fitImageToData = useCallback(() => {
     if (!imageDimensions) return;
@@ -138,11 +219,14 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     onTransformChangeRef.current({ ...transformRef.current, offsetX: 0, offsetY: 0 });
   }, []);
 
-  // === AUTO-FIT on first image upload ===
+  const centerPoints = useCallback(() => {
+    onPointsTransformChangeRef.current({ ...pointsTransformRef.current, offsetX: 0, offsetY: 0 });
+  }, []);
+
+  // Auto-fit on first image upload
   useEffect(() => {
     if (imageUrl && imageDimensions && prevImageUrlRef.current !== imageUrl) {
       prevImageUrlRef.current = imageUrl;
-      // Auto-fit: schedule after state settles
       requestAnimationFrame(() => fitImageToData());
     }
     if (!imageUrl) {
@@ -150,7 +234,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     }
   }, [imageUrl, imageDimensions, fitImageToData]);
 
-  // Draw points onto canvas (single redraw, no DOM nodes)
+  // Draw points onto canvas
   useEffect(() => {
     const canvas = pointsCanvasRef.current;
     if (!canvas) return;
@@ -159,7 +243,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
-    ctx.globalAlpha = pointSettings.opacity / 100;
+    ctx.globalAlpha = (pointSettings.opacity / 100) * (pointsTransform.opacity / 100);
     for (const p of coloredPoints) {
       ctx.beginPath();
       ctx.arc(p.cx, p.cy, pointRadius, 0, Math.PI * 2);
@@ -169,50 +253,171 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       ctx.lineWidth = 0.5;
       ctx.stroke();
     }
-  }, [coloredPoints, pointRadius, pointSettings.opacity, width, height]);
+  }, [coloredPoints, pointRadius, pointSettings.opacity, pointsTransform.opacity, width, height]);
 
-  // Apply view transform via DOM (no re-render)
+  // Apply view transform
   const applyViewTransform = useCallback(() => {
     if (!sceneRef.current) return;
     const { x, y, zoom } = viewRef.current;
     sceneRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
   }, []);
 
-  // === STABLE mouse handlers using refs — no stale closures ===
+  // Get corners of a bounding box
+  const getCorners = (bbox: { x: number; y: number; w: number; h: number }) => [
+    { x: bbox.x, y: bbox.y },
+    { x: bbox.x + bbox.w, y: bbox.y },
+    { x: bbox.x + bbox.w, y: bbox.y + bbox.h },
+    { x: bbox.x, y: bbox.y + bbox.h },
+  ];
+
+  // Hit test handle
+  const hitTestHandle = (mx: number, my: number, bbox: { x: number; y: number; w: number; h: number }): number => {
+    const corners = getCorners(bbox);
+    const zoom = viewRef.current.zoom;
+    const hs = HANDLE_HIT_SIZE / zoom;
+    for (let i = 0; i < 4; i++) {
+      if (Math.abs(mx - corners[i].x) < hs && Math.abs(my - corners[i].y) < hs) return i;
+    }
+    return -1;
+  };
+
+  // Hit test bbox interior
+  const hitTestBBox = (mx: number, my: number, bbox: { x: number; y: number; w: number; h: number }): boolean => {
+    return mx >= bbox.x && mx <= bbox.x + bbox.w && my >= bbox.y && my <= bbox.y + bbox.h;
+  };
+
+  // Convert mouse event to scene coordinates
+  const toSceneCoords = (e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    const { x: vx, y: vy, zoom } = viewRef.current;
+    return {
+      x: (e.clientX - rect.left - vx) / zoom,
+      y: (e.clientY - rect.top - vy) / zoom,
+    };
+  };
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    const t = transformRef.current;
+
+    // Alt+click = pan
     if (e.altKey) {
-      dragRef.current = { active: true, type: 'pan', startX: e.clientX - viewRef.current.x, startY: e.clientY - viewRef.current.y, startOffsetX: 0, startOffsetY: 0 };
-    } else if (imageUrl) {
-      dragRef.current = { active: true, type: 'image', startX: e.clientX, startY: e.clientY, startOffsetX: t.offsetX, startOffsetY: t.offsetY };
+      dragRef.current = {
+        mode: 'pan', startX: e.clientX - viewRef.current.x, startY: e.clientY - viewRef.current.y,
+        startOffsetX: 0, startOffsetY: 0, startScale: 1, handleCorner: -1, anchorX: 0, anchorY: 0,
+      };
+      return;
     }
-  }, [imageUrl]); // no transform dependency!
+
+    const sc = toSceneCoords(e);
+
+    // Check handles on active layer first
+    if (activeLayer === 'image' && imageBBox) {
+      const h = hitTestHandle(sc.x, sc.y, imageBBox);
+      if (h >= 0) {
+        const corners = getCorners(imageBBox);
+        const anchor = corners[(h + 2) % 4]; // opposite corner
+        dragRef.current = {
+          mode: 'resize-image', startX: e.clientX, startY: e.clientY,
+          startOffsetX: transformRef.current.offsetX, startOffsetY: transformRef.current.offsetY,
+          startScale: transformRef.current.scale, handleCorner: h, anchorX: anchor.x, anchorY: anchor.y,
+        };
+        return;
+      }
+    }
+    if (activeLayer === 'points' && pointsLayerBBox) {
+      const h = hitTestHandle(sc.x, sc.y, pointsLayerBBox);
+      if (h >= 0) {
+        const corners = getCorners(pointsLayerBBox);
+        const anchor = corners[(h + 2) % 4];
+        dragRef.current = {
+          mode: 'resize-points', startX: e.clientX, startY: e.clientY,
+          startOffsetX: pointsTransformRef.current.offsetX, startOffsetY: pointsTransformRef.current.offsetY,
+          startScale: pointsTransformRef.current.scale, handleCorner: h, anchorX: anchor.x, anchorY: anchor.y,
+        };
+        return;
+      }
+    }
+
+    // Check click on layers (active layer has priority)
+    const checkOrder: OverlayActiveLayer[] = activeLayer === 'image' ? ['image', 'points'] : ['points', 'image'];
+    for (const layer of checkOrder) {
+      if (layer === 'image' && imageBBox && hitTestBBox(sc.x, sc.y, imageBBox)) {
+        onActiveLayerChange('image');
+        dragRef.current = {
+          mode: 'move-image', startX: e.clientX, startY: e.clientY,
+          startOffsetX: transformRef.current.offsetX, startOffsetY: transformRef.current.offsetY,
+          startScale: 1, handleCorner: -1, anchorX: 0, anchorY: 0,
+        };
+        return;
+      }
+      if (layer === 'points' && hitTestBBox(sc.x, sc.y, pointsLayerBBox)) {
+        onActiveLayerChange('points');
+        dragRef.current = {
+          mode: 'move-points', startX: e.clientX, startY: e.clientY,
+          startOffsetX: pointsTransformRef.current.offsetX, startOffsetY: pointsTransformRef.current.offsetY,
+          startScale: 1, handleCorner: -1, anchorX: 0, anchorY: 0,
+        };
+        return;
+      }
+    }
+  }, [activeLayer, imageBBox, pointsLayerBBox, onActiveLayerChange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current?.active) return;
-    if (dragRef.current.type === 'pan') {
-      viewRef.current.x = e.clientX - dragRef.current.startX;
-      viewRef.current.y = e.clientY - dragRef.current.startY;
+    const d = dragRef.current;
+    if (!d) return;
+
+    const zoom = viewRef.current.zoom || 1;
+    const dx = (e.clientX - d.startX) / zoom;
+    const dy = (e.clientY - d.startY) / zoom;
+
+    if (d.mode === 'pan') {
+      viewRef.current.x = e.clientX - d.startX; // startX already stores offset
+      viewRef.current.y = e.clientY - d.startY;
+      // recalc: startX = e.clientX_initial - viewRef.x_initial, so viewRef.x = e.clientX - startX
       applyViewTransform();
-    } else {
-      const zoom = viewRef.current.zoom || 1;
-      const dx = (e.clientX - dragRef.current.startX) / zoom;
-      const dy = (e.clientY - dragRef.current.startY) / zoom;
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        onTransformChangeRef.current({
-          ...transformRef.current,
-          offsetX: dragRef.current!.startOffsetX + dx,
-          offsetY: dragRef.current!.startOffsetY + dy,
-        });
-      });
+      return;
     }
-  }, [applyViewTransform]); // no transform dependency!
+
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      if (d.mode === 'move-image') {
+        onTransformChangeRef.current({ ...transformRef.current, offsetX: d.startOffsetX + dx, offsetY: d.startOffsetY + dy });
+      } else if (d.mode === 'move-points') {
+        onPointsTransformChangeRef.current({ ...pointsTransformRef.current, offsetX: d.startOffsetX + dx, offsetY: d.startOffsetY + dy });
+      } else if (d.mode === 'resize-image') {
+        // Proportional resize based on diagonal distance from anchor
+        const sc = toSceneCoords(e);
+        const startSc = { x: d.anchorX + (d.startX - d.startX), y: d.anchorY }; // not used directly
+        const distNow = Math.sqrt((sc.x - d.anchorX) ** 2 + (sc.y - d.anchorY) ** 2);
+        // Original distance from anchor to the drag corner
+        const origBBox = imageBBox!;
+        const corners = getCorners(origBBox);
+        const dragCorner = corners[d.handleCorner];
+        const distOrig = Math.sqrt((dragCorner.x - d.anchorX) ** 2 + (dragCorner.y - d.anchorY) ** 2);
+        if (distOrig > 0) {
+          const ratio = distNow / distOrig;
+          const newScale = Math.max(0.05, d.startScale * ratio);
+          onTransformChangeRef.current({ ...transformRef.current, scale: newScale });
+        }
+      } else if (d.mode === 'resize-points') {
+        const sc = toSceneCoords(e);
+        const distNow = Math.sqrt((sc.x - d.anchorX) ** 2 + (sc.y - d.anchorY) ** 2);
+        const corners = getCorners(pointsLayerBBox);
+        const dragCorner = corners[d.handleCorner];
+        const distOrig = Math.sqrt((dragCorner.x - d.anchorX) ** 2 + (dragCorner.y - d.anchorY) ** 2);
+        if (distOrig > 0) {
+          const ratio = distNow / distOrig;
+          const newScale = Math.max(0.05, d.startScale * ratio);
+          onPointsTransformChangeRef.current({ ...pointsTransformRef.current, scale: newScale });
+        }
+      }
+    });
+  }, [applyViewTransform, imageBBox, pointsLayerBBox]);
 
   const handleMouseUp = useCallback(() => {
-    if (dragRef.current) dragRef.current.active = false;
+    dragRef.current = null;
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -222,7 +427,6 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       viewRef.current.zoom = Math.max(0.1, Math.min(10, viewRef.current.zoom * delta));
       applyViewTransform();
     }
-    // No scroll-to-scale — image scale is controlled only via sidebar slider
   }, [applyViewTransform]);
 
   // Image CSS transform
@@ -241,10 +445,62 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     };
   }, [imageDimensions, transform]);
 
+  // Points wrapper CSS transform
+  const pointsWrapperStyle = useMemo((): React.CSSProperties => ({
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width,
+    height,
+    transformOrigin: '0 0',
+    transform: `translate(${pointsTransform.offsetX}px, ${pointsTransform.offsetY}px) scale(${pointsTransform.scale})`,
+    pointerEvents: 'none' as const,
+    willChange: 'transform',
+  }), [pointsTransform, width, height]);
+
+  // Render selection boxes as SVG overlay
+  const renderSelectionOverlay = () => {
+    const zoom = viewRef.current.zoom || 1;
+    const hs = HANDLE_SIZE / zoom;
+
+    const renderBBox = (bbox: { x: number; y: number; w: number; h: number }, color: string, isActive: boolean) => {
+      const corners = getCorners(bbox);
+      return (
+        <g key={color}>
+          <rect
+            x={bbox.x} y={bbox.y} width={bbox.w} height={bbox.h}
+            fill="none" stroke={color} strokeWidth={isActive ? 2 / zoom : 1 / zoom}
+            strokeDasharray={isActive ? 'none' : `${4 / zoom}`}
+          />
+          {isActive && corners.map((c, i) => (
+            <rect
+              key={i}
+              x={c.x - hs / 2} y={c.y - hs / 2} width={hs} height={hs}
+              fill={color} stroke="hsl(var(--background))" strokeWidth={1 / zoom}
+              style={{ cursor: 'nwse-resize' }}
+            />
+          ))}
+        </g>
+      );
+    };
+
+    return (
+      <svg
+        style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none', overflow: 'visible' }}
+      >
+        {/* Points layer box */}
+        {points.length > 0 && renderBBox(pointsLayerBBox, 'hsl(142, 76%, 46%)', activeLayer === 'points')}
+        {/* Image layer box */}
+        {imageBBox && renderBBox(imageBBox, 'hsl(217, 91%, 60%)', activeLayer === 'image')}
+      </svg>
+    );
+  };
+
   // Export
   useImperativeHandle(ref, () => ({
     fitImageToData,
     centerImage,
+    centerPoints,
     getCanvasDimensions: () => ({ width, height }),
     exportToDataURL: async (format, dpi) => {
       const svgNs = 'http://www.w3.org/2000/svg';
@@ -275,7 +531,8 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       }
 
       const pg = document.createElementNS(svgNs, 'g');
-      pg.setAttribute('opacity', String(pointSettings.opacity / 100));
+      pg.setAttribute('opacity', String((pointSettings.opacity / 100) * (pointsTransform.opacity / 100)));
+      pg.setAttribute('transform', `translate(${pointsTransform.offsetX}, ${pointsTransform.offsetY}) scale(${pointsTransform.scale})`);
       for (const p of coloredPoints) {
         const c = document.createElementNS(svgNs, 'circle');
         c.setAttribute('cx', String(p.cx));
@@ -313,13 +570,15 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         img.src = url;
       });
     },
-  }), [width, height, imageUrl, imageDimensions, transform, pointSettings, coloredPoints, pointRadius, fitImageToData, centerImage]);
+  }), [width, height, imageUrl, imageDimensions, transform, pointSettings, pointsTransform, coloredPoints, pointRadius, fitImageToData, centerImage, centerPoints]);
+
+  const cursorStyle = dragRef.current ? 'grabbing' : 'default';
 
   return (
     <div
       ref={containerRef}
       className="w-full h-full overflow-hidden bg-muted/20 relative"
-      style={{ cursor: dragRef.current?.active ? 'grabbing' : (imageUrl ? 'grab' : 'default') }}
+      style={{ cursor: cursorStyle }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -333,12 +592,15 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         {imageUrl && imageDimensions && (
           <img src={imageUrl} alt="Overlay" style={imageStyle} draggable={false} />
         )}
-        <canvas
-          ref={pointsCanvasRef}
-          width={width}
-          height={height}
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-        />
+        <div style={pointsWrapperStyle}>
+          <canvas
+            ref={pointsCanvasRef}
+            width={width}
+            height={height}
+            style={{ position: 'absolute', top: 0, left: 0 }}
+          />
+        </div>
+        {renderSelectionOverlay()}
       </div>
 
       {!imageUrl && points.length === 0 && (
@@ -349,8 +611,32 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         </div>
       )}
 
-      <div className="absolute bottom-2 left-2 text-[10px] font-mono text-muted-foreground/60 pointer-events-none select-none">
-        Drag: move image · Scroll: scale · Alt+drag: pan · Alt+scroll: zoom
+      {/* Layer switcher at bottom */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm">
+        <button
+          onClick={(e) => { e.stopPropagation(); onActiveLayerChange('image'); }}
+          className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${
+            activeLayer === 'image'
+              ? 'bg-[hsl(217,91%,60%)] text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
+          }`}
+        >
+          Image
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onActiveLayerChange('points'); }}
+          className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${
+            activeLayer === 'points'
+              ? 'bg-[hsl(142,76%,46%)] text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
+          }`}
+        >
+          Points
+        </button>
+      </div>
+
+      <div className="absolute bottom-3 left-2 text-[10px] font-mono text-muted-foreground/60 pointer-events-none select-none">
+        Click: select layer · Drag: move · Corners: resize · Alt+drag: pan
       </div>
     </div>
   );
