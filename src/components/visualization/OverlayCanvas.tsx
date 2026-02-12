@@ -518,23 +518,27 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     centerPoints,
     getCanvasDimensions: () => ({ width, height }),
     exportToDataURL: async (format, dpi) => {
-      // Convert blob/object URL to data URL for export compatibility
+      // Convert blob/object URL to data URL via XHR+FileReader for reliable export
       let imageDataUrl: string | null = null;
       if (imageUrl && imageDimensions) {
         try {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = reject;
-            img.src = imageUrl;
+          imageDataUrl = await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', imageUrl, true);
+            xhr.responseType = 'blob';
+            xhr.onload = () => {
+              if (xhr.status === 200) {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(xhr.response);
+              } else {
+                reject(new Error('Failed to fetch image blob'));
+              }
+            };
+            xhr.onerror = reject;
+            xhr.send();
           });
-          const c = document.createElement('canvas');
-          c.width = img.naturalWidth;
-          c.height = img.naturalHeight;
-          const cx2 = c.getContext('2d')!;
-          cx2.drawImage(img, 0, 0);
-          imageDataUrl = c.toDataURL('image/png');
         } catch {
           // If conversion fails, skip image in export
         }

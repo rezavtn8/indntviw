@@ -1,5 +1,14 @@
 import { IndentationData, ColorScheme } from './indentation';
 import { Zone } from './zones';
+import {
+  OverlayTransform,
+  OverlayPointSettings,
+  PointsTransform,
+  OverlayActiveLayer,
+  DEFAULT_OVERLAY_TRANSFORM,
+  DEFAULT_OVERLAY_POINT_SETTINGS,
+  DEFAULT_POINTS_TRANSFORM,
+} from '@/components/visualization/OverlayCanvas';
 
 export interface FileSession {
   id: string;
@@ -18,6 +27,12 @@ export interface FileSession {
   selectedPointIds: number[];
   highlightedOutliers: number[];
   exportSelectedPointIds: number[];
+  // Per-file overlay settings
+  overlayImageDataUrl: string | null;
+  overlayTransform: OverlayTransform;
+  overlayPointSettings: OverlayPointSettings;
+  overlayPointsTransform: PointsTransform;
+  overlayActiveLayer: OverlayActiveLayer;
 }
 
 export const createFileSession = (
@@ -42,6 +57,11 @@ export const createFileSession = (
     selectedPointIds: [],
     highlightedOutliers: [],
     exportSelectedPointIds: [],
+    overlayImageDataUrl: null,
+    overlayTransform: DEFAULT_OVERLAY_TRANSFORM,
+    overlayPointSettings: DEFAULT_OVERLAY_POINT_SETTINGS,
+    overlayPointsTransform: DEFAULT_POINTS_TRANSFORM,
+    overlayActiveLayer: 'points',
   };
 };
 
