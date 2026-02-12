@@ -185,19 +185,43 @@ export const IndentViewApp: React.FC = () => {
     // Overlay view has its own dedicated controls
     if (activeView === 'overlay') {
       return (
-        <OverlayControlsPanel
-          imageUrl={overlayImageUrl}
-          onImageChange={handleOverlayImageChange}
-          transform={overlayTransform}
-          onTransformChange={setOverlayTransform}
-          pointSettings={overlayPointSettings}
-          onPointSettingsChange={setOverlayPointSettings}
-          pointsTransform={overlayPointsTransform}
-          onPointsTransformChange={setOverlayPointsTransform}
-          activeLayer={overlayActiveLayer}
-          onActiveLayerChange={setOverlayActiveLayer}
-          canvasRef={overlayCanvasRef}
-        />
+        <>
+          <FileUploader onDataLoaded={handleDataLoaded} isLoading={isLoading} setIsLoading={setIsLoading} />
+          {data && (
+            <>
+              <PropertySelector availableProperties={data.propertyNames} selectedProperty={selectedProperty} onPropertyChange={handlePropertyChange} />
+              <ColorSchemeSelector colorScheme={colorScheme} onColorSchemeChange={handleColorSchemeChange} />
+              <RangeControls 
+                dataMin={dataMin} dataMax={dataMax} currentMin={currentMin} currentMax={currentMax}
+                onMinChange={(val) => updateActiveSession({ customMin: val })}
+                onMaxChange={(val) => updateActiveSession({ customMax: val })}
+                onReset={handleResetRange} 
+              />
+              <Collapsible defaultOpen={false}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                  <span className="font-mono text-xs uppercase font-medium">Color Scale</span>
+                  <ChevronDown className="w-4 h-4" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <ColorLegend selectedProperty={selectedProperty} unit={getPropertyUnit(selectedProperty)} colorScheme={colorScheme} minValue={currentMin} maxValue={currentMax} />
+                </CollapsibleContent>
+              </Collapsible>
+            </>
+          )}
+          <OverlayControlsPanel
+            imageUrl={overlayImageUrl}
+            onImageChange={handleOverlayImageChange}
+            transform={overlayTransform}
+            onTransformChange={setOverlayTransform}
+            pointSettings={overlayPointSettings}
+            onPointSettingsChange={setOverlayPointSettings}
+            pointsTransform={overlayPointsTransform}
+            onPointsTransformChange={setOverlayPointsTransform}
+            activeLayer={overlayActiveLayer}
+            onActiveLayerChange={setOverlayActiveLayer}
+            canvasRef={overlayCanvasRef}
+          />
+        </>
       );
     }
     
