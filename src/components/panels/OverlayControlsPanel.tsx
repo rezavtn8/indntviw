@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
 import {
   OverlayTransform,
   OverlayPointSettings,
@@ -16,16 +14,14 @@ import {
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
-// Extracted as a standalone component to avoid re-mount on parent re-render
+// Standalone memoized slider row — no ref warnings, no re-mount
 const SliderRow: React.FC<{
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; unit?: string;
 }> = React.memo(({ label, value, min, max, step, onChange, unit }) => (
-  <div className="space-y-1">
-    <div className="flex justify-between">
-      <Label className="text-xs font-mono">{label}</Label>
-      <span className="text-xs text-muted-foreground font-mono">{value}{unit || ''}</span>
-    </div>
-    <Slider min={min} max={max} step={step} value={[value]} onValueChange={([v]) => onChange(v)} />
+  <div className="flex items-center gap-2">
+    <Label className="text-xs font-mono w-16 shrink-0">{label}</Label>
+    <Slider min={min} max={max} step={step} value={[value]} onValueChange={([v]) => onChange(v)} className="flex-1" />
+    <span className="text-xs text-muted-foreground font-mono w-12 text-right">{value}{unit || ''}</span>
   </div>
 ));
 SliderRow.displayName = 'SliderRow';
@@ -64,10 +60,11 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
     if (!canvasRef.current) return;
     setIsExporting(true);
     try {
+      const dims = canvasRef.current.getCanvasDimensions();
       if (exportFormat === 'pdf') {
         const dataUrl = await canvasRef.current.exportToDataURL('png', exportDpi);
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [800, 600] });
-        pdf.addImage(dataUrl, 'PNG', 0, 0, 800, 600);
+        const pdf = new jsPDF({ orientation: dims.width >= dims.height ? 'landscape' : 'portrait', unit: 'px', format: [dims.width, dims.height] });
+        pdf.addImage(dataUrl, 'PNG', 0, 0, dims.width, dims.height);
         pdf.save('overlay_export.pdf');
       } else {
         const dataUrl = await canvasRef.current.exportToDataURL(exportFormat === 'svg' ? 'svg' : 'png', exportDpi);
@@ -85,99 +82,80 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Image Upload */}
-      <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Image Upload — compact row */}
+      <div className="space-y-1.5">
         <Label className="text-xs font-mono uppercase font-medium">Microscope Image</Label>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs" onClick={() => fileInputRef.current?.click()}>
-            <Upload className="w-3.5 h-3.5" />
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs h-7" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-3 h-3" />
             {imageUrl ? 'Replace' : 'Upload'}
           </Button>
           {imageUrl && (
-            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => onImageChange(null)}>
-              <Trash2 className="w-3.5 h-3.5" />
+            <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => onImageChange(null)}>
+              <Trash2 className="w-3 h-3" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Image Transform */}
+      {/* Image Transform — flat, no collapsible */}
       {imageUrl && (
-        <Collapsible defaultOpen>
-          <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-            <span className="font-mono text-xs uppercase font-medium">Image Transform</span>
-            <ChevronDown className="w-4 h-4" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3 space-y-3">
-            <SliderRow label="X Offset" value={transform.offsetX} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetX: v })} unit="px" />
-            <SliderRow label="Y Offset" value={transform.offsetY} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetY: v })} unit="px" />
-            <SliderRow label="Scale" value={transform.scale} min={0.05} max={20} step={0.05} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
-            <SliderRow label="Rotation" value={transform.rotation} min={0} max={360} step={1} onChange={v => onTransformChange({ ...transform, rotation: v })} unit="°" />
-            <SliderRow label="Opacity" value={transform.opacity} min={0} max={100} step={1} onChange={v => onTransformChange({ ...transform, opacity: v })} unit="%" />
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => canvasRef.current?.fitImageToData()}>
-                <Maximize className="w-3.5 h-3.5" /> Fit to Data
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => canvasRef.current?.centerImage()}>
-                <Crosshair className="w-3.5 h-3.5" /> Center
-              </Button>
-            </div>
-            <Button variant="ghost" size="sm" className="w-full text-xs gap-1" onClick={() => onTransformChange(DEFAULT_OVERLAY_TRANSFORM)}>
-              <RotateCcw className="w-3.5 h-3.5" /> Reset Transform
+        <div className="space-y-2 pt-1 border-t border-border">
+          <SliderRow label="Opacity" value={transform.opacity} min={0} max={100} step={1} onChange={v => onTransformChange({ ...transform, opacity: v })} unit="%" />
+          <SliderRow label="Scale" value={transform.scale} min={0.1} max={5} step={0.01} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
+          <SliderRow label="Rotation" value={transform.rotation} min={0} max={360} step={1} onChange={v => onTransformChange({ ...transform, rotation: v })} unit="°" />
+          <SliderRow label="X Offset" value={transform.offsetX} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetX: v })} unit="px" />
+          <SliderRow label="Y Offset" value={transform.offsetY} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetY: v })} unit="px" />
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => canvasRef.current?.fitImageToData()}>
+              <Maximize className="w-3 h-3" /> Fit
             </Button>
-          </CollapsibleContent>
-        </Collapsible>
+            <Button variant="outline" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => canvasRef.current?.centerImage()}>
+              <Crosshair className="w-3 h-3" /> Center
+            </Button>
+            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => onTransformChange(DEFAULT_OVERLAY_TRANSFORM)}>
+              <RotateCcw className="w-3 h-3" /> Reset
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* Point Settings */}
-      <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-          <span className="font-mono text-xs uppercase font-medium">Points</span>
-          <ChevronDown className="w-4 h-4" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-3 space-y-3">
-          <SliderRow label="Size" value={pointSettings.sizeMultiplier} min={0.3} max={3} step={0.1} onChange={v => onPointSettingsChange({ ...pointSettings, sizeMultiplier: v })} unit="x" />
-          <SliderRow label="Opacity" value={pointSettings.opacity} min={0} max={100} step={1} onChange={v => onPointSettingsChange({ ...pointSettings, opacity: v })} unit="%" />
-          <Button variant="ghost" size="sm" className="w-full text-xs gap-1" onClick={() => onPointSettingsChange(DEFAULT_OVERLAY_POINT_SETTINGS)}>
-            <RotateCcw className="w-3.5 h-3.5" /> Reset Points
-          </Button>
-        </CollapsibleContent>
-      </Collapsible>
+      {/* Point Settings — flat */}
+      <div className="space-y-2 pt-1 border-t border-border">
+        <Label className="text-xs font-mono uppercase font-medium">Points</Label>
+        <SliderRow label="Size" value={pointSettings.sizeMultiplier} min={0.3} max={3} step={0.1} onChange={v => onPointSettingsChange({ ...pointSettings, sizeMultiplier: v })} unit="x" />
+        <SliderRow label="Opacity" value={pointSettings.opacity} min={0} max={100} step={1} onChange={v => onPointSettingsChange({ ...pointSettings, opacity: v })} unit="%" />
+      </div>
 
-      {/* Export */}
-      <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-          <span className="font-mono text-xs uppercase font-medium">Export</span>
-          <ChevronDown className="w-4 h-4" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-3 space-y-3">
-          <div className="grid grid-cols-3 gap-1">
-            {(['png', 'svg', 'pdf'] as const).map(fmt => (
-              <button
-                key={fmt}
-                onClick={() => setExportFormat(fmt)}
-                className={`px-2 py-1.5 rounded text-xs font-mono uppercase transition-colors ${
-                  exportFormat === fmt ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                {fmt}
-              </button>
-            ))}
+      {/* Export — single compact row */}
+      <div className="space-y-2 pt-1 border-t border-border">
+        <Label className="text-xs font-mono uppercase font-medium">Export</Label>
+        <div className="flex gap-1">
+          {(['png', 'svg', 'pdf'] as const).map(fmt => (
+            <button
+              key={fmt}
+              onClick={() => setExportFormat(fmt)}
+              className={`flex-1 px-2 py-1 rounded text-xs font-mono uppercase transition-colors ${
+                exportFormat === fmt ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {fmt}
+            </button>
+          ))}
+        </div>
+        {exportFormat !== 'svg' && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-mono w-16 shrink-0">DPI</Label>
+            <Input type="number" value={exportDpi} onChange={e => setExportDpi(Number(e.target.value))} className="h-7 text-xs font-mono flex-1" />
           </div>
-          {exportFormat !== 'svg' && (
-            <div className="space-y-1">
-              <Label className="text-xs font-mono">DPI</Label>
-              <Input type="number" value={exportDpi} onChange={e => setExportDpi(Number(e.target.value))} className="h-8 text-xs font-mono" />
-            </div>
-          )}
-          <Button onClick={handleExport} disabled={isExporting} className="w-full gap-2" size="sm">
-            <Download className="w-4 h-4" />
-            {isExporting ? 'Exporting...' : `Export ${exportFormat.toUpperCase()}`}
-          </Button>
-        </CollapsibleContent>
-      </Collapsible>
+        )}
+        <Button onClick={handleExport} disabled={isExporting} className="w-full gap-1.5 h-8" size="sm">
+          <Download className="w-3.5 h-3.5" />
+          {isExporting ? 'Exporting...' : `Export ${exportFormat.toUpperCase()}`}
+        </Button>
+      </div>
     </div>
   );
 };

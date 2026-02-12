@@ -183,30 +183,15 @@ export const IndentViewApp: React.FC = () => {
     // Overlay view has its own dedicated controls
     if (activeView === 'overlay') {
       return (
-        <>
-          <FileUploader onDataLoaded={handleDataLoaded} isLoading={isLoading} setIsLoading={setIsLoading} />
-          {data && (
-            <>
-              <PropertySelector availableProperties={data.propertyNames} selectedProperty={selectedProperty} onPropertyChange={handlePropertyChange} />
-              <ColorSchemeSelector colorScheme={colorScheme} onColorSchemeChange={handleColorSchemeChange} />
-              <RangeControls 
-                dataMin={dataMin} dataMax={dataMax} currentMin={currentMin} currentMax={currentMax}
-                onMinChange={(val) => updateActiveSession({ customMin: val })}
-                onMaxChange={(val) => updateActiveSession({ customMax: val })}
-                onReset={handleResetRange} 
-              />
-            </>
-          )}
-          <OverlayControlsPanel
-            imageUrl={overlayImageUrl}
-            onImageChange={handleOverlayImageChange}
-            transform={overlayTransform}
-            onTransformChange={setOverlayTransform}
-            pointSettings={overlayPointSettings}
-            onPointSettingsChange={setOverlayPointSettings}
-            canvasRef={overlayCanvasRef}
-          />
-        </>
+        <OverlayControlsPanel
+          imageUrl={overlayImageUrl}
+          onImageChange={handleOverlayImageChange}
+          transform={overlayTransform}
+          onTransformChange={setOverlayTransform}
+          pointSettings={overlayPointSettings}
+          onPointSettingsChange={setOverlayPointSettings}
+          canvasRef={overlayCanvasRef}
+        />
       );
     }
     

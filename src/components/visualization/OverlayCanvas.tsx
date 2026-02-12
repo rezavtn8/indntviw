@@ -46,6 +46,7 @@ export interface OverlayCanvasRef {
   exportToDataURL: (format: 'png' | 'svg', dpi: number) => Promise<string>;
   fitImageToData: () => void;
   centerImage: () => void;
+  getCanvasDimensions: () => { width: number; height: number };
 }
 
 export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
@@ -68,6 +69,14 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const dragRef = useRef<{ active: boolean; type: 'pan' | 'image'; startX: number; startY: number; startOffsetX: number; startOffsetY: number } | null>(null);
   const rafRef = useRef<number>(0);
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null);
+  const prevImageUrlRef = useRef<string | null>(null);
+
+  // === STALE CLOSURE FIX: keep transform in a ref ===
+  const transformRef = useRef(transform);
+  useEffect(() => { transformRef.current = transform; }, [transform]);
+
+  const onTransformChangeRef = useRef(onTransformChange);
+  useEffect(() => { onTransformChangeRef.current = onTransformChange; }, [onTransformChange]);
 
   const width = containerWidth || 800;
   const height = containerHeight || 600;
@@ -116,6 +125,31 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     return Math.max(2, Math.min(10, avgDist * scaleX * 0.35)) * pointSettings.sizeMultiplier;
   }, [points.length, xRange, yRange, scaleX, pointSettings.sizeMultiplier]);
 
+  // Fit / Center helpers
+  const fitImageToData = useCallback(() => {
+    if (!imageDimensions) return;
+    const scaleToFitX = plotWidth / imageDimensions.w;
+    const scaleToFitY = plotHeight / imageDimensions.h;
+    const fitScale = Math.min(scaleToFitX, scaleToFitY);
+    onTransformChangeRef.current({ ...transformRef.current, scale: fitScale, offsetX: 0, offsetY: 0, rotation: 0 });
+  }, [imageDimensions, plotWidth, plotHeight]);
+
+  const centerImage = useCallback(() => {
+    onTransformChangeRef.current({ ...transformRef.current, offsetX: 0, offsetY: 0 });
+  }, []);
+
+  // === AUTO-FIT on first image upload ===
+  useEffect(() => {
+    if (imageUrl && imageDimensions && prevImageUrlRef.current !== imageUrl) {
+      prevImageUrlRef.current = imageUrl;
+      // Auto-fit: schedule after state settles
+      requestAnimationFrame(() => fitImageToData());
+    }
+    if (!imageUrl) {
+      prevImageUrlRef.current = null;
+    }
+  }, [imageUrl, imageDimensions, fitImageToData]);
+
   // Draw points onto canvas (single redraw, no DOM nodes)
   useEffect(() => {
     const canvas = pointsCanvasRef.current;
@@ -144,16 +178,17 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     sceneRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
   }, []);
 
-  // Mouse handlers for pan (Alt+drag) and image drag (plain drag)
+  // === STABLE mouse handlers using refs — no stale closures ===
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    const t = transformRef.current;
     if (e.altKey) {
       dragRef.current = { active: true, type: 'pan', startX: e.clientX - viewRef.current.x, startY: e.clientY - viewRef.current.y, startOffsetX: 0, startOffsetY: 0 };
     } else if (imageUrl) {
-      dragRef.current = { active: true, type: 'image', startX: e.clientX, startY: e.clientY, startOffsetX: transform.offsetX, startOffsetY: transform.offsetY };
+      dragRef.current = { active: true, type: 'image', startX: e.clientX, startY: e.clientY, startOffsetX: t.offsetX, startOffsetY: t.offsetY };
     }
-  }, [imageUrl, transform.offsetX, transform.offsetY]);
+  }, [imageUrl]); // no transform dependency!
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragRef.current?.active) return;
@@ -165,17 +200,16 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       const zoom = viewRef.current.zoom || 1;
       const dx = (e.clientX - dragRef.current.startX) / zoom;
       const dy = (e.clientY - dragRef.current.startY) / zoom;
-      // Debounce React state update
       cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
-        onTransformChange({
-          ...transform,
+        onTransformChangeRef.current({
+          ...transformRef.current,
           offsetX: dragRef.current!.startOffsetX + dx,
           offsetY: dragRef.current!.startOffsetY + dy,
         });
       });
     }
-  }, [applyViewTransform, onTransformChange, transform]);
+  }, [applyViewTransform]); // no transform dependency!
 
   const handleMouseUp = useCallback(() => {
     if (dragRef.current) dragRef.current.active = false;
@@ -184,16 +218,15 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     if (e.altKey) {
-      // Zoom view
       const delta = e.deltaY > 0 ? 0.92 : 1.08;
       viewRef.current.zoom = Math.max(0.1, Math.min(10, viewRef.current.zoom * delta));
       applyViewTransform();
     } else {
-      // Scale image
       const delta = e.deltaY > 0 ? 0.95 : 1.05;
-      onTransformChange({ ...transform, scale: Math.max(0.05, Math.min(20, transform.scale * delta)) });
+      const t = transformRef.current;
+      onTransformChangeRef.current({ ...t, scale: Math.max(0.1, Math.min(5, t.scale * delta)) });
     }
-  }, [applyViewTransform, onTransformChange, transform]);
+  }, [applyViewTransform]); // no transform dependency!
 
   // Image CSS transform
   const imageStyle = useMemo((): React.CSSProperties => {
@@ -211,25 +244,12 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     };
   }, [imageDimensions, transform]);
 
-  // Fit / Center helpers
-  const fitImageToData = useCallback(() => {
-    if (!imageDimensions) return;
-    const scaleToFitX = plotWidth / imageDimensions.w;
-    const scaleToFitY = plotHeight / imageDimensions.h;
-    const fitScale = Math.min(scaleToFitX, scaleToFitY);
-    onTransformChange({ ...transform, scale: fitScale, offsetX: 0, offsetY: 0, rotation: 0 });
-  }, [imageDimensions, plotWidth, plotHeight, onTransformChange, transform]);
-
-  const centerImage = useCallback(() => {
-    onTransformChange({ ...transform, offsetX: 0, offsetY: 0 });
-  }, [onTransformChange, transform]);
-
   // Export
   useImperativeHandle(ref, () => ({
     fitImageToData,
     centerImage,
+    getCanvasDimensions: () => ({ width, height }),
     exportToDataURL: async (format, dpi) => {
-      // Build an offscreen SVG for export
       const svgNs = 'http://www.w3.org/2000/svg';
       const svg = document.createElementNS(svgNs, 'svg');
       svg.setAttribute('xmlns', svgNs);
@@ -237,14 +257,12 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       svg.setAttribute('height', String(height));
       svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-      // White background
       const bg = document.createElementNS(svgNs, 'rect');
       bg.setAttribute('width', String(width));
       bg.setAttribute('height', String(height));
       bg.setAttribute('fill', 'white');
       svg.appendChild(bg);
 
-      // Image layer
       if (imageUrl && imageDimensions) {
         const g = document.createElementNS(svgNs, 'g');
         const cx = width / 2 + transform.offsetX;
@@ -259,7 +277,6 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         svg.appendChild(g);
       }
 
-      // Points
       const pg = document.createElementNS(svgNs, 'g');
       pg.setAttribute('opacity', String(pointSettings.opacity / 100));
       for (const p of coloredPoints) {
@@ -312,17 +329,13 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      {/* Scene layer — CSS-transformed for pan/zoom, zero re-renders */}
       <div
         ref={sceneRef}
         style={{ width, height, position: 'relative', transformOrigin: '0 0', willChange: 'transform' }}
       >
-        {/* Image layer — GPU-accelerated CSS transforms */}
         {imageUrl && imageDimensions && (
           <img src={imageUrl} alt="Overlay" style={imageStyle} draggable={false} />
         )}
-
-        {/* Points canvas — single DOM node for all points */}
         <canvas
           ref={pointsCanvasRef}
           width={width}
@@ -331,7 +344,6 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         />
       </div>
 
-      {/* Empty state */}
       {!imageUrl && points.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-muted-foreground font-mono text-sm">
@@ -340,9 +352,8 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         </div>
       )}
 
-      {/* Interaction hint */}
       <div className="absolute bottom-2 left-2 text-[10px] font-mono text-muted-foreground/60 pointer-events-none select-none">
-        Drag: move image · Scroll: scale image · Alt+drag: pan · Alt+scroll: zoom
+        Drag: move image · Scroll: scale · Alt+drag: pan · Alt+scroll: zoom
       </div>
     </div>
   );
