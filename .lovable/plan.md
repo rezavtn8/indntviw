@@ -1,73 +1,88 @@
 
 
-# Overlay View — Microscope Image + Data Points
+# Overlay Tab -- Performance and UX Overhaul
 
-## Overview
-Add a new **"Overlay"** view tab (between 3D and Analysis) that lets you upload a microscope image of your sample, then overlay the indentation data points on top. You can pan, scale, and rotate the image to align it with the data, then export the composite figure.
+## Problems Found
 
-## How It Works
+1. **Canvas is hardcoded to 800x600** instead of filling available space
+2. **Every data point is an individual SVG circle DOM node** -- with hundreds of points, every slider change triggers a massive DOM update
+3. **SliderRow is defined as an inline component** inside the render function, causing React to unmount/remount it on every parent re-render (this is also the source of the console ref warning)
+4. **Pan and zoom use React state**, so every mousemove/wheel event triggers a full component re-render
+5. **No direct canvas interaction** -- you can only adjust the image via sliders, not by dragging on the canvas
+6. **No auto-fit** -- no way to quickly fit the image to match data bounds
 
-1. **Upload** a microscope image (JPG/PNG) via the sidebar or drag-and-drop onto the canvas
-2. The image appears as the background with your colored data points rendered on top
-3. **Transform controls** in the sidebar let you adjust:
-   - Image position (X/Y offset)
-   - Image scale (zoom in/out)
-   - Image rotation (degrees)
-   - Image opacity (so you can see through to data or vice versa)
-4. Point appearance controls: size multiplier, opacity
-5. **Export** the composite as PNG/SVG/PDF — reusing the same format/DPI controls from Export Studio
+## Solution
 
-## Architecture
+### Phase 1: Fix Performance
 
-### New view tab
-- Add `'overlay'` to the `ViewType` union in `ViewSidebar.tsx` (icon: `Layers`)
-- Wire it into `IndentViewApp.tsx` alongside the existing 2D/3D/Analysis/Export views
+**`src/components/visualization/OverlayCanvas.tsx`** -- Rewrite for performance:
 
-### New files
+- **Switch data points to a single Canvas 2D layer** instead of individual SVG circles. Render points onto an offscreen `<canvas>` element whenever points/colors change, then composite it with the image. This drops the DOM node count from N circles to 1 canvas element.
+- **Use CSS transforms for pan/zoom** on the container div instead of SVG `transform` attributes and React state. Store pan/zoom in a `useRef` and apply via `element.style.transform` directly -- zero re-renders during interaction.
+- **Image layer uses a simple `<img>` tag** with CSS transforms for position/scale/rotation/opacity, instead of an SVG `<image>` element. CSS transforms are GPU-accelerated.
+- **Direct image dragging**: Left-click + drag on the canvas moves the image offset. Scroll wheel adjusts image scale. This gives tactile, immediate feedback.
+- **Debounce slider updates**: The canvas reads transform values from a ref that updates immediately, while React state updates are throttled via `requestAnimationFrame`.
 
-**`src/components/visualization/OverlayCanvas.tsx`**
-- SVG-based canvas (similar pattern to ExportCanvas)
-- Renders an `<image>` element for the background photo
-- Renders colored circles for data points on top
-- Supports pan/zoom of the entire view (mouse wheel + drag)
-- Transform controls apply CSS/SVG transforms to the image layer independently
+**`src/components/panels/OverlayControlsPanel.tsx`** -- Fix the ref warning and reduce re-renders:
 
-**`src/components/panels/OverlayControlsPanel.tsx`**
-- Sidebar panel with:
-  - **Image upload** button (accepts JPG, PNG, WEBP)
-  - **Transform** section: X offset, Y offset, Scale (0.1x-10x), Rotation (0-360), Opacity (0-100%)
-  - **Points** section: Size multiplier, Opacity
-  - **Export** button: Format (PNG/SVG/PDF), dimensions, DPI
+- **Extract `SliderRow` to a standalone component** defined outside the render function (or use a stable `useCallback`-wrapped approach). This fixes the "Function components cannot be given refs" console error.
+- **Add a "Fit Image to Data" button** that automatically calculates scale/offset to align the image bounds with the data bounds.
+- **Add a "Center Image" button** as a quick-align shortcut.
 
-### State management
-- Overlay state (image URL, transforms) stored locally in `IndentViewApp` via `useState` since it's view-specific and doesn't need to persist across sessions
-- Image stored as an object URL from `URL.createObjectURL()` (no database, no base64)
+### Phase 2: Responsive Sizing
 
-### Changes to existing files
+**`src/components/IndentViewApp.tsx`**:
 
-**`src/components/layout/ViewSidebar.tsx`**
-- Add `'overlay'` to `ViewType`
-- Add new nav item with `Layers` icon labeled "Overlay"
-
-**`src/components/IndentViewApp.tsx`**
-- Expand `activeView` state type to include `'overlay'`
-- Add `renderContent()` case for overlay view
-- Add `renderSidebarControls()` case for overlay controls
-- Add overlay-specific state: `overlayImage`, `overlayTransform`
-
-### No changes needed to contexts or types — this is a self-contained view
+- Remove the hardcoded `width={800} height={600}` props.
+- Use a `ResizeObserver` (or the container's `clientWidth`/`clientHeight`) to pass the actual available dimensions to the overlay canvas, so it fills the viewport dynamically.
 
 ## Technical Details
 
-### Image handling
-- User selects an image file via `<input type="file" accept="image/*">`
-- Create object URL with `URL.createObjectURL(file)` 
-- Revoke on cleanup or replacement with `URL.revokeObjectURL()`
-- Image is rendered as an SVG `<image>` element with transform attributes
+### Canvas-based point rendering
 
-### Alignment workflow
-The SVG coordinate system matches the data coordinate system (same as ExportCanvas). The image transform controls (offset, scale, rotation) are applied to the image layer only, so the user drags/scales the photo until it aligns with the fixed data point positions.
+Instead of:
+```
+<g>
+  {points.map(p => <circle ... />)}  // N DOM nodes
+</g>
+```
 
-### Export
-The overlay canvas exposes a `exportToDataURL()` method (same pattern as ExportCanvas). The sidebar includes a simple export button that serializes the SVG to PNG/PDF.
+The new approach:
+```
+<canvas ref={pointsCanvasRef} />  // 1 DOM node
+```
+
+A `useEffect` redraws all points onto the canvas whenever `points`, `colorScheme`, or `selectedProperty` change. During pan/zoom, only the CSS transform on the container changes -- no redraw needed.
+
+### CSS transform for pan/zoom (zero re-renders)
+
+```
+// Store in ref, not state
+const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
+
+const applyTransform = () => {
+  const { x, y, zoom } = viewRef.current;
+  containerEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+};
+
+// On wheel: update ref + apply -- no setState
+onWheel = (e) => {
+  viewRef.current.zoom *= e.deltaY > 0 ? 0.95 : 1.05;
+  applyTransform();
+};
+```
+
+### Direct image dragging
+
+- Left-click + drag: updates `transform.offsetX/Y` via a callback (debounced to 1 update per animation frame)
+- Scroll wheel on image: adjusts `transform.scale`
+- Alt + drag: pan the entire view
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `src/components/visualization/OverlayCanvas.tsx` | Rewrite: Canvas 2D for points, CSS transforms for pan/zoom, direct image drag |
+| `src/components/panels/OverlayControlsPanel.tsx` | Extract SliderRow, add Fit/Center buttons, fix ref warning |
+| `src/components/IndentViewApp.tsx` | Dynamic sizing via ResizeObserver instead of hardcoded 800x600 |
 
