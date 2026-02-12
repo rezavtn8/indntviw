@@ -1,10 +1,9 @@
 import React, { useRef } from 'react';
-import { Upload, RotateCcw, Download, Trash2 } from 'lucide-react';
+import { Upload, RotateCcw, Download, Trash2, Maximize, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
 import {
@@ -16,6 +15,20 @@ import {
 } from '@/components/visualization/OverlayCanvas';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+
+// Extracted as a standalone component to avoid re-mount on parent re-render
+const SliderRow: React.FC<{
+  label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; unit?: string;
+}> = React.memo(({ label, value, min, max, step, onChange, unit }) => (
+  <div className="space-y-1">
+    <div className="flex justify-between">
+      <Label className="text-xs font-mono">{label}</Label>
+      <span className="text-xs text-muted-foreground font-mono">{value}{unit || ''}</span>
+    </div>
+    <Slider min={min} max={max} step={step} value={[value]} onValueChange={([v]) => onChange(v)} />
+  </div>
+));
+SliderRow.displayName = 'SliderRow';
 
 interface OverlayControlsPanelProps {
   imageUrl: string | null;
@@ -71,18 +84,6 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
     }
   };
 
-  const SliderRow = ({ label, value, min, max, step, onChange, unit }: {
-    label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; unit?: string;
-  }) => (
-    <div className="space-y-1">
-      <div className="flex justify-between">
-        <Label className="text-xs font-mono">{label}</Label>
-        <span className="text-xs text-muted-foreground font-mono">{value}{unit || ''}</span>
-      </div>
-      <Slider min={min} max={max} step={step} value={[value]} onValueChange={([v]) => onChange(v)} />
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       {/* Image Upload */}
@@ -112,9 +113,17 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
           <CollapsibleContent className="pt-3 space-y-3">
             <SliderRow label="X Offset" value={transform.offsetX} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetX: v })} unit="px" />
             <SliderRow label="Y Offset" value={transform.offsetY} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetY: v })} unit="px" />
-            <SliderRow label="Scale" value={transform.scale} min={0.1} max={10} step={0.05} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
+            <SliderRow label="Scale" value={transform.scale} min={0.05} max={20} step={0.05} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
             <SliderRow label="Rotation" value={transform.rotation} min={0} max={360} step={1} onChange={v => onTransformChange({ ...transform, rotation: v })} unit="°" />
             <SliderRow label="Opacity" value={transform.opacity} min={0} max={100} step={1} onChange={v => onTransformChange({ ...transform, opacity: v })} unit="%" />
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => canvasRef.current?.fitImageToData()}>
+                <Maximize className="w-3.5 h-3.5" /> Fit to Data
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => canvasRef.current?.centerImage()}>
+                <Crosshair className="w-3.5 h-3.5" /> Center
+              </Button>
+            </div>
             <Button variant="ghost" size="sm" className="w-full text-xs gap-1" onClick={() => onTransformChange(DEFAULT_OVERLAY_TRANSFORM)}>
               <RotateCcw className="w-3.5 h-3.5" /> Reset Transform
             </Button>

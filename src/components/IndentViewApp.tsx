@@ -1,5 +1,26 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
+// ResizeObserver wrapper for dynamic overlay sizing
+const OverlayContainer: React.FC<{ children: (w: number, h: number) => React.ReactNode }> = ({ children }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 800, h: 600 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setSize({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="w-full h-full border border-border bg-card">
+      {children(size.w, size.h)}
+    </div>
+  );
+};
+
 import { Heatmap2D } from '@/components/visualization/Heatmap2D';
 import { Scene3D } from '@/components/visualization/Scene3D';
 import { ExportCanvas } from '@/components/visualization/ExportCanvas';
@@ -392,21 +413,24 @@ export const IndentViewApp: React.FC = () => {
 
     if (activeView === 'overlay') {
       return (
-        <div className="w-full h-full border border-border bg-card">
-          <OverlayCanvas
-            ref={overlayCanvasRef}
-            points={data?.points || []}
-            selectedProperty={selectedProperty}
-            colorScheme={colorScheme}
-            minValue={currentMin}
-            maxValue={currentMax}
-            imageUrl={overlayImageUrl}
-            transform={overlayTransform}
-            pointSettings={overlayPointSettings}
-            width={800}
-            height={600}
-          />
-        </div>
+        <OverlayContainer>
+          {(w, h) => (
+            <OverlayCanvas
+              ref={overlayCanvasRef}
+              points={data?.points || []}
+              selectedProperty={selectedProperty}
+              colorScheme={colorScheme}
+              minValue={currentMin}
+              maxValue={currentMax}
+              imageUrl={overlayImageUrl}
+              transform={overlayTransform}
+              onTransformChange={setOverlayTransform}
+              pointSettings={overlayPointSettings}
+              containerWidth={w}
+              containerHeight={h}
+            />
+          )}
+        </OverlayContainer>
       );
     }
     

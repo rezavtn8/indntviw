@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
+import React, { useMemo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
 
@@ -36,13 +36,16 @@ interface OverlayCanvasProps {
   maxValue: number;
   imageUrl: string | null;
   transform: OverlayTransform;
+  onTransformChange: (t: OverlayTransform) => void;
   pointSettings: OverlayPointSettings;
-  width: number;
-  height: number;
+  containerWidth: number;
+  containerHeight: number;
 }
 
 export interface OverlayCanvasRef {
   exportToDataURL: (format: 'png' | 'svg', dpi: number) => Promise<string>;
+  fitImageToData: () => void;
+  centerImage: () => void;
 }
 
 export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
@@ -53,18 +56,21 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   maxValue,
   imageUrl,
   transform,
+  onTransformChange,
   pointSettings,
-  width,
-  height,
+  containerWidth,
+  containerHeight,
 }, ref) => {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pointsCanvasRef = useRef<HTMLCanvasElement>(null);
+  const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ active: boolean; type: 'pan' | 'image'; startX: number; startY: number; startOffsetX: number; startOffsetY: number } | null>(null);
+  const rafRef = useRef<number>(0);
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null);
 
-  // Pan/zoom state for the entire view
-  const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
-  const [viewZoom, setViewZoom] = useState(1);
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const width = containerWidth || 800;
+  const height = containerHeight || 600;
 
   // Load image dimensions
   useEffect(() => {
@@ -74,12 +80,17 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     img.src = imageUrl;
   }, [imageUrl]);
 
-  // Calculate data bounds
+  // Data bounds
   const dataBounds = useMemo(() => {
     if (points.length === 0) return { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
-    const xs = points.map(p => p.x);
-    const ys = points.map(p => p.y);
-    return { xMin: Math.min(...xs), xMax: Math.max(...xs), yMin: Math.min(...ys), yMax: Math.max(...ys) };
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (const p of points) {
+      if (p.x < xMin) xMin = p.x;
+      if (p.x > xMax) xMax = p.x;
+      if (p.y < yMin) yMin = p.y;
+      if (p.y > yMax) yMax = p.y;
+    }
+    return { xMin, xMax, yMin, yMax };
   }, [points]);
 
   const margin = 40;
@@ -90,10 +101,13 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const scaleX = plotWidth / xRange;
   const scaleY = plotHeight / yRange;
 
-  const transformPoint = useCallback((x: number, y: number) => ({
-    cx: margin + (x - dataBounds.xMin) * scaleX,
-    cy: margin + plotHeight - (y - dataBounds.yMin) * scaleY,
-  }), [dataBounds, scaleX, scaleY, plotHeight]);
+  // Compute colored points data (no DOM nodes)
+  const coloredPoints = useMemo(() => points.map(p => {
+    const val = p.properties[selectedProperty] ?? 0;
+    const cx = margin + (p.x - dataBounds.xMin) * scaleX;
+    const cy = margin + plotHeight - (p.y - dataBounds.yMin) * scaleY;
+    return { cx, cy, color: getColorForValue(val, minValue, maxValue, colorScheme) };
+  }), [points, selectedProperty, colorScheme, minValue, maxValue, dataBounds, scaleX, scaleY, plotHeight]);
 
   // Point radius
   const pointRadius = useMemo(() => {
@@ -102,54 +116,169 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     return Math.max(2, Math.min(10, avgDist * scaleX * 0.35)) * pointSettings.sizeMultiplier;
   }, [points.length, xRange, yRange, scaleX, pointSettings.sizeMultiplier]);
 
-  // Colored points
-  const coloredPoints = useMemo(() => points.map(p => {
-    const val = p.properties[selectedProperty] ?? 0;
-    const { cx, cy } = transformPoint(p.x, p.y);
-    return { cx, cy, color: getColorForValue(val, minValue, maxValue, colorScheme) };
-  }), [points, selectedProperty, colorScheme, minValue, maxValue, transformPoint]);
-
-  // Image transform string (applied to image layer only)
-  const imageTransformStr = useMemo(() => {
-    if (!imageDimensions) return '';
-    const centerX = width / 2 + transform.offsetX;
-    const centerY = height / 2 + transform.offsetY;
-    return `translate(${centerX}, ${centerY}) rotate(${transform.rotation}) scale(${transform.scale}) translate(${-imageDimensions.w / 2}, ${-imageDimensions.h / 2})`;
-  }, [transform, imageDimensions, width, height]);
-
-  // Pan handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - viewOffset.x, y: e.clientY - viewOffset.y });
+  // Draw points onto canvas (single redraw, no DOM nodes)
+  useEffect(() => {
+    const canvas = pointsCanvasRef.current;
+    if (!canvas) return;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, width, height);
+    ctx.globalAlpha = pointSettings.opacity / 100;
+    for (const p of coloredPoints) {
+      ctx.beginPath();
+      ctx.arc(p.cx, p.cy, pointRadius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
     }
-  }, [viewOffset]);
+  }, [coloredPoints, pointRadius, pointSettings.opacity, width, height]);
+
+  // Apply view transform via DOM (no re-render)
+  const applyViewTransform = useCallback(() => {
+    if (!sceneRef.current) return;
+    const { x, y, zoom } = viewRef.current;
+    sceneRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  }, []);
+
+  // Mouse handlers for pan (Alt+drag) and image drag (plain drag)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (e.altKey) {
+      dragRef.current = { active: true, type: 'pan', startX: e.clientX - viewRef.current.x, startY: e.clientY - viewRef.current.y, startOffsetX: 0, startOffsetY: 0 };
+    } else if (imageUrl) {
+      dragRef.current = { active: true, type: 'image', startX: e.clientX, startY: e.clientY, startOffsetX: transform.offsetX, startOffsetY: transform.offsetY };
+    }
+  }, [imageUrl, transform.offsetX, transform.offsetY]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isPanning) return;
-    setViewOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
-  }, [isPanning, panStart]);
+    if (!dragRef.current?.active) return;
+    if (dragRef.current.type === 'pan') {
+      viewRef.current.x = e.clientX - dragRef.current.startX;
+      viewRef.current.y = e.clientY - dragRef.current.startY;
+      applyViewTransform();
+    } else {
+      const zoom = viewRef.current.zoom || 1;
+      const dx = (e.clientX - dragRef.current.startX) / zoom;
+      const dy = (e.clientY - dragRef.current.startY) / zoom;
+      // Debounce React state update
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        onTransformChange({
+          ...transform,
+          offsetX: dragRef.current!.startOffsetX + dx,
+          offsetY: dragRef.current!.startOffsetY + dy,
+        });
+      });
+    }
+  }, [applyViewTransform, onTransformChange, transform]);
 
-  const handleMouseUp = useCallback(() => setIsPanning(false), []);
+  const handleMouseUp = useCallback(() => {
+    if (dragRef.current) dragRef.current.active = false;
+  }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setViewZoom(z => Math.max(0.1, Math.min(10, z * delta)));
-  }, []);
+    if (e.altKey) {
+      // Zoom view
+      const delta = e.deltaY > 0 ? 0.92 : 1.08;
+      viewRef.current.zoom = Math.max(0.1, Math.min(10, viewRef.current.zoom * delta));
+      applyViewTransform();
+    } else {
+      // Scale image
+      const delta = e.deltaY > 0 ? 0.95 : 1.05;
+      onTransformChange({ ...transform, scale: Math.max(0.05, Math.min(20, transform.scale * delta)) });
+    }
+  }, [applyViewTransform, onTransformChange, transform]);
+
+  // Image CSS transform
+  const imageStyle = useMemo((): React.CSSProperties => {
+    if (!imageDimensions) return {};
+    return {
+      position: 'absolute',
+      left: '50%',
+      top: '50%',
+      width: imageDimensions.w,
+      height: imageDimensions.h,
+      transform: `translate(-50%, -50%) translate(${transform.offsetX}px, ${transform.offsetY}px) rotate(${transform.rotation}deg) scale(${transform.scale})`,
+      opacity: transform.opacity / 100,
+      pointerEvents: 'none' as const,
+      willChange: 'transform',
+    };
+  }, [imageDimensions, transform]);
+
+  // Fit / Center helpers
+  const fitImageToData = useCallback(() => {
+    if (!imageDimensions) return;
+    const scaleToFitX = plotWidth / imageDimensions.w;
+    const scaleToFitY = plotHeight / imageDimensions.h;
+    const fitScale = Math.min(scaleToFitX, scaleToFitY);
+    onTransformChange({ ...transform, scale: fitScale, offsetX: 0, offsetY: 0, rotation: 0 });
+  }, [imageDimensions, plotWidth, plotHeight, onTransformChange, transform]);
+
+  const centerImage = useCallback(() => {
+    onTransformChange({ ...transform, offsetX: 0, offsetY: 0 });
+  }, [onTransformChange, transform]);
 
   // Export
   useImperativeHandle(ref, () => ({
+    fitImageToData,
+    centerImage,
     exportToDataURL: async (format, dpi) => {
-      if (!svgRef.current) return '';
+      // Build an offscreen SVG for export
+      const svgNs = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNs, 'svg');
+      svg.setAttribute('xmlns', svgNs);
+      svg.setAttribute('width', String(width));
+      svg.setAttribute('height', String(height));
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      // White background
+      const bg = document.createElementNS(svgNs, 'rect');
+      bg.setAttribute('width', String(width));
+      bg.setAttribute('height', String(height));
+      bg.setAttribute('fill', 'white');
+      svg.appendChild(bg);
+
+      // Image layer
+      if (imageUrl && imageDimensions) {
+        const g = document.createElementNS(svgNs, 'g');
+        const cx = width / 2 + transform.offsetX;
+        const cy = height / 2 + transform.offsetY;
+        g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${transform.rotation}) scale(${transform.scale}) translate(${-imageDimensions.w / 2}, ${-imageDimensions.h / 2})`);
+        g.setAttribute('opacity', String(transform.opacity / 100));
+        const img = document.createElementNS(svgNs, 'image');
+        img.setAttribute('href', imageUrl);
+        img.setAttribute('width', String(imageDimensions.w));
+        img.setAttribute('height', String(imageDimensions.h));
+        g.appendChild(img);
+        svg.appendChild(g);
+      }
+
+      // Points
+      const pg = document.createElementNS(svgNs, 'g');
+      pg.setAttribute('opacity', String(pointSettings.opacity / 100));
+      for (const p of coloredPoints) {
+        const c = document.createElementNS(svgNs, 'circle');
+        c.setAttribute('cx', String(p.cx));
+        c.setAttribute('cy', String(p.cy));
+        c.setAttribute('r', String(pointRadius));
+        c.setAttribute('fill', p.color);
+        c.setAttribute('stroke', 'rgba(0,0,0,0.3)');
+        c.setAttribute('stroke-width', '0.5');
+        pg.appendChild(c);
+      }
+      svg.appendChild(pg);
+
       const serializer = new XMLSerializer();
-      // Clone and remove view transform for export
-      const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
-      const g = clone.querySelector('[data-view-group]');
-      if (g) g.removeAttribute('transform');
+      const svgStr = serializer.serializeToString(svg);
 
       if (format === 'svg') {
-        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(serializer.serializeToString(clone));
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
       }
 
       const canvas = document.createElement('canvas');
@@ -157,56 +286,64 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       canvas.width = width * sf;
       canvas.height = height * sf;
       const ctx = canvas.getContext('2d')!;
-      const svgBlob = new Blob([serializer.serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       return new Promise<string>(resolve => {
         const img = new Image();
-        img.onload = () => { ctx.scale(sf, sf); ctx.drawImage(img, 0, 0); URL.revokeObjectURL(url); resolve(canvas.toDataURL('image/png')); };
+        img.onload = () => {
+          ctx.scale(sf, sf);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/png'));
+        };
         img.src = url;
       });
     },
-  }), [width, height]);
-
-  const viewTransform = `translate(${viewOffset.x}, ${viewOffset.y}) scale(${viewZoom})`;
+  }), [width, height, imageUrl, imageDimensions, transform, pointSettings, coloredPoints, pointRadius, fitImageToData, centerImage]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center overflow-hidden bg-muted/20">
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="xMidYMid meet"
-        className="w-full h-full max-w-full max-h-full"
-        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
+    <div
+      ref={containerRef}
+      className="w-full h-full overflow-hidden bg-muted/20 relative"
+      style={{ cursor: dragRef.current?.active ? 'grabbing' : (imageUrl ? 'grab' : 'default') }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onWheel={handleWheel}
+    >
+      {/* Scene layer — CSS-transformed for pan/zoom, zero re-renders */}
+      <div
+        ref={sceneRef}
+        style={{ width, height, position: 'relative', transformOrigin: '0 0', willChange: 'transform' }}
       >
-        <rect width={width} height={height} fill="white" />
-        <g data-view-group transform={viewTransform}>
-          {/* Background image */}
-          {imageUrl && imageDimensions && (
-            <g transform={imageTransformStr} opacity={transform.opacity / 100}>
-              <image href={imageUrl} width={imageDimensions.w} height={imageDimensions.h} />
-            </g>
-          )}
-
-          {/* Data points */}
-          <g opacity={pointSettings.opacity / 100}>
-            {coloredPoints.map((p, i) => (
-              <circle key={i} cx={p.cx} cy={p.cy} r={pointRadius} fill={p.color} stroke="rgba(0,0,0,0.3)" strokeWidth={0.5} />
-            ))}
-          </g>
-        </g>
-
-        {/* No-image placeholder */}
-        {!imageUrl && points.length === 0 && (
-          <text x={width / 2} y={height / 2} textAnchor="middle" fill="#999" fontSize={14} fontFamily="monospace">
-            Upload a microscope image and load data to begin
-          </text>
+        {/* Image layer — GPU-accelerated CSS transforms */}
+        {imageUrl && imageDimensions && (
+          <img src={imageUrl} alt="Overlay" style={imageStyle} draggable={false} />
         )}
-      </svg>
+
+        {/* Points canvas — single DOM node for all points */}
+        <canvas
+          ref={pointsCanvasRef}
+          width={width}
+          height={height}
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+        />
+      </div>
+
+      {/* Empty state */}
+      {!imageUrl && points.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-muted-foreground font-mono text-sm">
+            Upload a microscope image and load data to begin
+          </span>
+        </div>
+      )}
+
+      {/* Interaction hint */}
+      <div className="absolute bottom-2 left-2 text-[10px] font-mono text-muted-foreground/60 pointer-events-none select-none">
+        Drag: move image · Scroll: scale image · Alt+drag: pan · Alt+scroll: zoom
+      </div>
     </div>
   );
 });
