@@ -1,88 +1,91 @@
 
+# Overlay Tab -- Complete UX Redesign
 
-# Overlay Tab -- Performance and UX Overhaul
+## Problems Identified
 
-## Problems Found
-
-1. **Canvas is hardcoded to 800x600** instead of filling available space
-2. **Every data point is an individual SVG circle DOM node** -- with hundreds of points, every slider change triggers a massive DOM update
-3. **SliderRow is defined as an inline component** inside the render function, causing React to unmount/remount it on every parent re-render (this is also the source of the console ref warning)
-4. **Pan and zoom use React state**, so every mousemove/wheel event triggers a full component re-render
-5. **No direct canvas interaction** -- you can only adjust the image via sliders, not by dragging on the canvas
-6. **No auto-fit** -- no way to quickly fit the image to match data bounds
+1. **Bloated sidebar**: The overlay view duplicates File Uploader, Property Selector, Color Scheme, and Range Controls from the 2D view, pushing the actual overlay controls below the fold. Users have to scroll past irrelevant controls to find what matters.
+2. **Stale closure bug in drag handler**: `handleMouseMove` captures `transform` in its dependency array, meaning every drag frame creates a new callback. When dragging, the offset calculations use stale state, causing jitter and lag.
+3. **Image renders at native pixel size**: A 4000x3000 microscope photo renders at those pixel dimensions, then requires manual scaling down to ~0.1x. The image should auto-fit to the data bounds on first upload.
+4. **Scale slider range is absurd**: 0.05x to 20x is far too wide -- most useful values are between 0.5x and 3x. The slider is unusable because 95% of the range is irrelevant.
+5. **PDF export hardcodes 800x600**: Ignores actual canvas dimensions.
+6. **No auto-fit on upload**: User has to manually fiddle with scale/offset after every upload.
+7. **Too many collapsible sections**: Image Transform, Points, Export all as separate collapsibles makes the sidebar feel heavy for what should be simple controls.
 
 ## Solution
 
-### Phase 1: Fix Performance
+### Phase 1: Streamline the sidebar
 
-**`src/components/visualization/OverlayCanvas.tsx`** -- Rewrite for performance:
+**`src/components/IndentViewApp.tsx`** -- Remove the duplicated controls from the overlay view sidebar. The overlay view should only show:
+- Image upload (compact)
+- Image transform sliders (only when image is loaded)
+- Point settings (compact)
+- Export button (compact)
 
-- **Switch data points to a single Canvas 2D layer** instead of individual SVG circles. Render points onto an offscreen `<canvas>` element whenever points/colors change, then composite it with the image. This drops the DOM node count from N circles to 1 canvas element.
-- **Use CSS transforms for pan/zoom** on the container div instead of SVG `transform` attributes and React state. Store pan/zoom in a `useRef` and apply via `element.style.transform` directly -- zero re-renders during interaction.
-- **Image layer uses a simple `<img>` tag** with CSS transforms for position/scale/rotation/opacity, instead of an SVG `<image>` element. CSS transforms are GPU-accelerated.
-- **Direct image dragging**: Left-click + drag on the canvas moves the image offset. Scroll wheel adjusts image scale. This gives tactile, immediate feedback.
-- **Debounce slider updates**: The canvas reads transform values from a ref that updates immediately, while React state updates are throttled via `requestAnimationFrame`.
+The Property Selector, Color Scheme, and Range Controls are already accessible from the 2D view and persist across views via context -- no need to duplicate them.
 
-**`src/components/panels/OverlayControlsPanel.tsx`** -- Fix the ref warning and reduce re-renders:
+### Phase 2: Fix the canvas interactions
 
-- **Extract `SliderRow` to a standalone component** defined outside the render function (or use a stable `useCallback`-wrapped approach). This fixes the "Function components cannot be given refs" console error.
-- **Add a "Fit Image to Data" button** that automatically calculates scale/offset to align the image bounds with the data bounds.
-- **Add a "Center Image" button** as a quick-align shortcut.
+**`src/components/visualization/OverlayCanvas.tsx`**:
+- **Fix stale closure**: Store `transform` in a `useRef` that syncs with the prop. Use the ref inside mouse handlers so they always read the latest value without needing to be recreated.
+- **Auto-fit on first image upload**: When `imageUrl` changes and `imageDimensions` loads, automatically call `fitImageToData()` so the image starts aligned with the data bounds.
+- **Use the full container**: The scene `div` should match `width x height` of the container, and the image should be positioned relative to the data coordinate space (centered on the data center, not the viewport center).
 
-### Phase 2: Responsive Sizing
+### Phase 3: Compact the controls panel
 
-**`src/components/IndentViewApp.tsx`**:
-
-- Remove the hardcoded `width={800} height={600}` props.
-- Use a `ResizeObserver` (or the container's `clientWidth`/`clientHeight`) to pass the actual available dimensions to the overlay canvas, so it fills the viewport dynamically.
+**`src/components/panels/OverlayControlsPanel.tsx`**:
+- **Flatten the layout**: Remove unnecessary collapsible wrappers. Use a single compact form with clear section headers.
+- **Better scale slider**: Change range to 0.1x -- 5x with step 0.01.
+- **Inline quick actions**: Put Fit/Center/Reset as small icon buttons in a row, not full-width buttons.
+- **Compact export**: Single row with format selector and export button, no separate collapsible section.
+- **Fix PDF dimensions**: Use actual canvas dimensions instead of hardcoded 800x600.
 
 ## Technical Details
 
-### Canvas-based point rendering
+### Fixing the stale closure (critical performance fix)
 
-Instead of:
-```
-<g>
-  {points.map(p => <circle ... />)}  // N DOM nodes
-</g>
-```
+```text
+Current (broken):
+  handleMouseMove depends on [transform]
+  -> every transform change recreates the callback
+  -> drag uses stale values between frames
 
-The new approach:
-```
-<canvas ref={pointsCanvasRef} />  // 1 DOM node
-```
-
-A `useEffect` redraws all points onto the canvas whenever `points`, `colorScheme`, or `selectedProperty` change. During pan/zoom, only the CSS transform on the container changes -- no redraw needed.
-
-### CSS transform for pan/zoom (zero re-renders)
-
-```
-// Store in ref, not state
-const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
-
-const applyTransform = () => {
-  const { x, y, zoom } = viewRef.current;
-  containerEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
-};
-
-// On wheel: update ref + apply -- no setState
-onWheel = (e) => {
-  viewRef.current.zoom *= e.deltaY > 0 ? 0.95 : 1.05;
-  applyTransform();
-};
+Fixed:
+  const transformRef = useRef(transform);
+  useEffect(() => { transformRef.current = transform; }, [transform]);
+  
+  handleMouseMove reads from transformRef.current
+  -> callback is stable, always reads latest values
+  -> zero jitter during drag
 ```
 
-### Direct image dragging
+### Auto-fit on image load
 
-- Left-click + drag: updates `transform.offsetX/Y` via a callback (debounced to 1 update per animation frame)
-- Scroll wheel on image: adjusts `transform.scale`
-- Alt + drag: pan the entire view
+When `imageDimensions` changes (image loaded), if this is the first load (previous was null), automatically calculate and apply the fit transform. This means when you upload an image, it immediately appears aligned with your data -- no manual adjustment needed.
+
+### Sidebar layout (simplified)
+
+```text
++---------------------------+
+| [Upload Image] [x Remove] |  <- compact row
++---------------------------+
+| Image Opacity    [====] % |  <- only most-used slider inline
+| Scale            [====] x |
+| Rotation         [====] * |
+| X Offset         [====]px |
+| Y Offset         [====]px |
+| [Fit] [Center] [Reset]    |  <- small icon buttons
++---------------------------+
+| Point Size       [====] x |
+| Point Opacity    [====] % |
++---------------------------+
+| [PNG|SVG|PDF]  [Export]    |  <- single compact row
++---------------------------+
+```
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| `src/components/visualization/OverlayCanvas.tsx` | Rewrite: Canvas 2D for points, CSS transforms for pan/zoom, direct image drag |
-| `src/components/panels/OverlayControlsPanel.tsx` | Extract SliderRow, add Fit/Center buttons, fix ref warning |
-| `src/components/IndentViewApp.tsx` | Dynamic sizing via ResizeObserver instead of hardcoded 800x600 |
-
+| `src/components/visualization/OverlayCanvas.tsx` | Fix stale closure with transformRef, auto-fit on image load, use container dimensions properly |
+| `src/components/panels/OverlayControlsPanel.tsx` | Compact layout, better slider ranges, inline actions, fix PDF dimensions |
+| `src/components/IndentViewApp.tsx` | Remove duplicated Property/Color/Range controls from overlay sidebar |
