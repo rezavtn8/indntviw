@@ -22,6 +22,8 @@ export interface PointsTransform {
   offsetY: number;
   scale: number;
   opacity: number;
+  xStretch: number;
+  yStretch: number;
 }
 
 export const DEFAULT_OVERLAY_TRANSFORM: OverlayTransform = {
@@ -42,6 +44,8 @@ export const DEFAULT_POINTS_TRANSFORM: PointsTransform = {
   offsetY: 0,
   scale: 1,
   opacity: 90,
+  xStretch: 1,
+  yStretch: 1,
 };
 
 interface OverlayCanvasProps {
@@ -156,12 +160,20 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const scaleY = plotHeight / yRange;
 
   // Colored points data
-  const coloredPoints = useMemo(() => points.map(p => {
-    const val = p.properties[selectedProperty] ?? 0;
-    const cx = margin + (p.x - dataBounds.xMin) * scaleX;
-    const cy = margin + plotHeight - (p.y - dataBounds.yMin) * scaleY;
-    return { cx, cy, color: getColorForValue(val, minValue, maxValue, colorScheme) };
-  }), [points, selectedProperty, colorScheme, minValue, maxValue, dataBounds, scaleX, scaleY, plotHeight]);
+  const coloredPoints = useMemo(() => {
+    const centerX = margin + plotWidth / 2;
+    const centerY = margin + plotHeight / 2;
+    const xs = pointsTransform.xStretch ?? 1;
+    const ys = pointsTransform.yStretch ?? 1;
+    return points.map(p => {
+      const val = p.properties[selectedProperty] ?? 0;
+      const baseCx = margin + (p.x - dataBounds.xMin) * scaleX;
+      const baseCy = margin + plotHeight - (p.y - dataBounds.yMin) * scaleY;
+      const cx = centerX + (baseCx - centerX) * xs;
+      const cy = centerY + (baseCy - centerY) * ys;
+      return { cx, cy, color: getColorForValue(val, minValue, maxValue, colorScheme) };
+    });
+  }, [points, selectedProperty, colorScheme, minValue, maxValue, dataBounds, scaleX, scaleY, plotHeight, plotWidth, margin, pointsTransform.xStretch, pointsTransform.yStretch]);
 
   // Point radius
   const pointRadius = useMemo(() => {
