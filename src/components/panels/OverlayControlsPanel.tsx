@@ -7,14 +7,15 @@ import { Input } from '@/components/ui/input';
 import {
   OverlayTransform,
   OverlayPointSettings,
+  PointsTransform,
+  OverlayActiveLayer,
   DEFAULT_OVERLAY_TRANSFORM,
-  DEFAULT_OVERLAY_POINT_SETTINGS,
+  DEFAULT_POINTS_TRANSFORM,
   OverlayCanvasRef,
 } from '@/components/visualization/OverlayCanvas';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
-// Standalone memoized slider row — no ref warnings, no re-mount
 const SliderRow: React.FC<{
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; unit?: string;
 }> = React.memo(({ label, value, min, max, step, onChange, unit }) => (
@@ -33,6 +34,10 @@ interface OverlayControlsPanelProps {
   onTransformChange: (t: OverlayTransform) => void;
   pointSettings: OverlayPointSettings;
   onPointSettingsChange: (s: OverlayPointSettings) => void;
+  pointsTransform: PointsTransform;
+  onPointsTransformChange: (t: PointsTransform) => void;
+  activeLayer: OverlayActiveLayer;
+  onActiveLayerChange: (l: OverlayActiveLayer) => void;
   canvasRef: React.RefObject<OverlayCanvasRef>;
 }
 
@@ -43,6 +48,10 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
   onTransformChange,
   pointSettings,
   onPointSettingsChange,
+  pointsTransform,
+  onPointsTransformChange,
+  activeLayer,
+  onActiveLayerChange,
   canvasRef,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,7 +92,7 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Image Upload — compact row */}
+      {/* Image Upload */}
       <div className="space-y-1.5">
         <Label className="text-xs font-mono uppercase font-medium">Microscope Image</Label>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
@@ -100,11 +109,39 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
         </div>
       </div>
 
-      {/* Image Transform — flat, no collapsible */}
-      {imageUrl && (
+      {/* Layer Selector */}
+      <div className="space-y-1.5 pt-1 border-t border-border">
+        <Label className="text-xs font-mono uppercase font-medium">Active Layer</Label>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onActiveLayerChange('image')}
+            className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors ${
+              activeLayer === 'image'
+                ? 'bg-[hsl(217,91%,60%)] text-primary-foreground'
+                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Image
+          </button>
+          <button
+            onClick={() => onActiveLayerChange('points')}
+            className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors ${
+              activeLayer === 'points'
+                ? 'bg-[hsl(142,76%,46%)] text-primary-foreground'
+                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Points
+          </button>
+        </div>
+      </div>
+
+      {/* Context-aware layer controls */}
+      {activeLayer === 'image' ? (
         <div className="space-y-2 pt-1 border-t border-border">
+          <Label className="text-xs font-mono uppercase font-medium">Image Controls</Label>
           <SliderRow label="Opacity" value={transform.opacity} min={0} max={100} step={1} onChange={v => onTransformChange({ ...transform, opacity: v })} unit="%" />
-          <SliderRow label="Scale" value={transform.scale} min={0.1} max={5} step={0.01} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
+          <SliderRow label="Scale" value={transform.scale} min={0.05} max={5} step={0.01} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
           <SliderRow label="Rotation" value={transform.rotation} min={0} max={360} step={1} onChange={v => onTransformChange({ ...transform, rotation: v })} unit="°" />
           <SliderRow label="X Offset" value={transform.offsetX} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetX: v })} unit="px" />
           <SliderRow label="Y Offset" value={transform.offsetY} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetY: v })} unit="px" />
@@ -120,16 +157,26 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
             </Button>
           </div>
         </div>
+      ) : (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <Label className="text-xs font-mono uppercase font-medium">Points Controls</Label>
+          <SliderRow label="Opacity" value={pointsTransform.opacity} min={0} max={100} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, opacity: v })} unit="%" />
+          <SliderRow label="Scale" value={pointsTransform.scale} min={0.05} max={5} step={0.01} onChange={v => onPointsTransformChange({ ...pointsTransform, scale: v })} unit="x" />
+          <SliderRow label="Size" value={pointSettings.sizeMultiplier} min={0.3} max={3} step={0.1} onChange={v => onPointSettingsChange({ ...pointSettings, sizeMultiplier: v })} unit="x" />
+          <SliderRow label="X Offset" value={pointsTransform.offsetX} min={-500} max={500} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, offsetX: v })} unit="px" />
+          <SliderRow label="Y Offset" value={pointsTransform.offsetY} min={-500} max={500} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, offsetY: v })} unit="px" />
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => canvasRef.current?.centerPoints()}>
+              <Crosshair className="w-3 h-3" /> Center
+            </Button>
+            <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => onPointsTransformChange(DEFAULT_POINTS_TRANSFORM)}>
+              <RotateCcw className="w-3 h-3" /> Reset
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* Point Settings — flat */}
-      <div className="space-y-2 pt-1 border-t border-border">
-        <Label className="text-xs font-mono uppercase font-medium">Points</Label>
-        <SliderRow label="Size" value={pointSettings.sizeMultiplier} min={0.3} max={3} step={0.1} onChange={v => onPointSettingsChange({ ...pointSettings, sizeMultiplier: v })} unit="x" />
-        <SliderRow label="Opacity" value={pointSettings.opacity} min={0} max={100} step={1} onChange={v => onPointSettingsChange({ ...pointSettings, opacity: v })} unit="%" />
-      </div>
-
-      {/* Export — single compact row */}
+      {/* Export */}
       <div className="space-y-2 pt-1 border-t border-border">
         <Label className="text-xs font-mono uppercase font-medium">Export</Label>
         <div className="flex gap-1">
