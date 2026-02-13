@@ -64,6 +64,7 @@ interface OverlayCanvasProps {
   onActiveLayerChange: (l: OverlayActiveLayer) => void;
   containerWidth: number;
   containerHeight: number;
+  pointsVisible?: boolean;
 }
 
 export interface OverlayCanvasRef {
@@ -107,6 +108,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   onActiveLayerChange,
   containerWidth,
   containerHeight,
+  pointsVisible = true,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointsCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -652,7 +654,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         {imageUrl && imageDimensions && (
           <img src={imageUrl} alt="Overlay" style={imageStyle} draggable={false} />
         )}
-        <div style={pointsWrapperStyle}>
+        <div style={{ ...pointsWrapperStyle, display: pointsVisible === false ? 'none' : undefined }}>
           <canvas
             ref={pointsCanvasRef}
             width={width}

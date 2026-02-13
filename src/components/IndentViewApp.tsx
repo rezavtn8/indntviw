@@ -60,6 +60,7 @@ export const IndentViewApp: React.FC = () => {
   // Overlay state - derived from active session
   const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
   const [overlayBlobUrl, setOverlayBlobUrl] = useState<string | null>(null);
+  const [overlayPointsVisible, setOverlayPointsVisible] = useState(true);
   const prevSessionIdRef = useRef<string | null>(null);
   // Context hooks
   const {
@@ -255,6 +256,8 @@ export const IndentViewApp: React.FC = () => {
             activeLayer={overlayActiveLayer}
             onActiveLayerChange={setOverlayActiveLayer}
             canvasRef={overlayCanvasRef}
+            pointsVisible={overlayPointsVisible}
+            onPointsVisibleChange={setOverlayPointsVisible}
           />
         </>
       );
@@ -482,6 +485,7 @@ export const IndentViewApp: React.FC = () => {
               onActiveLayerChange={setOverlayActiveLayer}
               containerWidth={w}
               containerHeight={h}
+              pointsVisible={overlayPointsVisible}
             />
           )}
         </OverlayContainer>
