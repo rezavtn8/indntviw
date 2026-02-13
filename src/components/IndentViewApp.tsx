@@ -60,7 +60,7 @@ export const IndentViewApp: React.FC = () => {
   // Overlay state - derived from active session
   const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
   const [overlayBlobUrl, setOverlayBlobUrl] = useState<string | null>(null);
-  const [overlayPointsVisible, setOverlayPointsVisible] = useState(true);
+  
   const prevSessionIdRef = useRef<string | null>(null);
   // Context hooks
   const {
@@ -100,6 +100,7 @@ export const IndentViewApp: React.FC = () => {
   const overlayPointSettings = activeSession?.overlayPointSettings ?? DEFAULT_OVERLAY_POINT_SETTINGS;
   const overlayPointsTransform = activeSession?.overlayPointsTransform ?? DEFAULT_POINTS_TRANSFORM;
   const overlayActiveLayer = activeSession?.overlayActiveLayer ?? 'points';
+  const overlayPointsVisible = activeSession?.overlayPointsVisible ?? true;
   const overlayImageDataUrl = activeSession?.overlayImageDataUrl ?? null;
 
   // Create blob URL from stored data URL for rendering (recreate on session switch)
@@ -257,7 +258,7 @@ export const IndentViewApp: React.FC = () => {
             onActiveLayerChange={setOverlayActiveLayer}
             canvasRef={overlayCanvasRef}
             pointsVisible={overlayPointsVisible}
-            onPointsVisibleChange={setOverlayPointsVisible}
+            onPointsVisibleChange={(v) => updateActiveSession({ overlayPointsVisible: v })}
           />
         </>
       );
