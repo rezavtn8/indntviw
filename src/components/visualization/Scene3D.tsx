@@ -196,7 +196,7 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   return (
     <Canvas gl={{ toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}>
       <PerspectiveCamera makeDefault position={[8, 6, 8]} />
-      <OrbitControls enableDamping dampingFactor={0.05} zoomSpeed={0.4} />
+      <OrbitControls enableDamping dampingFactor={0.05} zoomSpeed={0.2} />
       
       <ambientLight intensity={0.6} />
       <directionalLight position={[10, 10, 10]} intensity={1} />
