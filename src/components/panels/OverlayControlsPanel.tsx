@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, RotateCcw, Download, Trash2, Maximize, Crosshair } from 'lucide-react';
+import { Upload, RotateCcw, Download, Trash2, Maximize, Crosshair, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,8 @@ interface OverlayControlsPanelProps {
   activeLayer: OverlayActiveLayer;
   onActiveLayerChange: (l: OverlayActiveLayer) => void;
   canvasRef: React.RefObject<OverlayCanvasRef>;
+  pointsVisible: boolean;
+  onPointsVisibleChange: (v: boolean) => void;
 }
 
 export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
@@ -53,6 +55,8 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
   activeLayer,
   onActiveLayerChange,
   canvasRef,
+  pointsVisible,
+  onPointsVisibleChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exportFormat, setExportFormat] = React.useState<'png' | 'svg' | 'pdf'>('png');
@@ -107,6 +111,20 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Points Visibility Toggle */}
+      <div className="flex items-center justify-between pt-1 border-t border-border">
+        <Label className="text-xs font-mono uppercase font-medium">Points</Label>
+        <Button
+          variant={pointsVisible ? 'outline' : 'ghost'}
+          size="sm"
+          className="h-7 px-2 gap-1 text-xs"
+          onClick={() => onPointsVisibleChange(!pointsVisible)}
+        >
+          {pointsVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+          {pointsVisible ? 'Visible' : 'Hidden'}
+        </Button>
       </div>
 
       {/* Layer Selector */}
