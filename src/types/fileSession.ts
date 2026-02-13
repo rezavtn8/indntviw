@@ -33,6 +33,7 @@ export interface FileSession {
   overlayPointSettings: OverlayPointSettings;
   overlayPointsTransform: PointsTransform;
   overlayActiveLayer: OverlayActiveLayer;
+  overlayPointsVisible: boolean;
 }
 
 export const createFileSession = (
@@ -62,6 +63,7 @@ export const createFileSession = (
     overlayPointSettings: DEFAULT_OVERLAY_POINT_SETTINGS,
     overlayPointsTransform: DEFAULT_POINTS_TRANSFORM,
     overlayActiveLayer: 'points',
+    overlayPointsVisible: true,
   };
 };
 
