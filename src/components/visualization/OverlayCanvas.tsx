@@ -246,19 +246,38 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     }
   }, [imageUrl, imageDimensions, fitImageToData]);
 
-  // Draw points onto canvas
+  // Draw points onto canvas (dynamically sized to fit stretched points)
   useEffect(() => {
     const canvas = pointsCanvasRef.current;
     if (!canvas) return;
-    canvas.width = width;
-    canvas.height = height;
+    if (coloredPoints.length === 0) {
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.left = '0px';
+      canvas.style.top = '0px';
+      return;
+    }
+    // Compute actual bounds of all points
+    let minX = 0, minY = 0, maxX = width, maxY = height;
+    for (const p of coloredPoints) {
+      minX = Math.min(minX, p.cx - pointRadius - 2);
+      minY = Math.min(minY, p.cy - pointRadius - 2);
+      maxX = Math.max(maxX, p.cx + pointRadius + 2);
+      maxY = Math.max(maxY, p.cy + pointRadius + 2);
+    }
+    const cw = Math.ceil(maxX - minX);
+    const ch = Math.ceil(maxY - minY);
+    canvas.width = cw;
+    canvas.height = ch;
+    canvas.style.left = `${minX}px`;
+    canvas.style.top = `${minY}px`;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, cw, ch);
     ctx.globalAlpha = (pointSettings.opacity / 100) * (pointsTransform.opacity / 100);
     for (const p of coloredPoints) {
       ctx.beginPath();
-      ctx.arc(p.cx, p.cy, pointRadius, 0, Math.PI * 2);
+      ctx.arc(p.cx - minX, p.cy - minY, pointRadius, 0, Math.PI * 2);
       ctx.fillStyle = p.color;
       ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,0.3)';
