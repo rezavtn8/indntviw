@@ -1,91 +1,95 @@
 
+## Sample-Separated Jitter Points in Group Comparison Box Plots
 
-# Overlay Tab -- Dual-Layer Interactive Editor
+### What This Feature Does
+Currently in the "Between Groups" box plot, all samples in a treatment group are pooled together and their jittered points are drawn with a single color. This feature adds a **"Sample Colors" toggle** that, when enabled:
+- Keeps the box/whiskers/violin in **black & white** style (so they remain clean and publication-ready)
+- Colors each jittered point by **which sample it came from** within the group
+- Shows a **right-side legend panel** mapping each color to its sample name
 
-## The Problem
+For example: a "WT" group with 4 samples would show all jittered points on the WT box, but each sample's points would be a distinct color (e.g., orange, teal, purple, green), while the box itself remains B&W.
 
-Right now the overlay tab treats points as a fixed grid and only the image can be moved (and only via sliders or clunky drag). The user wants **two independent objects** -- the microscope image and the data points -- that can both be **freely moved, resized, and adjusted directly on the canvas**, like layers in a design tool.
+---
 
-## Solution: Two Selectable, Draggable Layers
-
-The overlay becomes a simple two-layer compositor where each layer (Image and Points) is an independent object the user can click to select, drag to move, and resize using corner handles.
-
-### How it works for the user
-
-1. **Click on the image** -- it gets selected with a blue bounding box and corner handles
-2. **Click on the points** -- they get selected with a green bounding box and corner handles
-3. **Drag** the selected layer to reposition it
-4. **Drag a corner handle** to resize (maintains aspect ratio)
-5. **Sidebar sliders** update to show the selected layer's properties (opacity, rotation, scale)
-6. **Layer switcher buttons** at the top of the sidebar let you toggle between "Image" and "Points" layers quickly
+### Architecture Overview
 
 ```text
-Canvas view:
-+------------------------------------------+
-|                                          |
-|   +-- blue handles (selected) --+        |
-|   |   [microscope image]        |        |
-|   |                             |        |
-|   +-----------------------------+        |
-|                                          |
-|      o  o  o  o  o  <- data points       |
-|      o  o  o  o  o     (green box        |
-|      o  o  o  o  o      when selected)   |
-|                                          |
-|  [Image] [Points]  <- layer tabs bottom  |
-+------------------------------------------+
+GroupComparison.tsx (orchestrator)
+  ├─ adds "Sample Colors" toggle state
+  ├─ builds per-sample color map { sessionId → color }
+  ├─ passes enriched data to BoxViolinPlots
+  │
+  └─ BoxViolinPlots.tsx (wrapper)
+       ├─ passes sampleColoredPoints prop to BoxViolinSvg
+       │
+       └─ BoxViolinSvg.tsx (SVG renderer)
+            └─ when sampleColoredPoints present:
+                 renders jitter with per-point colors
+                 adds right-side legend panel
 ```
 
-### Sidebar layout (context-aware)
+---
 
+### Files to Modify
+
+**1. `src/components/analysis/boxViolin/jitter.ts`**
+- Extend `JitteredPoint` interface to optionally carry a `color: string` field
+- Add a new `getColoredJitteredPoints()` function that accepts an array of `{ values: number[], color: string }` (one per sample), computes jitter for each, and returns points with their assigned sample color
+
+**2. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
+- Add optional prop `sampleColoredJitter?: { groupIdx: number; points: Array<{ x: number; y: number; color: string }> }[]` 
+- Add optional prop `sampleLegend?: { name: string; color: string }[]`
+- When `sampleColoredJitter` is provided for a group, skip the normal uniform-color jitter and render per-point colored circles instead
+- Add a right-side legend column in the SVG that lists sample name → color dot pairs (stacked vertically, capped width ~120px)
+- Increase `svgWidth` by the legend width when the legend is active
+
+**3. `src/components/analysis/boxViolin/layout.ts`**
+- Export a `LEGEND_WIDTH = 140` constant (used for SVG width calculation when legend is shown)
+
+**4. `src/components/analysis/BoxViolinPlots.tsx`**
+- Add optional prop `sampleColoredData?: { groupIdx: number; samples: { name: string; color: string; values: number[] }[] }[]`
+- When this prop is provided, compute `sampleColoredJitter` and `sampleLegend` and pass them to `BoxViolinSvg`
+- The box/stats data (`data` prop) remains unchanged — only the jitter rendering changes
+
+**5. `src/components/analysis/GroupComparison.tsx`**
+- Add `showSampleColors` toggle state (default `false`)
+- Add the toggle button in the "Plot Options" bar (next to Violin and Points)
+- Build a `sampleColoredData` structure: for each group, map each of its sessions to a distinct color (palette of ~12 colors) and include their values
+- Pass `blackAndWhite={showSampleColors}` to `BoxViolinPlots` when sample colors mode is on (so boxes go B&W automatically)
+- Pass `sampleColoredData` to `BoxViolinPlots`
+
+---
+
+### Sample Color Palette
+A dedicated 12-color palette distinct from treatment group colors will be used:
+```ts
+const SAMPLE_COLORS = [
+  '#e6194b', '#3cb44b', '#4363d8', '#f58231',
+  '#911eb4', '#42d4f4', '#f032e6', '#bfef45',
+  '#fabed4', '#469990', '#dcbeff', '#9A6324',
+];
+```
+Colors are assigned by sample index within the group, cycling if more than 12 samples.
+
+---
+
+### SVG Legend Layout
+The legend will be placed inside the SVG to the right of the plot area, so it exports correctly with PNG:
 ```text
-+---------------------------+
-| [Upload Image]  [x]       |
-+---------------------------+
-| Active Layer:              |
-| [Image] [Points]           |  <- toggle buttons
-+---------------------------+
-| -- Selected Layer --       |
-| Opacity      [========] % |
-| Scale        [========] x |
-| Rotation     [========] * |
-| [Fit] [Center] [Reset]    |
-+---------------------------+
-| Export                     |
-| [PNG|SVG|PDF]  [Export]    |
-+---------------------------+
+[  Plot Area  ] | [Legend]
+                  ● Sample_1.txt
+                  ● Sample_2.txt
+                  ● Sample_3.txt
+                  ...
 ```
+Each legend entry: colored circle (r=5) + sample file name (truncated to ~18 chars), stacked vertically starting at `topMargin`.
 
-## Technical Changes
+---
 
-### 1. `src/components/visualization/OverlayCanvas.tsx`
-
-- **Add `PointsTransform`**: New transform state for the points layer with `offsetX`, `offsetY`, `scale` (passed in as props, same pattern as the image transform)
-- **Active layer state**: Track which layer (`'image' | 'points'`) is currently selected
-- **Bounding box + handles**: Draw selection outlines and 4 corner resize handles for the active layer using a lightweight SVG overlay on top of the canvas
-- **Hit testing**: On mousedown, check if the click is on a handle (start resize), on the active layer (start drag), or on the other layer (switch selection)
-- **Resize via handles**: Corner drag scales the layer proportionally. The scale factor is computed from the drag delta relative to the opposite corner
-- **Both layers use CSS transforms**: Image stays as `<img>` with CSS transform. Points canvas gets wrapped in a div with its own CSS transform for offset/scale
-- **Remove the fixed data-coordinate mapping for points**: Instead, the points canvas renders at a fixed internal resolution, and the wrapper div's transform handles positioning/scaling
-
-### 2. `src/components/panels/OverlayControlsPanel.tsx`
-
-- **Add layer selector**: Two toggle buttons at the top ("Image" / "Points") that control which layer's sliders are shown
-- **Shared slider set**: Opacity, Scale, Rotation sliders apply to whichever layer is selected
-- **Fit/Center/Reset**: Apply to the active layer
-- **Accept new props**: `pointsTransform`, `onPointsTransformChange`, `activeLayer`, `onActiveLayerChange`
-
-### 3. `src/components/IndentViewApp.tsx`
-
-- **Add `pointsTransform` state**: New state alongside `overlayTransform` for the points layer
-- **Add `activeLayer` state**: `'image' | 'points'`
-- **Pass new props** to both `OverlayCanvas` and `OverlayControlsPanel`
-
-### Files changed
-
-| File | Change |
-|------|--------|
-| `src/components/visualization/OverlayCanvas.tsx` | Add points transform, active layer selection, bounding box handles, resize logic |
-| `src/components/panels/OverlayControlsPanel.tsx` | Layer selector toggle, context-aware sliders |
-| `src/components/IndentViewApp.tsx` | New state for points transform and active layer |
-
+### Technical Details
+- The toggle only appears in `GroupComparison` (the "Between Groups" tab), not in other BoxViolinPlots usages
+- When `showSampleColors = false`, behavior is completely unchanged
+- When `showSampleColors = true`: boxes go B&W, jitter is multi-colored by sample, legend appears on the right
+- The `showJitter` toggle still controls whether any jitter is shown at all
+- Jitter remains seeded for visual stability (seed incorporates `sampleIndex * 10000 + pointIndex`)
+- The `BoxViolinSvg` changes are backward compatible — `sampleColoredJitter` and `sampleLegend` are optional props; omitting them gives the existing behavior
