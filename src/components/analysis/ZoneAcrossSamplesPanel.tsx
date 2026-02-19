@@ -49,6 +49,7 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
   const [selectedZones, setSelectedZones] = useState<ZoneSelection[]>([]);
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [showScatterDensity, setShowScatterDensity] = useState(false);
   
   const sessionsWithZones = useMemo(() => {
     return fileSessions.filter(s => s.zones.length > 0);
@@ -262,6 +263,10 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
               <Label className="font-mono text-[10px]">Points</Label>
               <Switch checked={showJitter} onCheckedChange={setShowJitter} />
             </div>
+            <div className="flex items-center gap-2">
+              <Label className="font-mono text-[10px]">Scatter Density</Label>
+              <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
+            </div>
           </div>
 
           <BoxViolinPlots
@@ -270,6 +275,7 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
             selectedProperty={selectedProperty}
             showViolin={showViolin}
             showJitter={showJitter}
+            blendOverlap={showScatterDensity}
             xAxisLabel="Zones (across Samples)"
           />
         </>

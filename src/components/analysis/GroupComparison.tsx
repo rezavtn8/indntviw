@@ -45,7 +45,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
   const [showSampleColors, setShowSampleColors] = useState(false);
-  const [showBlendOverlap, setShowBlendOverlap] = useState(false);
+  const [showScatterDensity, setShowScatterDensity] = useState(false);
 
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
@@ -169,8 +169,8 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           <Switch checked={showSampleColors} onCheckedChange={setShowSampleColors} />
         </div>
         <div className="flex items-center gap-2">
-          <Label className="font-mono text-[10px]">Blend Overlap</Label>
-          <Switch checked={showBlendOverlap} onCheckedChange={setShowBlendOverlap} />
+          <Label className="font-mono text-[10px]">Scatter Density</Label>
+          <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
         </div>
       </div>
 
@@ -183,7 +183,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           showJitter={showJitter}
           blackAndWhite={showSampleColors}
           sampleColoredData={sampleColoredData}
-          blendOverlap={showBlendOverlap}
+          blendOverlap={showScatterDensity}
         />
       )}
 

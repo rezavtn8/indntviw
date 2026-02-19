@@ -34,6 +34,7 @@ export const ZoneComparisonPanel: React.FC<ZoneComparisonPanelProps> = ({
 }) => {
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [showScatterDensity, setShowScatterDensity] = useState(false);
 
   const zoneStats = useMemo((): ZoneStats[] => {
     return zones.map(zone => {
@@ -141,6 +142,10 @@ export const ZoneComparisonPanel: React.FC<ZoneComparisonPanelProps> = ({
               <Label className="font-mono text-[10px]">Points</Label>
               <Switch checked={showJitter} onCheckedChange={setShowJitter} />
             </div>
+            <div className="flex items-center gap-1">
+              <Label className="font-mono text-[10px]">Scatter Density</Label>
+              <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
+            </div>
           </div>
 
           {boxPlotData.length > 0 && (
@@ -149,6 +154,7 @@ export const ZoneComparisonPanel: React.FC<ZoneComparisonPanelProps> = ({
               selectedProperty={selectedProperty}
               showViolin={showViolin}
               showJitter={showJitter}
+              blendOverlap={showScatterDensity}
               xAxisLabel="Zones"
             />
           )}

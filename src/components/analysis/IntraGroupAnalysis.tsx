@@ -48,6 +48,7 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [showScatterDensity, setShowScatterDensity] = useState(false);
 
   // Ensure selectedGroupId is always valid - sync with groups
   const effectiveGroupId = useMemo(() => {
@@ -227,6 +228,10 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
                 <Label className="font-mono text-[10px]">Points</Label>
                 <Switch checked={showJitter} onCheckedChange={setShowJitter} />
               </div>
+              <div className="flex items-center gap-2">
+                <Label className="font-mono text-[10px]">Scatter Density</Label>
+                <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
+              </div>
             </div>
 
             {/* Box Plot */}
@@ -236,6 +241,7 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
                 selectedProperty={selectedProperty}
                 showViolin={showViolin}
                 showJitter={showJitter}
+                blendOverlap={showScatterDensity}
                 xAxisLabel={`Samples (within Group ${selectedGroup?.name || ''})`}
               />
             )}
@@ -383,6 +389,7 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
                 selectedProperty={selectedProperty}
                 showViolin={showViolin}
                 showJitter={showJitter}
+                blendOverlap={showScatterDensity}
               />
             </div>
 
