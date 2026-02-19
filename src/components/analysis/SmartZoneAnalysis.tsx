@@ -38,6 +38,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
 }) => {
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [showScatterDensity, setShowScatterDensity] = useState(false);
 
   const getPropertyLabel = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -224,6 +225,10 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
               <Switch checked={showJitter} onCheckedChange={setShowJitter} />
               <Label className="font-mono text-xs">Points</Label>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
+              <Label className="font-mono text-xs">Scatter Density</Label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -258,6 +263,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
                 selectedProperty={selectedProperty}
                 showViolin={showViolin}
                 showJitter={showJitter}
+                blendOverlap={showScatterDensity}
               />
             </CardContent>
           </Card>
@@ -394,6 +400,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
                     selectedProperty={selectedProperty}
                     showViolin={showViolin}
                     showJitter={showJitter}
+                    blendOverlap={showScatterDensity}
                   />
 
                   {/* Per-sample statistics */}
