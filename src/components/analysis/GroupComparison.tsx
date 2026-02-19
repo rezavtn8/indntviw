@@ -17,9 +17,16 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { BoxViolinPlots } from './BoxViolinPlots';
+import { BoxViolinPlots, SampleColoredGroup } from './BoxViolinPlots';
 import { StatsTable } from './StatsTable';
 import { CheckCircle, XCircle, Users } from 'lucide-react';
+
+// 12-color palette for per-sample differentiation (distinct from treatment group colors)
+const SAMPLE_COLORS = [
+  '#e6194b', '#3cb44b', '#4363d8', '#f58231',
+  '#911eb4', '#42d4f4', '#f032e6', '#bfef45',
+  '#fabed4', '#469990', '#dcbeff', '#9A6324',
+];
 
 interface GroupData {
   group: SampleGroup;
@@ -37,6 +44,7 @@ interface GroupComparisonProps {
 export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, groups, selectedProperty }) => {
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [showSampleColors, setShowSampleColors] = useState(false);
 
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
@@ -70,6 +78,37 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
       stats: g.stats,
     }));
   }, [groupData]);
+
+  // Build per-sample colored data for sample colors mode
+  const sampleColoredData = useMemo((): SampleColoredGroup[] | undefined => {
+    if (!showSampleColors) return undefined;
+
+    // Collect all unique sessions across groups to assign global color indices
+    // Each session gets a color based on its position in the global sample list
+    const allSessionIds: string[] = [];
+    groups.filter(g => g.sessionIds.length > 0).forEach(group => {
+      group.sessionIds.forEach(id => {
+        if (!allSessionIds.includes(id)) allSessionIds.push(id);
+      });
+    });
+
+    return groupData.map((gd, groupIdx) => {
+      const groupSessions = fileSessions.filter(s => gd.group.sessionIds.includes(s.id));
+      return {
+        groupIdx,
+        samples: groupSessions.map((session) => {
+          const globalIdx = allSessionIds.indexOf(session.id);
+          const color = SAMPLE_COLORS[globalIdx % SAMPLE_COLORS.length];
+          const values = getPropertyValues(session.data.points, selectedProperty);
+          return {
+            name: session.fileName,
+            color,
+            values,
+          };
+        }),
+      };
+    });
+  }, [showSampleColors, groupData, fileSessions, groups, selectedProperty]);
 
   const twoGroupTests = useMemo(() => {
     if (groupData.length !== 2) return null;
@@ -115,7 +154,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
   return (
     <div className="space-y-3">
       {/* Plot Options */}
-      <div className="flex items-center gap-4 p-2 bg-muted/30 rounded">
+      <div className="flex flex-wrap items-center gap-4 p-2 bg-muted/30 rounded">
         <div className="flex items-center gap-2">
           <Label className="font-mono text-[10px]">Violin</Label>
           <Switch checked={showViolin} onCheckedChange={setShowViolin} />
@@ -123,6 +162,10 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
         <div className="flex items-center gap-2">
           <Label className="font-mono text-[10px]">Points</Label>
           <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Sample Colors</Label>
+          <Switch checked={showSampleColors} onCheckedChange={setShowSampleColors} />
         </div>
       </div>
 
@@ -133,6 +176,8 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           selectedProperty={selectedProperty}
           showViolin={showViolin}
           showJitter={showJitter}
+          blackAndWhite={showSampleColors}
+          sampleColoredData={sampleColoredData}
         />
       )}
 

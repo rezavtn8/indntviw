@@ -15,19 +15,12 @@ function seededRandom(seed: number): number {
 export interface JitteredPoint {
   x: number;
   y: number;
+  color?: string;
 }
 
 /**
  * Generate jittered points for a set of values.
  * Points are centered around x=0 (assumes group transform will position them).
- * 
- * @param values - The data values
- * @param jitterWidth - The width of the jitter area
- * @param groupIndex - Used as part of the random seed for reproducibility
- * @param niceMin - Axis minimum
- * @param niceMax - Axis maximum  
- * @param topMargin - Top margin of plot area
- * @param maxPoints - Maximum number of points to render (default 100)
  */
 export function getJitteredPoints(
   values: number[],
@@ -43,4 +36,40 @@ export function getJitteredPoints(
     x: (seededRandom(groupIndex * 1000 + i) - 0.5) * maxJitter,
     y: valueToY(v, niceMin, niceMax, topMargin),
   }));
+}
+
+/**
+ * Generate colored jittered points from multiple samples.
+ * Each sample's points get a distinct color.
+ * 
+ * @param samples - Array of { values, color } per sample
+ * @param jitterWidth - The width of the jitter area
+ * @param groupIndex - Used as part of the random seed
+ * @param niceMin - Axis minimum
+ * @param niceMax - Axis maximum
+ * @param topMargin - Top margin of plot area
+ */
+export function getColoredJitteredPoints(
+  samples: { values: number[]; color: string }[],
+  jitterWidth: number,
+  groupIndex: number,
+  niceMin: number,
+  niceMax: number,
+  topMargin: number
+): JitteredPoint[] {
+  const maxJitter = jitterWidth * 0.3;
+  const result: JitteredPoint[] = [];
+
+  samples.forEach((sample, sampleIdx) => {
+    sample.values.forEach((v, pointIdx) => {
+      const seed = groupIndex * 100000 + sampleIdx * 10000 + pointIdx;
+      result.push({
+        x: (seededRandom(seed) - 0.5) * maxJitter,
+        y: valueToY(v, niceMin, niceMax, topMargin),
+        color: sample.color,
+      });
+    });
+  });
+
+  return result;
 }

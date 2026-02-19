@@ -4,6 +4,7 @@
 
 // Plot area dimensions
 export const BOX_WIDTH = 40;
+export const LEGEND_WIDTH = 150;
 export const GROUP_WIDTH = 100;
 export const LEFT_PADDING = 70;
 export const RIGHT_PADDING = 60;
