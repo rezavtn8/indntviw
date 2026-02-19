@@ -263,10 +263,13 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
                   cy={pt.y}
                   r={2}
                   fill={pointColor}
-                  fillOpacity={blackAndWhite ? 0.5 : 0.4}
+                  fillOpacity={blendOverlap ? 0.75 : (blackAndWhite ? 0.5 : 0.4)}
+                  stroke={blendOverlap ? 'none' : undefined}
                 />
               ));
-              return <>{circles}</>;
+              return blendOverlap
+                ? <g style={{ mixBlendMode: 'multiply' }}>{circles}</g>
+                : <>{circles}</>;
             })()}
 
             {/* Sample-colored jitter (when sampleColoredJitter provided) */}
