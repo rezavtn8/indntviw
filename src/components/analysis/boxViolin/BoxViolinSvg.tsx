@@ -269,9 +269,12 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
                 key={i}
                 cx={pt.x}
                 cy={pt.y}
-                r={2.5}
+                r={3}
                 fill={pt.color!}
-                fillOpacity={0.75}
+                fillOpacity={0.45}
+                stroke={pt.color!}
+                strokeOpacity={0.8}
+                strokeWidth={0.8}
               />
             ))}
 
