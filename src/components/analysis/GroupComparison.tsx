@@ -45,6 +45,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
   const [showSampleColors, setShowSampleColors] = useState(false);
+  const [showBeeswarm, setShowBeeswarm] = useState(false);
 
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
@@ -167,6 +168,10 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           <Label className="font-mono text-[10px]">Sample Colors</Label>
           <Switch checked={showSampleColors} onCheckedChange={setShowSampleColors} />
         </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Beeswarm</Label>
+          <Switch checked={showBeeswarm} onCheckedChange={setShowBeeswarm} />
+        </div>
       </div>
 
       {/* Box Plot */}
@@ -178,6 +183,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           showJitter={showJitter}
           blackAndWhite={showSampleColors}
           sampleColoredData={sampleColoredData}
+          beeswarmMode={showBeeswarm}
         />
       )}
 
