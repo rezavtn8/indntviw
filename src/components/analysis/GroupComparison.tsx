@@ -166,12 +166,21 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
         </div>
         <div className="flex items-center gap-2">
           <Label className="font-mono text-[10px]">Sample Colors</Label>
-          <Switch checked={showSampleColors} onCheckedChange={setShowSampleColors} />
+          <Switch
+            checked={showSampleColors}
+            onCheckedChange={(v) => {
+              setShowSampleColors(v);
+              if (!v) setShowBlendOverlap(false);
+            }}
+          />
         </div>
-        <div className="flex items-center gap-2">
-          <Label className="font-mono text-[10px]">Blend Overlap</Label>
-          <Switch checked={showBlendOverlap} onCheckedChange={setShowBlendOverlap} />
-        </div>
+        {showSampleColors && (
+          <div className="flex items-center gap-1.5 pl-2 border-l border-border/50">
+            <span className="text-muted-foreground text-[10px]">↳</span>
+            <Label className="font-mono text-[10px] text-muted-foreground">Blend Overlap</Label>
+            <Switch checked={showBlendOverlap} onCheckedChange={setShowBlendOverlap} />
+          </div>
+        )}
       </div>
 
       {/* Box Plot */}
