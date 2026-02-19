@@ -64,8 +64,8 @@ export interface BoxViolinSvgProps {
   sampleColoredJitter?: SampleColoredJitterGroup[];
   /** When provided, renders a right-side legend with sample names + colors */
   sampleLegend?: SampleLegendEntry[];
-  /** When provided, overrides uniform jitter with pre-computed beeswarm points (no sample colors) */
-  beeswarmPoints?: SampleColoredJitterGroup[];
+  /** When true, applies SVG multiply blend-mode to jitter points so overlapping areas show mixed colors */
+  blendOverlap?: boolean;
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -85,7 +85,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   xAxisLabel,
   sampleColoredJitter,
   sampleLegend,
-  beeswarmPoints,
+  blendOverlap = false,
 }) => {
   // Calculate axis bounds from all values
   const allValues = data.flatMap(d => d.values);
@@ -110,12 +110,6 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   const coloredJitterMap = new Map<number, JitteredPoint[]>();
   if (sampleColoredJitter) {
     sampleColoredJitter.forEach(g => coloredJitterMap.set(g.groupIdx, g.points));
-  }
-
-  // Build lookup map for beeswarm points (uniform color): groupIdx -> points
-  const beeswarmMap = new Map<number, JitteredPoint[]>();
-  if (beeswarmPoints) {
-    beeswarmPoints.forEach(g => beeswarmMap.set(g.groupIdx, g.points));
   }
   
   // Y-coordinate helper bound to current axis
@@ -241,12 +235,10 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
         const strokeColor = blackAndWhite ? '#000000' : color;
         const pointColor = blackAndWhite ? '#333333' : color;
 
-        // Determine which jitter points to use (priority: colored > beeswarm > uniform)
+        // Determine which jitter points to use
         const coloredPoints = coloredJitterMap.get(idx);
-        const beeswarmPts = beeswarmMap.get(idx);
         const useColoredJitter = showJitter && !!coloredPoints;
-        const useBeeswarmJitter = showJitter && !coloredPoints && !!beeswarmPts;
-        const useUniformJitter = showJitter && !coloredPoints && !beeswarmPts;
+        const useUniformJitter = showJitter && !coloredPoints;
 
         return (
           <g key={name} transform={`translate(${centerX}, 0)`}>
@@ -261,48 +253,44 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
               />
             )}
 
-            {/* Uniform jitter (default behavior) */}
-            {useUniformJitter &&
-              getJitteredPoints(values, BOX_WIDTH, idx, niceMin, niceMax, topMargin).map((pt, i) => (
+            {/* Uniform jitter (default behavior, no sample colors) */}
+            {useUniformJitter && (() => {
+              const pts = getJitteredPoints(values, BOX_WIDTH, idx, niceMin, niceMax, topMargin);
+              const circles = pts.map((pt, i) => (
                 <circle
                   key={i}
                   cx={pt.x}
                   cy={pt.y}
                   r={2}
                   fill={pointColor}
-                  fillOpacity={blackAndWhite ? 0.5 : 0.4}
+                  fillOpacity={blendOverlap ? 0.75 : (blackAndWhite ? 0.5 : 0.4)}
+                  stroke={blendOverlap ? 'none' : undefined}
                 />
-              ))}
-
-            {/* Beeswarm jitter — uniform color, non-overlapping */}
-            {useBeeswarmJitter && beeswarmPts!.map((pt, i) => (
-              <circle
-                key={i}
-                cx={pt.x}
-                cy={pt.y}
-                r={3}
-                fill={pointColor}
-                fillOpacity={blackAndWhite ? 0.6 : 0.5}
-                stroke={strokeColor}
-                strokeOpacity={0.5}
-                strokeWidth={0.6}
-              />
-            ))}
+              ));
+              return blendOverlap
+                ? <g style={{ mixBlendMode: 'multiply' }}>{circles}</g>
+                : <>{circles}</>;
+            })()}
 
             {/* Sample-colored jitter (when sampleColoredJitter provided) */}
-            {useColoredJitter && coloredPoints!.map((pt, i) => (
-              <circle
-                key={i}
-                cx={pt.x}
-                cy={pt.y}
-                r={3}
-                fill={pt.color!}
-                fillOpacity={0.45}
-                stroke={pt.color!}
-                strokeOpacity={0.8}
-                strokeWidth={0.8}
-              />
-            ))}
+            {useColoredJitter && (() => {
+              const circles = coloredPoints!.map((pt, i) => (
+                <circle
+                  key={i}
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={3}
+                  fill={pt.color!}
+                  fillOpacity={blendOverlap ? 0.75 : 0.45}
+                  stroke={blendOverlap ? 'none' : pt.color!}
+                  strokeOpacity={blendOverlap ? 0 : 0.8}
+                  strokeWidth={blendOverlap ? 0 : 0.8}
+                />
+              ));
+              return blendOverlap
+                ? <g style={{ mixBlendMode: 'multiply' }}>{circles}</g>
+                : <>{circles}</>;
+            })()}
 
             {/* Whiskers */}
             <line x1={0} y1={whiskerHigh} x2={0} y2={q3Y} stroke={strokeColor} strokeWidth={1.5} />

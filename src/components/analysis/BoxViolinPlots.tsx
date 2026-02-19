@@ -9,7 +9,7 @@ import React, { useMemo, useRef, useCallback } from 'react';
 import { DescriptiveStats, welchTTest, oneWayANOVA } from '@/utils/advancedStatistics';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { BoxViolinSvg, PairwiseResult, getPValueAsterisks, SampleLegendEntry, SampleColoredJitterGroup } from './boxViolin';
-import { getColoredJitteredPoints, getColoredBeeswarmPoints, getBeeswarmPoints } from './boxViolin/jitter';
+import { getColoredJitteredPoints } from './boxViolin/jitter';
 import { calculateNiceAxisBounds, BASE_TOP_MARGIN, calculateBracketAreaHeight } from './boxViolin/layout';
 import { rasterizeSvgToDataUrl } from '@/utils/svgRasterize';
 import { Button } from '@/components/ui/button';
@@ -39,8 +39,8 @@ export interface BoxViolinPlotsProps {
   xAxisLabel?: string;
   /** When provided, renders per-sample colored jitter with a side legend */
   sampleColoredData?: SampleColoredGroup[];
-  /** When true, uses beeswarm (non-overlapping) layout instead of random jitter */
-  beeswarmMode?: boolean;
+  /** When true, applies multiply blend-mode so overlapping points show mixed colors */
+  blendOverlap?: boolean;
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -55,7 +55,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   blackAndWhite = false,
   xAxisLabel = 'Samples',
   sampleColoredData,
-  beeswarmMode = false,
+  blendOverlap = false,
 }) => {
   // Get property config for display
   const propertyConfig = useMemo(() => {
@@ -125,44 +125,21 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     });
     const legend: SampleLegendEntry[] = Array.from(legendMap.entries()).map(([name, color]) => ({ name, color }));
 
-    // Build colored jitter per group — beeswarm or random
+    // Build colored jitter per group — always random jitter, blend is handled by SVG
     const jitterGroups: SampleColoredJitterGroup[] = sampleColoredData.map(group => ({
       groupIdx: group.groupIdx,
-      points: beeswarmMode
-        ? getColoredBeeswarmPoints(
-            group.samples.map(s => ({ values: s.values, color: s.color })),
-            3, // radius
-            niceMin,
-            niceMax,
-            topMargin,
-          )
-        : getColoredJitteredPoints(
-            group.samples.map(s => ({ values: s.values, color: s.color })),
-            40, // BOX_WIDTH
-            group.groupIdx,
-            niceMin,
-            niceMax,
-            topMargin,
-          ),
+      points: getColoredJitteredPoints(
+        group.samples.map(s => ({ values: s.values, color: s.color })),
+        40, // BOX_WIDTH
+        group.groupIdx,
+        niceMin,
+        niceMax,
+        topMargin,
+      ),
     }));
 
     return { sampleColoredJitter: jitterGroups, sampleLegend: legend };
-  }, [sampleColoredData, data, pairwiseResults.length, showPValueAsterisks, beeswarmMode]);
-
-  // Beeswarm points for uniform-color mode (no sampleColoredData)
-  const beeswarmPts = useMemo((): SampleColoredJitterGroup[] | undefined => {
-    if (!beeswarmMode || (sampleColoredData && sampleColoredData.length > 0)) return undefined;
-
-    const allValues = data.flatMap(d => d.values);
-    const { niceMin, niceMax } = calculateNiceAxisBounds(allValues);
-    const bracketAreaHeight = calculateBracketAreaHeight(pairwiseResults.length, showPValueAsterisks);
-    const topMargin = BASE_TOP_MARGIN + bracketAreaHeight;
-
-    return data.map((d, idx) => ({
-      groupIdx: idx,
-      points: getBeeswarmPoints(d.values, 3, niceMin, niceMax, topMargin),
-    }));
-  }, [beeswarmMode, sampleColoredData, data, pairwiseResults.length, showPValueAsterisks]);
+  }, [sampleColoredData, data, pairwiseResults.length, showPValueAsterisks]);
 
   const svgContainerRef = useRef<HTMLDivElement>(null);
 
@@ -213,7 +190,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           xAxisLabel={xAxisLabel}
           sampleColoredJitter={sampleColoredJitter}
           sampleLegend={sampleLegend}
-          beeswarmPoints={beeswarmPts}
+          blendOverlap={blendOverlap}
         />
       </div>
 
