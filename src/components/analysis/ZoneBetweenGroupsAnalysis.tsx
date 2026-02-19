@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BoxViolinPlots } from './BoxViolinPlots';
+import { BoxViolinPlots, SampleColoredGroup } from './BoxViolinPlots';
 import { MapPin, Layers } from 'lucide-react';
 
 interface ZoneBetweenGroupsAnalysisProps {
@@ -42,6 +42,7 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
   const [selectedZoneName, setSelectedZoneName] = useState<string>('');
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
+  const [showSampleColors, setShowSampleColors] = useState(false);
   const [showScatterDensity, setShowScatterDensity] = useState(false);
 
   // Find all unique zone names across all sessions in groups
@@ -99,6 +100,47 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
       stats: d.stats,
     }));
   }, [groupZoneData]);
+
+  // Build per-sample colored data: each session within a group is a separate colored sample
+  const sampleColoredData = useMemo((): SampleColoredGroup[] | undefined => {
+    if (!showSampleColors || !selectedZoneName) return undefined;
+
+    // Collect all unique sessions across groups for global color assignment
+    const allSessionIds: string[] = [];
+    groups.forEach(group => {
+      fileSessions.filter(s => group.sessionIds.includes(s.id)).forEach(s => {
+        if (!allSessionIds.includes(s.id)) allSessionIds.push(s.id);
+      });
+    });
+
+    const SAMPLE_COLORS = [
+      '#e6194b', '#3cb44b', '#4363d8', '#f58231',
+      '#911eb4', '#42d4f4', '#f032e6', '#bfef45',
+      '#fabed4', '#469990', '#dcbeff', '#9A6324',
+    ];
+
+    return groupZoneData.map((d, groupIdx) => {
+      const groupSessions = fileSessions.filter(s => d.group.sessionIds.includes(s.id));
+      return {
+        groupIdx,
+        samples: groupSessions.flatMap(session => {
+          const matchingZones = session.zones.filter(z => z.name === selectedZoneName);
+          const values: number[] = [];
+          matchingZones.forEach(zone => {
+            const zonePoints = session.data.points.filter(p => zone.memberPointIds.includes(p.id));
+            values.push(...getPropertyValues(zonePoints, selectedProperty));
+          });
+          if (values.length === 0) return [];
+          const globalIdx = allSessionIds.indexOf(session.id);
+          return [{
+            name: session.fileName.replace(/\.[^/.]+$/, ''),
+            color: SAMPLE_COLORS[globalIdx % SAMPLE_COLORS.length],
+            values,
+          }];
+        }),
+      };
+    }).filter(g => g.samples.length > 0);
+  }, [showSampleColors, selectedZoneName, groupZoneData, fileSessions, groups, selectedProperty]);
 
   const boxPlotKey = useMemo(() => {
     return `${selectedZoneName}-${groupZoneData.map(d => `${d.group.id}:${d.values.length}`).join('|')}`;
@@ -180,6 +222,10 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
           <Switch checked={showJitter} onCheckedChange={setShowJitter} />
         </div>
         <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Sample Colors</Label>
+          <Switch checked={showSampleColors} onCheckedChange={setShowSampleColors} />
+        </div>
+        <div className="flex items-center gap-2">
           <Label className="font-mono text-[10px]">Scatter Density</Label>
           <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
         </div>
@@ -198,6 +244,8 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
           selectedProperty={selectedProperty}
           showViolin={showViolin}
           showJitter={showJitter}
+          blackAndWhite={showSampleColors}
+          sampleColoredData={sampleColoredData}
           blendOverlap={showScatterDensity}
         />
       )}
