@@ -64,6 +64,8 @@ export interface BoxViolinSvgProps {
   sampleColoredJitter?: SampleColoredJitterGroup[];
   /** When provided, renders a right-side legend with sample names + colors */
   sampleLegend?: SampleLegendEntry[];
+  /** When provided, overrides uniform jitter with pre-computed beeswarm points (no sample colors) */
+  beeswarmPoints?: SampleColoredJitterGroup[];
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -83,6 +85,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   xAxisLabel,
   sampleColoredJitter,
   sampleLegend,
+  beeswarmPoints,
 }) => {
   // Calculate axis bounds from all values
   const allValues = data.flatMap(d => d.values);
@@ -107,6 +110,12 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   const coloredJitterMap = new Map<number, JitteredPoint[]>();
   if (sampleColoredJitter) {
     sampleColoredJitter.forEach(g => coloredJitterMap.set(g.groupIdx, g.points));
+  }
+
+  // Build lookup map for beeswarm points (uniform color): groupIdx -> points
+  const beeswarmMap = new Map<number, JitteredPoint[]>();
+  if (beeswarmPoints) {
+    beeswarmPoints.forEach(g => beeswarmMap.set(g.groupIdx, g.points));
   }
   
   // Y-coordinate helper bound to current axis
@@ -232,10 +241,12 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
         const strokeColor = blackAndWhite ? '#000000' : color;
         const pointColor = blackAndWhite ? '#333333' : color;
 
-        // Determine which jitter points to use
+        // Determine which jitter points to use (priority: colored > beeswarm > uniform)
         const coloredPoints = coloredJitterMap.get(idx);
+        const beeswarmPts = beeswarmMap.get(idx);
         const useColoredJitter = showJitter && !!coloredPoints;
-        const useUniformJitter = showJitter && !coloredPoints;
+        const useBeeswarmJitter = showJitter && !coloredPoints && !!beeswarmPts;
+        const useUniformJitter = showJitter && !coloredPoints && !beeswarmPts;
 
         return (
           <g key={name} transform={`translate(${centerX}, 0)`}>
@@ -262,6 +273,21 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
                   fillOpacity={blackAndWhite ? 0.5 : 0.4}
                 />
               ))}
+
+            {/* Beeswarm jitter — uniform color, non-overlapping */}
+            {useBeeswarmJitter && beeswarmPts!.map((pt, i) => (
+              <circle
+                key={i}
+                cx={pt.x}
+                cy={pt.y}
+                r={3}
+                fill={pointColor}
+                fillOpacity={blackAndWhite ? 0.6 : 0.5}
+                stroke={strokeColor}
+                strokeOpacity={0.5}
+                strokeWidth={0.6}
+              />
+            ))}
 
             {/* Sample-colored jitter (when sampleColoredJitter provided) */}
             {useColoredJitter && coloredPoints!.map((pt, i) => (

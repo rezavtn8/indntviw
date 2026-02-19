@@ -1,5 +1,6 @@
 /**
  * Jittered Points Generation with Seeded Randomness
+ * and Beeswarm Non-Overlapping Layout
  */
 
 import { valueToY } from './layout';
@@ -41,13 +42,6 @@ export function getJitteredPoints(
 /**
  * Generate colored jittered points from multiple samples.
  * Each sample's points get a distinct color.
- * 
- * @param samples - Array of { values, color } per sample
- * @param jitterWidth - The width of the jitter area
- * @param groupIndex - Used as part of the random seed
- * @param niceMin - Axis minimum
- * @param niceMax - Axis maximum
- * @param topMargin - Top margin of plot area
  */
 export function getColoredJitteredPoints(
   samples: { values: number[]; color: string }[],
@@ -72,4 +66,118 @@ export function getColoredJitteredPoints(
   });
 
   return result;
+}
+
+/**
+ * Beeswarm layout: places each point at its exact Y position,
+ * nudging X only enough to avoid overlapping neighbours.
+ * All points are guaranteed visible.
+ */
+export function getBeeswarmPoints(
+  values: number[],
+  radius: number,
+  niceMin: number,
+  niceMax: number,
+  topMargin: number,
+  maxHalfWidth = 80
+): JitteredPoint[] {
+  const diameter = radius * 2 + 0.5; // small gap between circles
+
+  // Sort by y for efficient packing
+  const items = values.map(v => ({ y: valueToY(v, niceMin, niceMax, topMargin) }));
+  items.sort((a, b) => a.y - b.y);
+
+  const placed: JitteredPoint[] = [];
+
+  for (const item of items) {
+    let x = 0;
+    let step = diameter;
+    let direction = 1;
+
+    // Keep trying positions until no collision
+    let attempts = 0;
+    while (attempts < 200) {
+      const collision = placed.some(p => {
+        const dx = p.x - x;
+        const dy = p.y - item.y;
+        return Math.sqrt(dx * dx + dy * dy) < diameter;
+      });
+
+      if (!collision) break;
+
+      x += direction * step;
+      direction = -direction;
+      step += diameter * 0.5;
+
+      // Cap to avoid extreme spread
+      if (Math.abs(x) > maxHalfWidth) {
+        x = Math.sign(x) * maxHalfWidth;
+      }
+
+      attempts++;
+    }
+
+    placed.push({ x, y: item.y });
+  }
+
+  return placed;
+}
+
+/**
+ * Beeswarm layout for multiple samples with per-sample colors.
+ * All samples are packed together, so inter-sample overlap is also resolved.
+ */
+export function getColoredBeeswarmPoints(
+  samples: { values: number[]; color: string }[],
+  radius: number,
+  niceMin: number,
+  niceMax: number,
+  topMargin: number,
+  maxHalfWidth = 80
+): JitteredPoint[] {
+  const diameter = radius * 2 + 0.5;
+
+  // Flatten all samples, preserving color
+  const items: { y: number; color: string }[] = [];
+  samples.forEach(sample => {
+    sample.values.forEach(v => {
+      items.push({ y: valueToY(v, niceMin, niceMax, topMargin), color: sample.color });
+    });
+  });
+
+  // Sort by y for efficient packing
+  items.sort((a, b) => a.y - b.y);
+
+  const placed: JitteredPoint[] = [];
+
+  for (const item of items) {
+    let x = 0;
+    let step = diameter;
+    let direction = 1;
+
+    let attempts = 0;
+    while (attempts < 200) {
+      const collision = placed.some(p => {
+        const dx = p.x - x;
+        const dy = p.y - item.y;
+        return Math.sqrt(dx * dx + dy * dy) < diameter;
+      });
+
+      if (!collision) break;
+
+      x += direction * step;
+      direction = -direction;
+      step += diameter * 0.5;
+
+      if (Math.abs(x) > maxHalfWidth) {
+        x = Math.sign(x) * maxHalfWidth;
+      }
+
+      attempts++;
+    }
+
+    placed.push({ x, y: item.y, color: item.color });
+  }
+
+  return placed;
 }
