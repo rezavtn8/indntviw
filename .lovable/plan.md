@@ -1,113 +1,83 @@
 
-## "Beeswarm" Toggle — Non-Overlapping Point Layout
+## Replace "Beeswarm" with "Blend Overlap" Toggle
 
 ### The Problem
-With the current random jitter, dense datasets cause points to stack on top of each other. Even with translucency (0.45 opacity), the bottom layers can be hard to see. The user wants a mode where every single point is guaranteed to be visible.
+The beeswarm algorithm forces 500+ points per group to not overlap by pushing them horizontally. With dense nanoindentation datasets, this creates an absurdly wide point cloud (as seen in the screenshot). It defeats the purpose entirely.
 
-### The Solution: Beeswarm Layout
-A **beeswarm** is a dot-plot variant where points are placed at their exact Y position (data value) but pushed left or right just enough to avoid overlapping their neighbors. All points remain visible because none can hide behind another. This is the standard solution in scientific visualization for this exact problem.
+### The Solution: SVG Multiply Blend Mode
+Replace the Beeswarm toggle with a **"Blend Overlap"** toggle that applies `mix-blend-mode: multiply` to the jitter point layer. This is the standard technique used in scientific visualization tools (Prism, R ggplot2, Illustrator) for exactly this problem:
 
-Key properties:
-- Y position is always exact (data fidelity preserved)
-- X position is offset only enough to avoid overlap (no more than necessary)
-- Points are packed symmetrically around center, so distribution shape stays visible
-- Works together with the existing "Sample Colors" toggle (colored beeswarm)
+- Points stay in their **random jitter positions** (same as Sample Colors mode)
+- Overlapping circles from different samples **multiply their colors** together:
+  - Blue + Red = Purple
+  - Red + Green = Dark Olive/Brown
+  - Three overlapping = even darker, distinct hue
+- All layers remain visible — overlap depth is encoded as color intensity
+- Zero performance cost — it is a single CSS property on an SVG group element
 
----
-
-### Architecture
-
-The toggle is added in `GroupComparison.tsx` alongside the existing "Sample Colors" toggle. When enabled, it replaces the jitter positioning algorithm with beeswarm positioning. The beeswarm algorithm lives in `jitter.ts` as a new exported function.
-
-```text
-GroupComparison.tsx
-  └─ showBeeswarm state + toggle UI
-  └─ passes beeswarmMode prop to BoxViolinPlots
-
-BoxViolinPlots.tsx
-  └─ when beeswarmMode=true, calls getBeeswarmPoints / getColoredBeeswarmPoints
-     instead of getColoredJitteredPoints
-
-BoxViolinSvg.tsx
-  └─ no changes needed — already renders JitteredPoint[] regardless of how they were computed
-
-jitter.ts
-  └─ getBeeswarmPoints(values, radius, niceMin, niceMax, topMargin): JitteredPoint[]
-  └─ getColoredBeeswarmPoints(samples, radius, niceMin, niceMax, topMargin): JitteredPoint[]
-```
-
----
-
-### Files to Modify
-
-**1. `src/components/analysis/boxViolin/jitter.ts`**
-
-Add two new exported functions:
-
-`getBeeswarmPoints(values, radius, niceMin, niceMax, topMargin)`:
-- Sort values (for deterministic layout)
-- For each point, find its Y pixel coordinate
-- Greedily push its X coordinate outward from center until it no longer collides with any already-placed point (collision = distance < `radius * 2`)
-- Return array of `{ x, y }` — no color
-
-`getColoredBeeswarmPoints(samples, radius, niceMin, niceMax, topMargin)`:
-- Same algorithm but accepts `{ values, color }[]` (one per sample)
-- Flattens all samples into one list, sorts by Y for proper packing
-- Returns `{ x, y, color }[]`
-
-The beeswarm algorithm:
-```
-placed = []
-for each point (sorted by y):
-  x = 0
-  step = 0
-  direction = +1
-  while any placed point within 2*r distance:
-    x += direction * step
-    direction = -direction
-    step += 0.5
-  placed.push({ x, y, color })
-```
-This produces a symmetric, packed column of dots.
-
-**2. `src/components/analysis/BoxViolinPlots.tsx`**
-
-- Add optional prop `beeswarmMode?: boolean`
-- When `beeswarmMode=true` AND `sampleColoredData` is provided: call `getColoredBeeswarmPoints` instead of `getColoredJitteredPoints` to compute `sampleColoredJitter`
-- When `beeswarmMode=true` AND no `sampleColoredData`: pass a new optional `beeswarmPoints` prop to `BoxViolinSvg` (uniform beeswarm without sample colors)
-- Point radius used for beeswarm collision = `3` (same as current circle radius)
-
-**3. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
-
-- Add optional prop `beeswarmPoints?: { groupIdx: number; points: JitteredPoint[] }[]`
-- In the render loop: when `beeswarmPoints` has an entry for this group, use those points for uniform jitter rendering (instead of calling `getJitteredPoints`)
-- This handles the case where beeswarm is on but sample colors are off
-
-**4. `src/components/analysis/GroupComparison.tsx`**
-
-- Add `showBeeswarm` state (default `false`)
-- Add a "Beeswarm" toggle in the Plot Options bar (alongside Violin, Points, Sample Colors)
-- Pass `beeswarmMode={showBeeswarm}` down to `BoxViolinPlots`
-- Label: "Beeswarm" with a tooltip note would be nice but keep it simple — just a switch
+This approach is called "multiply blending" and it works because the SVG background is white: any single color on white is unchanged, and two overlapping colors produce a darker mixed color that is distinct from either original.
 
 ---
 
 ### Behavior Matrix
 
-| Jitter | Sample Colors | Beeswarm | Result |
-|--------|--------------|----------|--------|
-| ON | OFF | OFF | Current random jitter (group color) |
-| ON | ON | OFF | Current translucent colored jitter |
-| ON | OFF | ON | Beeswarm, uniform group color |
-| ON | ON | ON | Beeswarm with per-sample colors — all points visible |
-| OFF | any | any | No points shown |
+| Points | Sample Colors | Blend Overlap | Result |
+|--------|--------------|---------------|--------|
+| ON | OFF | OFF | Default random jitter, group color |
+| ON | ON | OFF | Per-sample colored jitter, translucent (existing behavior) |
+| ON | ON | ON | Per-sample colored jitter with multiply blend — overlaps show mixed colors |
+| ON | OFF | ON | Uniform group color jitter with multiply blend |
+| OFF | any | any | No points |
 
 ---
 
-### Technical Details
+### Files to Modify
 
-- The beeswarm algorithm is O(n²) per group but with typical nanoindentation datasets (hundreds to low thousands of points per group), this is instant
-- Beeswarm width can grow wider than the box for large datasets — this is expected and desired. Points that exceed the box width still appear correctly because they render in the group's `<g transform>` space
-- If the group is very dense (thousands of points), the beeswarm column can get very wide. We add a soft cap: if x would exceed `±BOX_WIDTH * 2`, still place but capped (some overlap is accepted at extreme density)
-- No changes to export behavior — the SVG already renders beeswarm points the same as jitter points
-- `showBeeswarm` is independent of `showSampleColors`: you can use either alone or together
+**1. `src/components/analysis/GroupComparison.tsx`**
+- Remove `showBeeswarm` state
+- Add `showBlendOverlap` state (default `false`)
+- Replace the "Beeswarm" `<Switch>` UI with "Blend Overlap"
+- Pass `blendOverlap={showBlendOverlap}` to `BoxViolinPlots` (replacing `beeswarmMode`)
+
+**2. `src/components/analysis/BoxViolinPlots.tsx`**
+- Remove `beeswarmMode` prop
+- Add `blendOverlap?: boolean` prop
+- Remove the `beeswarmPts` useMemo block (no longer needed)
+- Remove `getBeeswarmPoints` / `getColoredBeeswarmPoints` imports
+- Pass `blendOverlap` through to `BoxViolinSvg`
+
+**3. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
+- Remove `beeswarmPoints` prop and all associated logic (`beeswarmMap`, `useBeeswarmJitter` rendering block)
+- Add `blendOverlap?: boolean` prop
+- When rendering sample-colored jitter: if `blendOverlap=true`, wrap the circles in a `<g style={{ mixBlendMode: 'multiply' }}>` and increase `fillOpacity` to `0.7` (multiply needs higher base opacity to show clear blending)
+- When rendering uniform jitter: same — wrap in multiply blend group when `blendOverlap=true`
+- Point opacity strategy:
+  - Normal sample colors mode: `fillOpacity=0.45` (unchanged — translucent)
+  - Blend mode: `fillOpacity=0.75` (higher — multiply needs stronger base color to blend visibly)
+  - Stroke removed in blend mode (stroke interferes with multiply blending)
+
+**4. `src/components/analysis/boxViolin/jitter.ts`**
+- Remove `getBeeswarmPoints` and `getColoredBeeswarmPoints` functions (clean up dead code)
+- Keep `getJitteredPoints` and `getColoredJitteredPoints` unchanged
+
+**5. `src/components/analysis/boxViolin/index.ts`**
+- Remove any beeswarm-related exports if present
+
+---
+
+### Technical Details of Multiply Blend Mode
+
+SVG `mix-blend-mode: multiply` works as follows:
+- Each channel: `result = src * dst / 255`
+- On white background (255,255,255): `result = src * 255/255 = src` → no change (correct)
+- Two overlapping colors: `result = c1 * c2 / 255` → darker, distinct hue
+- Three overlapping: product of all three → even darker
+
+For the sample color palette (bright, saturated colors), this produces clearly distinct overlap indicators. For example:
+- `#e6194b` (red) + `#3cb44b` (green) → dark olive
+- `#4363d8` (blue) + `#f58231` (orange) → dark brown
+- `#e6194b` + `#42d4f4` (cyan) → dark magenta
+
+The user can instantly see "this point is from sample 1 alone" vs "this point is where sample 1 and sample 2 overlap" vs "triple overlap" — all without any repositioning.
+
+This works correctly in SVG export and PNG rasterization via html2canvas (which supports mix-blend-mode).
