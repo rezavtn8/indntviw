@@ -10,6 +10,7 @@ import React from 'react';
 import { DescriptiveStats } from '@/utils/advancedStatistics';
 import {
   BOX_WIDTH,
+  LEGEND_WIDTH,
   PLOT_HEIGHT,
   LABEL_AREA_HEIGHT,
   BASE_TOP_MARGIN,
@@ -24,7 +25,7 @@ import {
   BRACKET_ROW_HEIGHT,
 } from './layout';
 import { getViolinPath } from './violin';
-import { getJitteredPoints } from './jitter';
+import { getJitteredPoints, JitteredPoint } from './jitter';
 
 export interface BoxViolinDataItem {
   name: string;
@@ -40,6 +41,16 @@ export interface PairwiseResult {
   asterisks: string;
 }
 
+export interface SampleLegendEntry {
+  name: string;
+  color: string;
+}
+
+export interface SampleColoredJitterGroup {
+  groupIdx: number;
+  points: JitteredPoint[];
+}
+
 export interface BoxViolinSvgProps {
   data: BoxViolinDataItem[];
   pairwiseResults: PairwiseResult[];
@@ -49,6 +60,10 @@ export interface BoxViolinSvgProps {
   blackAndWhite: boolean;
   yAxisLabel?: string;
   xAxisLabel?: string;
+  /** When provided, overrides uniform jitter with per-sample colored points */
+  sampleColoredJitter?: SampleColoredJitterGroup[];
+  /** When provided, renders a right-side legend with sample names + colors */
+  sampleLegend?: SampleLegendEntry[];
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -66,6 +81,8 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   blackAndWhite,
   yAxisLabel,
   xAxisLabel,
+  sampleColoredJitter,
+  sampleLegend,
 }) => {
   // Calculate axis bounds from all values
   const allValues = data.flatMap(d => d.values);
@@ -77,14 +94,26 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
     showPValueAsterisks
   );
   const topMargin = BASE_TOP_MARGIN + bracketAreaHeight;
+
+  const hasLegend = sampleLegend && sampleLegend.length > 0;
   
-  // Calculate SVG dimensions with space for axis labels
-  const svgWidth = calculateSvgWidth(data.length) + (yAxisLabel ? Y_AXIS_LABEL_WIDTH : 0);
+  // Calculate SVG dimensions with space for axis labels and optional legend
+  const plotWidth = calculateSvgWidth(data.length);
+  const svgWidth = plotWidth + (yAxisLabel ? Y_AXIS_LABEL_WIDTH : 0) + (hasLegend ? LEGEND_WIDTH : 0);
   const svgHeight = topMargin + PLOT_HEIGHT + LABEL_AREA_HEIGHT + (xAxisLabel ? X_AXIS_LABEL_HEIGHT : 0);
   const leftOffset = yAxisLabel ? Y_AXIS_LABEL_WIDTH : 0;
+
+  // Build lookup map for colored jitter: groupIdx -> points
+  const coloredJitterMap = new Map<number, JitteredPoint[]>();
+  if (sampleColoredJitter) {
+    sampleColoredJitter.forEach(g => coloredJitterMap.set(g.groupIdx, g.points));
+  }
   
   // Y-coordinate helper bound to current axis
   const getY = (value: number) => valueToY(value, niceMin, niceMax, topMargin);
+
+  // Legend X start position
+  const legendX = plotWidth + leftOffset + 10;
   
   return (
     <svg 
@@ -125,7 +154,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
               <line 
                 x1={50} 
                 y1={y} 
-                x2={svgWidth - leftOffset - 20} 
+                x2={plotWidth - 20} 
                 y2={y} 
                 stroke="#111111" 
                 strokeOpacity={0.1} 
@@ -203,10 +232,14 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
         const strokeColor = blackAndWhite ? '#000000' : color;
         const pointColor = blackAndWhite ? '#333333' : color;
 
-        // All elements within this group are positioned relative to centerX
+        // Determine which jitter points to use
+        const coloredPoints = coloredJitterMap.get(idx);
+        const useColoredJitter = showJitter && !!coloredPoints;
+        const useUniformJitter = showJitter && !coloredPoints;
+
         return (
           <g key={name} transform={`translate(${centerX}, 0)`}>
-            {/* Violin (if enabled) - centered at x=0 */}
+            {/* Violin (if enabled) */}
             {showViolin && (
               <path
                 d={getViolinPath(values, BOX_WIDTH * 1.5, niceMin, niceMax, topMargin)}
@@ -217,8 +250,8 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
               />
             )}
 
-            {/* Jittered points (if enabled) - centered at x=0 */}
-            {showJitter &&
+            {/* Uniform jitter (default behavior) */}
+            {useUniformJitter &&
               getJitteredPoints(values, BOX_WIDTH, idx, niceMin, niceMax, topMargin).map((pt, i) => (
                 <circle
                   key={i}
@@ -230,13 +263,25 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
                 />
               ))}
 
-            {/* Whiskers - centered at x=0 */}
+            {/* Sample-colored jitter (when sampleColoredJitter provided) */}
+            {useColoredJitter && coloredPoints!.map((pt, i) => (
+              <circle
+                key={i}
+                cx={pt.x}
+                cy={pt.y}
+                r={2.5}
+                fill={pt.color!}
+                fillOpacity={0.75}
+              />
+            ))}
+
+            {/* Whiskers */}
             <line x1={0} y1={whiskerHigh} x2={0} y2={q3Y} stroke={strokeColor} strokeWidth={1.5} />
             <line x1={0} y1={q1Y} x2={0} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
             <line x1={-10} y1={whiskerHigh} x2={10} y2={whiskerHigh} stroke={strokeColor} strokeWidth={1.5} />
             <line x1={-10} y1={whiskerLow} x2={10} y2={whiskerLow} stroke={strokeColor} strokeWidth={1.5} />
 
-            {/* Box - centered at x=0 */}
+            {/* Box */}
             <rect
               x={-BOX_WIDTH / 2}
               y={q3Y}
@@ -258,15 +303,15 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
               strokeWidth={3}
             />
 
-            {/* Mean diamond - centered at x=0 */}
+            {/* Mean diamond */}
             <polygon
               points={`0,${meanY - 4} 4,${meanY} 0,${meanY + 4} -4,${meanY}`}
-              fill={blackAndWhite ? '#ffffff' : '#ffffff'}
+              fill="#ffffff"
               stroke={strokeColor}
               strokeWidth={2}
             />
 
-            {/* Label - positioned at x=0 with rotation */}
+            {/* Label */}
             <text
               x={0}
               y={labelY}
@@ -291,10 +336,52 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
         );
       })}
 
+      {/* Right-side sample legend */}
+      {hasLegend && (
+        <g transform={`translate(${legendX}, ${topMargin})`}>
+          {/* Legend title */}
+          <text
+            x={0}
+            y={0}
+            fill="#111111"
+            style={{ fontSize: '10px', fontWeight: 'bold', ...FONT_STYLE }}
+          >
+            Samples
+          </text>
+          {/* Vertical separator line */}
+          <line
+            x1={-8}
+            y1={-10}
+            x2={-8}
+            y2={PLOT_HEIGHT}
+            stroke="#cccccc"
+            strokeWidth={1}
+          />
+          {/* Legend entries */}
+          {sampleLegend!.map((entry, i) => {
+            const entryY = 16 + i * 18;
+            const label = entry.name.length > 18 ? entry.name.slice(0, 16) + '…' : entry.name;
+            return (
+              <g key={i} transform={`translate(0, ${entryY})`}>
+                <circle cx={5} cy={0} r={5} fill={entry.color} fillOpacity={0.85} />
+                <text
+                  x={14}
+                  y={4}
+                  fill="#333333"
+                  style={{ fontSize: '9px', ...FONT_STYLE }}
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      )}
+
       {/* X-axis label */}
       {xAxisLabel && (
         <text
-          x={(svgWidth + leftOffset) / 2}
+          x={(plotWidth + leftOffset) / 2}
           y={svgHeight - 6}
           textAnchor="middle"
           fill="#111111"

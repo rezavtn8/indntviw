@@ -8,11 +8,24 @@
 import React, { useMemo, useRef, useCallback } from 'react';
 import { DescriptiveStats, welchTTest, oneWayANOVA } from '@/utils/advancedStatistics';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
-import { BoxViolinSvg, PairwiseResult, getPValueAsterisks } from './boxViolin';
+import { BoxViolinSvg, PairwiseResult, getPValueAsterisks, SampleLegendEntry, SampleColoredJitterGroup } from './boxViolin';
+import { getColoredJitteredPoints } from './boxViolin/jitter';
+import { calculateNiceAxisBounds, BASE_TOP_MARGIN, calculateBracketAreaHeight } from './boxViolin/layout';
 import { rasterizeSvgToDataUrl } from '@/utils/svgRasterize';
 import { Button } from '@/components/ui/button';
 import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
+
+export interface SampleColoredSample {
+  name: string;
+  color: string;
+  values: number[];
+}
+
+export interface SampleColoredGroup {
+  groupIdx: number;
+  samples: SampleColoredSample[];
+}
 
 export interface BoxViolinPlotsProps {
   data: { name: string; color: string; values: number[]; stats: DescriptiveStats }[];
@@ -24,6 +37,8 @@ export interface BoxViolinPlotsProps {
   blackAndWhite?: boolean;
   /** X-axis label - defaults to "Samples" */
   xAxisLabel?: string;
+  /** When provided, renders per-sample colored jitter with a side legend */
+  sampleColoredData?: SampleColoredGroup[];
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -37,6 +52,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   isExport = false,
   blackAndWhite = false,
   xAxisLabel = 'Samples',
+  sampleColoredData,
 }) => {
   // Get property config for display
   const propertyConfig = useMemo(() => {
@@ -54,7 +70,6 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     
     const results: PairwiseResult[] = [];
     
-    // For 2 groups, show one comparison
     if (data.length === 2) {
       const test = welchTTest(data[0].values, data[1].values);
       results.push({ 
@@ -64,12 +79,10 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
         asterisks: getPValueAsterisks(test.pValue) 
       });
     } else {
-      // For multiple groups, first check ANOVA significance
       const groups = data.map(d => d.values);
       const anova = oneWayANOVA(groups);
       
       if (anova.isSignificant) {
-        // Show pairwise comparisons (adjacent pairs to avoid clutter)
         for (let i = 0; i < data.length - 1; i++) {
           const test = welchTTest(data[i].values, data[i + 1].values);
           results.push({ 
@@ -84,6 +97,46 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     
     return results;
   }, [data, showPValueAsterisks]);
+
+  // Compute colored jitter groups and legend from sampleColoredData
+  const { sampleColoredJitter, sampleLegend } = useMemo((): {
+    sampleColoredJitter: SampleColoredJitterGroup[] | undefined;
+    sampleLegend: SampleLegendEntry[] | undefined;
+  } => {
+    if (!sampleColoredData || sampleColoredData.length === 0) {
+      return { sampleColoredJitter: undefined, sampleLegend: undefined };
+    }
+
+    // Axis bounds (needed for jitter y-calculation)
+    const allValues = data.flatMap(d => d.values);
+    const { niceMin, niceMax } = calculateNiceAxisBounds(allValues);
+    const bracketAreaHeight = calculateBracketAreaHeight(pairwiseResults.length, showPValueAsterisks);
+    const topMargin = BASE_TOP_MARGIN + bracketAreaHeight;
+
+    // Build a global legend (all unique samples across all groups)
+    const legendMap = new Map<string, string>();
+    sampleColoredData.forEach(group => {
+      group.samples.forEach(s => {
+        if (!legendMap.has(s.name)) legendMap.set(s.name, s.color);
+      });
+    });
+    const legend: SampleLegendEntry[] = Array.from(legendMap.entries()).map(([name, color]) => ({ name, color }));
+
+    // Build colored jitter per group
+    const jitterGroups: SampleColoredJitterGroup[] = sampleColoredData.map(group => ({
+      groupIdx: group.groupIdx,
+      points: getColoredJitteredPoints(
+        group.samples.map(s => ({ values: s.values, color: s.color })),
+        40, // BOX_WIDTH
+        group.groupIdx,
+        niceMin,
+        niceMax,
+        topMargin,
+      ),
+    }));
+
+    return { sampleColoredJitter: jitterGroups, sampleLegend: legend };
+  }, [sampleColoredData, data, pairwiseResults.length, showPValueAsterisks]);
 
   const svgContainerRef = useRef<HTMLDivElement>(null);
 
@@ -132,6 +185,8 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           blackAndWhite={blackAndWhite}
           yAxisLabel={yAxisLabel}
           xAxisLabel={xAxisLabel}
+          sampleColoredJitter={sampleColoredJitter}
+          sampleLegend={sampleLegend}
         />
       </div>
 
