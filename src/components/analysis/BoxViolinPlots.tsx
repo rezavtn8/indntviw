@@ -126,11 +126,12 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
     const legend: SampleLegendEntry[] = Array.from(legendMap.entries()).map(([name, color]) => ({ name, color }));
 
     // Build colored jitter per group — always random jitter, blend is handled by SVG
+    const jitterW = blendOverlap ? 40 * 3 : 40; // wider spread in blend mode fills the full box
     const jitterGroups: SampleColoredJitterGroup[] = sampleColoredData.map(group => ({
       groupIdx: group.groupIdx,
       points: getColoredJitteredPoints(
         group.samples.map(s => ({ values: s.values, color: s.color })),
-        40, // BOX_WIDTH
+        jitterW,
         group.groupIdx,
         niceMin,
         niceMax,

@@ -255,7 +255,8 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
 
             {/* Uniform jitter (default behavior, no sample colors) */}
             {useUniformJitter && (() => {
-              const pts = getJitteredPoints(values, BOX_WIDTH, idx, niceMin, niceMax, topMargin);
+              const jitterW = blendOverlap ? BOX_WIDTH * 3 : BOX_WIDTH;
+              const pts = getJitteredPoints(values, jitterW, idx, niceMin, niceMax, topMargin);
               const circles = pts.map((pt, i) => (
                 <circle
                   key={i}
