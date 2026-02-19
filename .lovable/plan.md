@@ -1,31 +1,39 @@
 
-## Sample-Separated Jitter Points in Group Comparison Box Plots
+## "Beeswarm" Toggle — Non-Overlapping Point Layout
 
-### What This Feature Does
-Currently in the "Between Groups" box plot, all samples in a treatment group are pooled together and their jittered points are drawn with a single color. This feature adds a **"Sample Colors" toggle** that, when enabled:
-- Keeps the box/whiskers/violin in **black & white** style (so they remain clean and publication-ready)
-- Colors each jittered point by **which sample it came from** within the group
-- Shows a **right-side legend panel** mapping each color to its sample name
+### The Problem
+With the current random jitter, dense datasets cause points to stack on top of each other. Even with translucency (0.45 opacity), the bottom layers can be hard to see. The user wants a mode where every single point is guaranteed to be visible.
 
-For example: a "WT" group with 4 samples would show all jittered points on the WT box, but each sample's points would be a distinct color (e.g., orange, teal, purple, green), while the box itself remains B&W.
+### The Solution: Beeswarm Layout
+A **beeswarm** is a dot-plot variant where points are placed at their exact Y position (data value) but pushed left or right just enough to avoid overlapping their neighbors. All points remain visible because none can hide behind another. This is the standard solution in scientific visualization for this exact problem.
+
+Key properties:
+- Y position is always exact (data fidelity preserved)
+- X position is offset only enough to avoid overlap (no more than necessary)
+- Points are packed symmetrically around center, so distribution shape stays visible
+- Works together with the existing "Sample Colors" toggle (colored beeswarm)
 
 ---
 
-### Architecture Overview
+### Architecture
+
+The toggle is added in `GroupComparison.tsx` alongside the existing "Sample Colors" toggle. When enabled, it replaces the jitter positioning algorithm with beeswarm positioning. The beeswarm algorithm lives in `jitter.ts` as a new exported function.
 
 ```text
-GroupComparison.tsx (orchestrator)
-  ├─ adds "Sample Colors" toggle state
-  ├─ builds per-sample color map { sessionId → color }
-  ├─ passes enriched data to BoxViolinPlots
-  │
-  └─ BoxViolinPlots.tsx (wrapper)
-       ├─ passes sampleColoredPoints prop to BoxViolinSvg
-       │
-       └─ BoxViolinSvg.tsx (SVG renderer)
-            └─ when sampleColoredPoints present:
-                 renders jitter with per-point colors
-                 adds right-side legend panel
+GroupComparison.tsx
+  └─ showBeeswarm state + toggle UI
+  └─ passes beeswarmMode prop to BoxViolinPlots
+
+BoxViolinPlots.tsx
+  └─ when beeswarmMode=true, calls getBeeswarmPoints / getColoredBeeswarmPoints
+     instead of getColoredJitteredPoints
+
+BoxViolinSvg.tsx
+  └─ no changes needed — already renders JitteredPoint[] regardless of how they were computed
+
+jitter.ts
+  └─ getBeeswarmPoints(values, radius, niceMin, niceMax, topMargin): JitteredPoint[]
+  └─ getColoredBeeswarmPoints(samples, radius, niceMin, niceMax, topMargin): JitteredPoint[]
 ```
 
 ---
@@ -33,63 +41,73 @@ GroupComparison.tsx (orchestrator)
 ### Files to Modify
 
 **1. `src/components/analysis/boxViolin/jitter.ts`**
-- Extend `JitteredPoint` interface to optionally carry a `color: string` field
-- Add a new `getColoredJitteredPoints()` function that accepts an array of `{ values: number[], color: string }` (one per sample), computes jitter for each, and returns points with their assigned sample color
 
-**2. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
-- Add optional prop `sampleColoredJitter?: { groupIdx: number; points: Array<{ x: number; y: number; color: string }> }[]` 
-- Add optional prop `sampleLegend?: { name: string; color: string }[]`
-- When `sampleColoredJitter` is provided for a group, skip the normal uniform-color jitter and render per-point colored circles instead
-- Add a right-side legend column in the SVG that lists sample name → color dot pairs (stacked vertically, capped width ~120px)
-- Increase `svgWidth` by the legend width when the legend is active
+Add two new exported functions:
 
-**3. `src/components/analysis/boxViolin/layout.ts`**
-- Export a `LEGEND_WIDTH = 140` constant (used for SVG width calculation when legend is shown)
+`getBeeswarmPoints(values, radius, niceMin, niceMax, topMargin)`:
+- Sort values (for deterministic layout)
+- For each point, find its Y pixel coordinate
+- Greedily push its X coordinate outward from center until it no longer collides with any already-placed point (collision = distance < `radius * 2`)
+- Return array of `{ x, y }` — no color
 
-**4. `src/components/analysis/BoxViolinPlots.tsx`**
-- Add optional prop `sampleColoredData?: { groupIdx: number; samples: { name: string; color: string; values: number[] }[] }[]`
-- When this prop is provided, compute `sampleColoredJitter` and `sampleLegend` and pass them to `BoxViolinSvg`
-- The box/stats data (`data` prop) remains unchanged — only the jitter rendering changes
+`getColoredBeeswarmPoints(samples, radius, niceMin, niceMax, topMargin)`:
+- Same algorithm but accepts `{ values, color }[]` (one per sample)
+- Flattens all samples into one list, sorts by Y for proper packing
+- Returns `{ x, y, color }[]`
 
-**5. `src/components/analysis/GroupComparison.tsx`**
-- Add `showSampleColors` toggle state (default `false`)
-- Add the toggle button in the "Plot Options" bar (next to Violin and Points)
-- Build a `sampleColoredData` structure: for each group, map each of its sessions to a distinct color (palette of ~12 colors) and include their values
-- Pass `blackAndWhite={showSampleColors}` to `BoxViolinPlots` when sample colors mode is on (so boxes go B&W automatically)
-- Pass `sampleColoredData` to `BoxViolinPlots`
+The beeswarm algorithm:
+```
+placed = []
+for each point (sorted by y):
+  x = 0
+  step = 0
+  direction = +1
+  while any placed point within 2*r distance:
+    x += direction * step
+    direction = -direction
+    step += 0.5
+  placed.push({ x, y, color })
+```
+This produces a symmetric, packed column of dots.
+
+**2. `src/components/analysis/BoxViolinPlots.tsx`**
+
+- Add optional prop `beeswarmMode?: boolean`
+- When `beeswarmMode=true` AND `sampleColoredData` is provided: call `getColoredBeeswarmPoints` instead of `getColoredJitteredPoints` to compute `sampleColoredJitter`
+- When `beeswarmMode=true` AND no `sampleColoredData`: pass a new optional `beeswarmPoints` prop to `BoxViolinSvg` (uniform beeswarm without sample colors)
+- Point radius used for beeswarm collision = `3` (same as current circle radius)
+
+**3. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
+
+- Add optional prop `beeswarmPoints?: { groupIdx: number; points: JitteredPoint[] }[]`
+- In the render loop: when `beeswarmPoints` has an entry for this group, use those points for uniform jitter rendering (instead of calling `getJitteredPoints`)
+- This handles the case where beeswarm is on but sample colors are off
+
+**4. `src/components/analysis/GroupComparison.tsx`**
+
+- Add `showBeeswarm` state (default `false`)
+- Add a "Beeswarm" toggle in the Plot Options bar (alongside Violin, Points, Sample Colors)
+- Pass `beeswarmMode={showBeeswarm}` down to `BoxViolinPlots`
+- Label: "Beeswarm" with a tooltip note would be nice but keep it simple — just a switch
 
 ---
 
-### Sample Color Palette
-A dedicated 12-color palette distinct from treatment group colors will be used:
-```ts
-const SAMPLE_COLORS = [
-  '#e6194b', '#3cb44b', '#4363d8', '#f58231',
-  '#911eb4', '#42d4f4', '#f032e6', '#bfef45',
-  '#fabed4', '#469990', '#dcbeff', '#9A6324',
-];
-```
-Colors are assigned by sample index within the group, cycling if more than 12 samples.
+### Behavior Matrix
 
----
-
-### SVG Legend Layout
-The legend will be placed inside the SVG to the right of the plot area, so it exports correctly with PNG:
-```text
-[  Plot Area  ] | [Legend]
-                  ● Sample_1.txt
-                  ● Sample_2.txt
-                  ● Sample_3.txt
-                  ...
-```
-Each legend entry: colored circle (r=5) + sample file name (truncated to ~18 chars), stacked vertically starting at `topMargin`.
+| Jitter | Sample Colors | Beeswarm | Result |
+|--------|--------------|----------|--------|
+| ON | OFF | OFF | Current random jitter (group color) |
+| ON | ON | OFF | Current translucent colored jitter |
+| ON | OFF | ON | Beeswarm, uniform group color |
+| ON | ON | ON | Beeswarm with per-sample colors — all points visible |
+| OFF | any | any | No points shown |
 
 ---
 
 ### Technical Details
-- The toggle only appears in `GroupComparison` (the "Between Groups" tab), not in other BoxViolinPlots usages
-- When `showSampleColors = false`, behavior is completely unchanged
-- When `showSampleColors = true`: boxes go B&W, jitter is multi-colored by sample, legend appears on the right
-- The `showJitter` toggle still controls whether any jitter is shown at all
-- Jitter remains seeded for visual stability (seed incorporates `sampleIndex * 10000 + pointIndex`)
-- The `BoxViolinSvg` changes are backward compatible — `sampleColoredJitter` and `sampleLegend` are optional props; omitting them gives the existing behavior
+
+- The beeswarm algorithm is O(n²) per group but with typical nanoindentation datasets (hundreds to low thousands of points per group), this is instant
+- Beeswarm width can grow wider than the box for large datasets — this is expected and desired. Points that exceed the box width still appear correctly because they render in the group's `<g transform>` space
+- If the group is very dense (thousands of points), the beeswarm column can get very wide. We add a soft cap: if x would exceed `±BOX_WIDTH * 2`, still place but capped (some overlap is accepted at extreme density)
+- No changes to export behavior — the SVG already renders beeswarm points the same as jitter points
+- `showBeeswarm` is independent of `showSampleColors`: you can use either alone or together
