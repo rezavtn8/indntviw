@@ -1,83 +1,66 @@
 
-## Replace "Beeswarm" with "Blend Overlap" Toggle
+## Fix: Make "Blend Overlap" a Sub-Mode of "Sample Colors"
 
 ### The Problem
-The beeswarm algorithm forces 500+ points per group to not overlap by pushing them horizontally. With dense nanoindentation datasets, this creates an absurdly wide point cloud (as seen in the screenshot). It defeats the purpose entirely.
+Currently "Blend Overlap" is an independent toggle that can be turned on even when "Sample Colors" is OFF. When Sample Colors is off, all points are the same color, so multiply-blending identical colors just makes them slightly darker — it provides no useful information and looks broken (the user called it "a scam").
 
-### The Solution: SVG Multiply Blend Mode
-Replace the Beeswarm toggle with a **"Blend Overlap"** toggle that applies `mix-blend-mode: multiply` to the jitter point layer. This is the standard technique used in scientific visualization tools (Prism, R ggplot2, Illustrator) for exactly this problem:
+Blend Overlap only makes sense when Sample Colors is ON, because the entire point is to show *which samples overlap* by mixing their distinct colors.
 
-- Points stay in their **random jitter positions** (same as Sample Colors mode)
-- Overlapping circles from different samples **multiply their colors** together:
-  - Blue + Red = Purple
-  - Red + Green = Dark Olive/Brown
-  - Three overlapping = even darker, distinct hue
-- All layers remain visible — overlap depth is encoded as color intensity
-- Zero performance cost — it is a single CSS property on an SVG group element
+### The Fix
+Remove "Blend Overlap" as a standalone toggle. Instead, make it a **sub-option of Sample Colors** — a secondary switch that only appears (or only activates) when Sample Colors is already enabled.
 
-This approach is called "multiply blending" and it works because the SVG background is white: any single color on white is unchanged, and two overlapping colors produce a darker mixed color that is distinct from either original.
+The UI will look like:
 
----
+```text
+[Violin ○] [Points ○] [Sample Colors ○──→ Blend Overlap ○]
+```
 
-### Behavior Matrix
-
-| Points | Sample Colors | Blend Overlap | Result |
-|--------|--------------|---------------|--------|
-| ON | OFF | OFF | Default random jitter, group color |
-| ON | ON | OFF | Per-sample colored jitter, translucent (existing behavior) |
-| ON | ON | ON | Per-sample colored jitter with multiply blend — overlaps show mixed colors |
-| ON | OFF | ON | Uniform group color jitter with multiply blend |
-| OFF | any | any | No points |
+When Sample Colors is toggled OFF, Blend Overlap is hidden/reset to OFF automatically.
 
 ---
 
 ### Files to Modify
 
 **1. `src/components/analysis/GroupComparison.tsx`**
-- Remove `showBeeswarm` state
-- Add `showBlendOverlap` state (default `false`)
-- Replace the "Beeswarm" `<Switch>` UI with "Blend Overlap"
-- Pass `blendOverlap={showBlendOverlap}` to `BoxViolinPlots` (replacing `beeswarmMode`)
+- Add auto-reset: when `showSampleColors` turns OFF, also set `showBlendOverlap` to `false`
+- Move the "Blend Overlap" switch so it renders **only when `showSampleColors` is true**, visually indented or connected with a small arrow/label to indicate it's a sub-option
+- Keep both state variables as-is internally — just control when Blend Overlap is visible and when it resets
 
-**2. `src/components/analysis/BoxViolinPlots.tsx`**
-- Remove `beeswarmMode` prop
-- Add `blendOverlap?: boolean` prop
-- Remove the `beeswarmPts` useMemo block (no longer needed)
-- Remove `getBeeswarmPoints` / `getColoredBeeswarmPoints` imports
-- Pass `blendOverlap` through to `BoxViolinSvg`
-
-**3. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
-- Remove `beeswarmPoints` prop and all associated logic (`beeswarmMap`, `useBeeswarmJitter` rendering block)
-- Add `blendOverlap?: boolean` prop
-- When rendering sample-colored jitter: if `blendOverlap=true`, wrap the circles in a `<g style={{ mixBlendMode: 'multiply' }}>` and increase `fillOpacity` to `0.7` (multiply needs higher base opacity to show clear blending)
-- When rendering uniform jitter: same — wrap in multiply blend group when `blendOverlap=true`
-- Point opacity strategy:
-  - Normal sample colors mode: `fillOpacity=0.45` (unchanged — translucent)
-  - Blend mode: `fillOpacity=0.75` (higher — multiply needs stronger base color to blend visibly)
-  - Stroke removed in blend mode (stroke interferes with multiply blending)
-
-**4. `src/components/analysis/boxViolin/jitter.ts`**
-- Remove `getBeeswarmPoints` and `getColoredBeeswarmPoints` functions (clean up dead code)
-- Keep `getJitteredPoints` and `getColoredJitteredPoints` unchanged
-
-**5. `src/components/analysis/boxViolin/index.ts`**
-- Remove any beeswarm-related exports if present
+**2. `src/components/analysis/boxViolin/BoxViolinSvg.tsx`**
+- Add a guard: only apply `mixBlendMode: multiply` when **both** `blendOverlap=true` AND `sampleColoredJitter` is being used (i.e., skip blend mode for uniform jitter entirely)
+- This ensures that even if `blendOverlap` is somehow passed as `true` without sample colors, it has no visual effect
 
 ---
 
-### Technical Details of Multiply Blend Mode
+### UI Layout (in the Plot Options bar)
 
-SVG `mix-blend-mode: multiply` works as follows:
-- Each channel: `result = src * dst / 255`
-- On white background (255,255,255): `result = src * 255/255 = src` → no change (correct)
-- Two overlapping colors: `result = c1 * c2 / 255` → darker, distinct hue
-- Three overlapping: product of all three → even darker
+```text
+[Violin]  [Points]  [Sample Colors ●]  [↳ Blend Overlap ●]
+```
 
-For the sample color palette (bright, saturated colors), this produces clearly distinct overlap indicators. For example:
-- `#e6194b` (red) + `#3cb44b` (green) → dark olive
-- `#4363d8` (blue) + `#f58231` (orange) → dark brown
-- `#e6194b` + `#42d4f4` (cyan) → dark magenta
+The "Blend Overlap" label will have a small left-indent and a subtle "↳" prefix or dimmed separator to signal it is a child control of Sample Colors. It disappears entirely when Sample Colors is OFF.
 
-The user can instantly see "this point is from sample 1 alone" vs "this point is where sample 1 and sample 2 overlap" vs "triple overlap" — all without any repositioning.
+---
 
-This works correctly in SVG export and PNG rasterization via html2canvas (which supports mix-blend-mode).
+### Behavior Matrix (corrected)
+
+| Points | Sample Colors | Blend Overlap | Result |
+|--------|--------------|---------------|--------|
+| ON | OFF | — (hidden) | Default random jitter, group color |
+| ON | ON | OFF | Per-sample colored jitter, translucent |
+| ON | ON | ON | Per-sample colored jitter with multiply blend — overlaps show mixed colors |
+| OFF | any | any | No points |
+
+---
+
+### Technical Details
+- No changes to `jitter.ts`, `layout.ts`, `BoxViolinPlots.tsx`, or `index.ts` — this is purely a UI/logic fix
+- The `blendOverlap` prop still flows through the component tree unchanged
+- The guard in `BoxViolinSvg.tsx` is a safety net — the real fix is in `GroupComparison.tsx` controlling visibility
+- When `showSampleColors` is turned ON → OFF, `showBlendOverlap` resets to `false` via the `onCheckedChange` handler:
+  ```tsx
+  onCheckedChange={(v) => {
+    setShowSampleColors(v);
+    if (!v) setShowBlendOverlap(false);
+  }}
+  ```
