@@ -53,6 +53,7 @@ export const GroupZoneAnalysis: React.FC<GroupZoneAnalysisProps> = ({
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
   const [showScatterDensity, setShowScatterDensity] = useState(false);
+  const [showSmallDots, setShowSmallDots] = useState(false);
 
   // Get groups that have sessions with zones
   const groupsWithZones = useMemo(() => {
@@ -315,6 +316,10 @@ export const GroupZoneAnalysis: React.FC<GroupZoneAnalysisProps> = ({
               <Label className="font-mono text-[10px]">Scatter Density</Label>
               <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
             </div>
+            <div className="flex items-center gap-2">
+              <Label className="font-mono text-[10px]">Small Dots</Label>
+              <Switch checked={showSmallDots} onCheckedChange={setShowSmallDots} />
+            </div>
           </div>
 
           <BoxViolinPlots
@@ -324,6 +329,7 @@ export const GroupZoneAnalysis: React.FC<GroupZoneAnalysisProps> = ({
             showViolin={showViolin}
             showJitter={showJitter}
             blendOverlap={showScatterDensity}
+            smallDots={showSmallDots}
             xAxisLabel="Zones (by Group)"
           />
         </>

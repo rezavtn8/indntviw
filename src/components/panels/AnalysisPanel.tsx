@@ -45,6 +45,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
   const [showJitter, setShowJitter] = useState(true);
   const [blackAndWhite, setBlackAndWhite] = useState(false);
   const [showScatterDensity, setShowScatterDensity] = useState(false);
+  const [showSmallDots, setShowSmallDots] = useState(false);
 
   const getPropertyLabel = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -251,6 +252,10 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
             <Label className="font-mono text-xs cursor-pointer">Scatter Density</Label>
             <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
           </div>
+          <div className="flex items-center justify-between">
+            <Label className="font-mono text-xs cursor-pointer">Small Dots</Label>
+            <Switch checked={showSmallDots} onCheckedChange={setShowSmallDots} />
+          </div>
         </div>
       </div>
 
@@ -309,6 +314,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
                       showJitter={showJitter}
                       blackAndWhite={blackAndWhite}
                       blendOverlap={showScatterDensity}
+                      smallDots={showSmallDots}
                       xAxisLabel={sampleName}
                     />
                   </TabsContent>
