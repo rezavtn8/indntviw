@@ -66,6 +66,8 @@ export interface BoxViolinSvgProps {
   sampleLegend?: SampleLegendEntry[];
   /** When true, applies SVG multiply blend-mode to jitter points so overlapping areas show mixed colors */
   blendOverlap?: boolean;
+  /** When true, reduces jitter dot radius for dense datasets */
+  smallDots?: boolean;
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -86,6 +88,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
   sampleColoredJitter,
   sampleLegend,
   blendOverlap = false,
+  smallDots = false,
 }) => {
   // Calculate axis bounds from all values
   const allValues = data.flatMap(d => d.values);
@@ -262,7 +265,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
                   key={i}
                   cx={pt.x}
                   cy={pt.y}
-                  r={2}
+                  r={smallDots ? 1 : 2}
                   fill={pointColor}
                   fillOpacity={blendOverlap ? 0.75 : (blackAndWhite ? 0.5 : 0.4)}
                   stroke={blendOverlap ? 'none' : undefined}
@@ -280,7 +283,7 @@ export const BoxViolinSvg: React.FC<BoxViolinSvgProps> = ({
                   key={i}
                   cx={pt.x}
                   cy={pt.y}
-                  r={3}
+                  r={smallDots ? 1.5 : 3}
                   fill={pt.color!}
                   fillOpacity={blendOverlap ? 0.75 : 0.45}
                   stroke={blendOverlap ? 'none' : pt.color!}

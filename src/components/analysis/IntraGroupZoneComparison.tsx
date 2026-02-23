@@ -31,6 +31,7 @@ interface IntraGroupZoneComparisonProps {
   showViolin?: boolean;
   showJitter?: boolean;
   blendOverlap?: boolean;
+  smallDots?: boolean;
 }
 
 interface PooledZone {
@@ -61,6 +62,7 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
   showViolin = false,
   showJitter = true,
   blendOverlap = false,
+  smallDots = false,
 }) => {
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
@@ -207,6 +209,7 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
         showViolin={showViolin}
         showJitter={showJitter}
         blendOverlap={blendOverlap}
+        smallDots={smallDots}
         showPValueAsterisks={true}
         xAxisLabel="Zones (pooled within Group)"
       />

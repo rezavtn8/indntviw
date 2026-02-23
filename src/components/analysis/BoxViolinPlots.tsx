@@ -41,6 +41,8 @@ export interface BoxViolinPlotsProps {
   sampleColoredData?: SampleColoredGroup[];
   /** When true, applies multiply blend-mode so overlapping points show mixed colors */
   blendOverlap?: boolean;
+  /** When true, reduces jitter dot radius for dense datasets */
+  smallDots?: boolean;
 }
 
 const FONT_STYLE: React.CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif' };
@@ -56,6 +58,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
   xAxisLabel = 'Samples',
   sampleColoredData,
   blendOverlap = false,
+  smallDots = false,
 }) => {
   // Get property config for display
   const propertyConfig = useMemo(() => {
@@ -192,6 +195,7 @@ export const BoxViolinPlots: React.FC<BoxViolinPlotsProps> = ({
           sampleColoredJitter={sampleColoredJitter}
           sampleLegend={sampleLegend}
           blendOverlap={blendOverlap}
+          smallDots={smallDots}
         />
       </div>
 

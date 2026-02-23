@@ -46,6 +46,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
   const [showJitter, setShowJitter] = useState(true);
   const [showSampleColors, setShowSampleColors] = useState(false);
   const [showScatterDensity, setShowScatterDensity] = useState(false);
+  const [showSmallDots, setShowSmallDots] = useState(false);
 
   const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
@@ -172,6 +173,10 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           <Label className="font-mono text-[10px]">Scatter Density</Label>
           <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
         </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Small Dots</Label>
+          <Switch checked={showSmallDots} onCheckedChange={setShowSmallDots} />
+        </div>
       </div>
 
       {/* Box Plot */}
@@ -184,6 +189,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           blackAndWhite={showSampleColors}
           sampleColoredData={sampleColoredData}
           blendOverlap={showScatterDensity}
+          smallDots={showSmallDots}
         />
       )}
 

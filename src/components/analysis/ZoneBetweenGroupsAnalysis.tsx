@@ -44,6 +44,7 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
   const [showJitter, setShowJitter] = useState(true);
   const [showSampleColors, setShowSampleColors] = useState(false);
   const [showScatterDensity, setShowScatterDensity] = useState(false);
+  const [showSmallDots, setShowSmallDots] = useState(false);
 
   // Find all unique zone names across all sessions in groups
   const allZoneNames = useMemo(() => {
@@ -229,6 +230,10 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
           <Label className="font-mono text-[10px]">Scatter Density</Label>
           <Switch checked={showScatterDensity} onCheckedChange={setShowScatterDensity} />
         </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-mono text-[10px]">Small Dots</Label>
+          <Switch checked={showSmallDots} onCheckedChange={setShowSmallDots} />
+        </div>
       </div>
 
       {/* Info badge */}
@@ -247,6 +252,7 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
           blackAndWhite={showSampleColors}
           sampleColoredData={sampleColoredData}
           blendOverlap={showScatterDensity}
+          smallDots={showSmallDots}
         />
       )}
 
