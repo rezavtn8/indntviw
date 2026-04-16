@@ -46,7 +46,7 @@ import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
 import { Spatial3DPanel } from '@/components/analysis/Spatial3DPanel';
 import { ComprehensiveBatchExport } from '@/components/analysis/ComprehensiveBatchExport';
 import { FileTabs } from '@/components/FileTabs';
-import { AppLayout, ViewSidebar, ContextPanel, AppToolbar, ProjectActions } from '@/components/layout';
+import { AppLayout, ViewSidebar, ContextPanel, AppToolbar, ProjectActions, Wordmark, BrandMark } from '@/components/layout';
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
