@@ -48,7 +48,7 @@ import { AnalysisPanel } from '@/components/panels/AnalysisPanel';
 import { Spatial3DPanel } from '@/components/analysis/Spatial3DPanel';
 import { ComprehensiveBatchExport } from '@/components/analysis/ComprehensiveBatchExport';
 import { FileTabs } from '@/components/FileTabs';
-import { AppLayout, ViewSidebar, ContextPanel, AppToolbar, ProjectActions, Wordmark, BrandMark } from '@/components/layout';
+import { AppLayout, ViewSidebar, ContextPanel, AppToolbar, ProjectActions, Wordmark, BrandMark, SegmentedTabs } from '@/components/layout';
 import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -373,9 +373,14 @@ export const IndentViewApp: React.FC = () => {
   };
 
   const renderToolbar = () => {
+    // Hide redundant export button when already in Export Studio
+    const toolbarProps = activeView === 'export'
+      ? { ...toolbarEditProps, visualizationRef: undefined as any, selectedProperty: undefined as any }
+      : toolbarEditProps;
+
     if (activeView === '2d') {
       return (
-        <AppToolbar {...toolbarEditProps}>
+        <AppToolbar {...toolbarProps}>
           <ZoneToolbar 
             activeTool={heatmapDrawingTool} onToolChange={setHeatmapDrawingTool}
             onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
@@ -390,7 +395,7 @@ export const IndentViewApp: React.FC = () => {
     
     if (activeView === 'export' && exportMode === 'figure') {
       return (
-        <AppToolbar {...toolbarEditProps}>
+        <AppToolbar {...toolbarProps}>
           <ZoneToolbar 
             activeTool={drawingTool} onToolChange={setDrawingTool}
             onDeleteSelected={() => selectedZoneId && handleZoneDelete(selectedZoneId)}
@@ -403,7 +408,7 @@ export const IndentViewApp: React.FC = () => {
       );
     }
     
-    return <AppToolbar {...toolbarEditProps} />;
+    return <AppToolbar {...toolbarProps} />;
   };
 
   // Render export mode tabs
@@ -411,31 +416,15 @@ export const IndentViewApp: React.FC = () => {
     if (activeView !== 'export') return null;
     
     return (
-      <div className="border-b-2 border-border bg-card px-4 py-2">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setExportMode('figure')}
-            className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
-              exportMode === 'figure'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            <Image className="w-4 h-4" />
-            Figure Export
-          </button>
-          <button
-            onClick={() => setExportMode('batch')}
-            className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-sm transition-colors ${
-              exportMode === 'batch'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            Batch Export
-          </button>
-        </div>
+      <div className="bg-card px-4 pt-2">
+        <SegmentedTabs
+          activeId={exportMode}
+          onChange={(id) => setExportMode(id as 'figure' | 'batch')}
+          tabs={[
+            { id: 'figure', label: 'Figure Export', icon: Image },
+            { id: 'batch', label: 'Batch Export', icon: Package },
+          ]}
+        />
       </div>
     );
   };
@@ -492,29 +481,44 @@ export const IndentViewApp: React.FC = () => {
 
     if (activeView === 'overlay') {
       return (
-        <OverlayContainer>
-          {(w, h) => (
-            <OverlayCanvas
-              ref={overlayCanvasRef}
-              points={data?.points || []}
-              selectedProperty={selectedProperty}
-              colorScheme={colorScheme}
-              minValue={currentMin}
-              maxValue={currentMax}
-              imageUrl={overlayImageUrl}
-              transform={overlayTransform}
-              onTransformChange={setOverlayTransform}
-              pointSettings={overlayPointSettings}
-              pointsTransform={overlayPointsTransform}
-              onPointsTransformChange={setOverlayPointsTransform}
-              activeLayer={overlayActiveLayer}
-              onActiveLayerChange={setOverlayActiveLayer}
-              containerWidth={w}
-              containerHeight={h}
-              pointsVisible={overlayPointsVisible}
-            />
+        <div className="w-full h-full flex gap-3">
+          <div className="flex-1 h-full">
+            <OverlayContainer>
+              {(w, h) => (
+                <OverlayCanvas
+                  ref={overlayCanvasRef}
+                  points={data?.points || []}
+                  selectedProperty={selectedProperty}
+                  colorScheme={colorScheme}
+                  minValue={currentMin}
+                  maxValue={currentMax}
+                  imageUrl={overlayImageUrl}
+                  transform={overlayTransform}
+                  onTransformChange={setOverlayTransform}
+                  pointSettings={overlayPointSettings}
+                  pointsTransform={overlayPointsTransform}
+                  onPointsTransformChange={setOverlayPointsTransform}
+                  activeLayer={overlayActiveLayer}
+                  onActiveLayerChange={setOverlayActiveLayer}
+                  containerWidth={w}
+                  containerHeight={h}
+                  pointsVisible={overlayPointsVisible}
+                />
+              )}
+            </OverlayContainer>
+          </div>
+          {data && (
+            <div className="flex-shrink-0 flex items-center pr-2">
+              <ColorLegend
+                selectedProperty={selectedProperty}
+                unit={getPropertyUnit(selectedProperty)}
+                colorScheme={colorScheme}
+                minValue={currentMin}
+                maxValue={currentMax}
+              />
+            </div>
           )}
-        </OverlayContainer>
+        </div>
       );
     }
     

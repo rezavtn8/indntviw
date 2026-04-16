@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { IndentationPoint } from '@/types/indentation';
 import { calculateSurfaceAnalysis, SurfaceAnalysisResult } from '@/utils/spatial3DStatistics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusChip, StatusTone } from '@/components/ui/status-chip';
 import { Waves, Mountain, Square, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -16,13 +16,13 @@ export const SurfaceAnalysis: React.FC<SurfaceAnalysisProps> = ({ points }) => {
     [points]
   );
 
-  const roughnessClass = useMemo(() => {
+  const roughnessClass = useMemo((): { label: string; tone: StatusTone } => {
     const rq = analysis.Rq;
-    if (rq < 0.1) return { label: 'Ultra Smooth', color: 'bg-green-500/20 text-green-600' };
-    if (rq < 0.5) return { label: 'Smooth', color: 'bg-emerald-500/20 text-emerald-600' };
-    if (rq < 1.0) return { label: 'Moderate', color: 'bg-yellow-500/20 text-yellow-600' };
-    if (rq < 2.0) return { label: 'Rough', color: 'bg-orange-500/20 text-orange-600' };
-    return { label: 'Very Rough', color: 'bg-red-500/20 text-red-600' };
+    if (rq < 0.1) return { label: 'Ultra Smooth', tone: 'good' };
+    if (rq < 0.5) return { label: 'Smooth', tone: 'good' };
+    if (rq < 1.0) return { label: 'Moderate', tone: 'neutral' };
+    if (rq < 2.0) return { label: 'Rough', tone: 'warn' };
+    return { label: 'Very Rough', tone: 'warn' };
   }, [analysis.Rq]);
 
   const skewnessInterpretation = useMemo(() => {
@@ -40,9 +40,7 @@ export const SurfaceAnalysis: React.FC<SurfaceAnalysisProps> = ({ points }) => {
             <CardTitle className="text-sm flex items-center gap-2">
               <Waves className="w-4 h-4" />
               Surface Roughness
-              <Badge variant="secondary" className={roughnessClass.color}>
-                {roughnessClass.label}
-              </Badge>
+              <StatusChip tone={roughnessClass.tone}>{roughnessClass.label}</StatusChip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -107,7 +105,7 @@ export const SurfaceAnalysis: React.FC<SurfaceAnalysisProps> = ({ points }) => {
             {/* Visual roughness indicator */}
             <div className="mt-4">
               <div className="text-xs text-muted-foreground mb-1">Roughness Scale</div>
-              <div className="h-2 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 relative">
+              <div className="h-2 rounded-full relative" style={{ background: 'linear-gradient(90deg, #3aa0a0 0%, #888 50%, #e8594f 100%)' }}>
                 <div 
                   className="absolute w-3 h-3 bg-foreground rounded-full border-2 border-background -top-0.5 transform -translate-x-1/2"
                   style={{ left: `${Math.min(100, (analysis.Rq / 3) * 100)}%` }}

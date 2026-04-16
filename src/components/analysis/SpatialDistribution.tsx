@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { IndentationPoint } from '@/types/indentation';
 import { calculateSpatialDistribution, SpatialDistributionResult } from '@/utils/spatial3DStatistics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusChip, StatusTone } from '@/components/ui/status-chip';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Crosshair, Activity, Flame } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -24,19 +25,19 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
   );
 
   // Interpret NN ratio
-  const patternType = useMemo(() => {
-    if (analysis.nnRatio < 0.8) return { label: 'Clustered', color: 'bg-orange-500/20 text-orange-600', icon: '◆' };
-    if (analysis.nnRatio > 1.2) return { label: 'Dispersed', color: 'bg-blue-500/20 text-blue-600', icon: '◇' };
-    return { label: 'Random', color: 'bg-gray-500/20 text-gray-600', icon: '○' };
+  const patternType = useMemo((): { label: string; tone: StatusTone; icon: string } => {
+    if (analysis.nnRatio < 0.8) return { label: 'Clustered', tone: 'warn', icon: '◆' };
+    if (analysis.nnRatio > 1.2) return { label: 'Dispersed', tone: 'info', icon: '◇' };
+    return { label: 'Random', tone: 'neutral', icon: '○' };
   }, [analysis.nnRatio]);
 
-  // Interpret Moran's I
+  // Interpret Moran's I — navy = positive, coral = negative (matches diverging colormap convention)
   const autocorrelationType = useMemo(() => {
-    if (analysis.moransI > 0.3) return { label: 'Strong Positive', color: 'text-green-600', desc: 'Similar values cluster together' };
-    if (analysis.moransI > 0.1) return { label: 'Weak Positive', color: 'text-emerald-600', desc: 'Some clustering of similar values' };
-    if (analysis.moransI < -0.3) return { label: 'Strong Negative', color: 'text-red-600', desc: 'Dissimilar values cluster (checkerboard)' };
-    if (analysis.moransI < -0.1) return { label: 'Weak Negative', color: 'text-orange-600', desc: 'Some dispersal of similar values' };
-    return { label: 'Random', color: 'text-muted-foreground', desc: 'No spatial pattern detected' };
+    if (analysis.moransI > 0.3) return { label: 'Strong Positive', color: '#2a4d8f', desc: 'Similar values cluster together' };
+    if (analysis.moransI > 0.1) return { label: 'Weak Positive', color: '#3aa0a0', desc: 'Some clustering of similar values' };
+    if (analysis.moransI < -0.3) return { label: 'Strong Negative', color: '#e8594f', desc: 'Dissimilar values cluster (checkerboard)' };
+    if (analysis.moransI < -0.1) return { label: 'Weak Negative', color: '#e8594f', desc: 'Some dispersal of similar values' };
+    return { label: 'Random', color: 'hsl(var(--muted-foreground))', desc: 'No spatial pattern detected' };
   }, [analysis.moransI]);
 
   return (
@@ -73,9 +74,7 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
             <CardTitle className="text-sm flex items-center gap-2">
               <Crosshair className="w-4 h-4" />
               Nearest Neighbor Analysis
-              <Badge variant="secondary" className={patternType.color}>
-                {patternType.icon} {patternType.label}
-              </Badge>
+              <StatusChip tone={patternType.tone}>{patternType.icon} {patternType.label}</StatusChip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -96,7 +95,7 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
             {/* NN Ratio visualization */}
             <div className="p-3 bg-muted/30 rounded-lg">
               <div className="text-xs text-muted-foreground mb-2">Spatial Pattern</div>
-              <div className="relative h-2 bg-gradient-to-r from-orange-500 via-gray-400 to-blue-500 rounded-full">
+              <div className="relative h-2 rounded-full" style={{ background: 'linear-gradient(90deg, #e8594f 0%, #888 50%, #2a4d8f 100%)' }}>
                 <div 
                   className="absolute w-3 h-3 bg-foreground rounded-full border-2 border-background -top-0.5 transform -translate-x-1/2"
                   style={{ left: `${Math.min(100, Math.max(0, analysis.nnRatio * 50))}%` }}
@@ -135,7 +134,7 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
 
             <div className="p-3 bg-muted/30 rounded-lg">
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${autocorrelationType.color}`}>
+                <span className="text-sm font-medium" style={{ color: autocorrelationType.color }}>
                   {autocorrelationType.label}
                 </span>
               </div>
@@ -150,7 +149,7 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
             </div>
 
             {/* Moran's I visualization */}
-            <div className="mt-4 relative h-2 bg-gradient-to-r from-red-500 via-gray-400 to-green-500 rounded-full">
+            <div className="mt-4 relative h-2 rounded-full" style={{ background: 'linear-gradient(90deg, #e8594f 0%, #888 50%, #2a4d8f 100%)' }}>
               <div 
                 className="absolute w-3 h-3 bg-foreground rounded-full border-2 border-background -top-0.5 transform -translate-x-1/2"
                 style={{ left: `${(analysis.moransI + 1) * 50}%` }}
@@ -174,13 +173,13 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-red-500/10 rounded-lg text-center">
-                <div className="text-2xl font-bold text-red-600">{analysis.hotspotCount}</div>
+              <div className="p-3 rounded-lg text-center" style={{ background: '#e8594f1a' }}>
+                <div className="text-2xl font-bold" style={{ color: '#e8594f' }}>{analysis.hotspotCount}</div>
                 <div className="text-xs text-muted-foreground">Hotspots</div>
                 <div className="text-xs text-muted-foreground">(High {property})</div>
               </div>
-              <div className="p-3 bg-blue-500/10 rounded-lg text-center">
-                <div className="text-2xl font-bold text-blue-600">{analysis.coldspotCount}</div>
+              <div className="p-3 rounded-lg text-center" style={{ background: '#2a4d8f1a' }}>
+                <div className="text-2xl font-bold" style={{ color: '#2a4d8f' }}>{analysis.coldspotCount}</div>
                 <div className="text-xs text-muted-foreground">Coldspots</div>
                 <div className="text-xs text-muted-foreground">(Low {property})</div>
               </div>

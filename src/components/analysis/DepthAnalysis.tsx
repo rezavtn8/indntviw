@@ -81,25 +81,25 @@ export const DepthAnalysis: React.FC<DepthAnalysisProps> = ({
             Depth Statistics
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Z Range:</span>
-              <span className="font-mono">{analysis.zMin.toFixed(3)} - {analysis.zMax.toFixed(3)}</span>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Z Range</dt>
+              <dd className="font-mono">{analysis.zMin.toFixed(3)} – {analysis.zMax.toFixed(3)}</dd>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Z Mean:</span>
-              <span className="font-mono">{analysis.zMean.toFixed(3)}</span>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Z Mean</dt>
+              <dd className="font-mono">{analysis.zMean.toFixed(3)}</dd>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Z Std Dev:</span>
-              <span className="font-mono">{analysis.zStdDev.toFixed(3)}</span>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Z Std Dev</dt>
+              <dd className="font-mono">{analysis.zStdDev.toFixed(3)}</dd>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Z Median:</span>
-              <span className="font-mono">{analysis.zMedian.toFixed(3)}</span>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Z Median</dt>
+              <dd className="font-mono">{analysis.zMedian.toFixed(3)}</dd>
             </div>
-          </div>
+          </dl>
         </CardContent>
       </Card>
 
@@ -138,18 +138,18 @@ export const DepthAnalysis: React.FC<DepthAnalysisProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <div className="grid grid-cols-2 gap-2 text-xs mb-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Gradient:</span>
-              <span className="font-mono">{analysis.depthGradient.toFixed(4)} {propertyUnit}/unit</span>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-2">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Gradient</dt>
+              <dd className="font-mono">{analysis.depthGradient.toFixed(4)} {propertyUnit}/unit</dd>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Correlation (r):</span>
-              <span className={`font-mono ${Math.abs(analysis.depthCorrelation) > 0.5 ? 'text-primary' : ''}`}>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">Correlation (r)</dt>
+              <dd className={`font-mono ${Math.abs(analysis.depthCorrelation) > 0.5 ? 'text-primary' : ''}`}>
                 {analysis.depthCorrelation.toFixed(3)}
-              </span>
+              </dd>
             </div>
-          </div>
+          </dl>
           <div className="h-32">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>

@@ -57,17 +57,17 @@ export const CorrelationAnalysis: React.FC<CorrelationAnalysisProps> = ({ points
     return matrix.sort((a, b) => Math.abs(b.pearsonR) - Math.abs(a.pearsonR));
   }, [points, properties]);
 
+  // Brand-aligned: navy = positive (good correlation), coral = negative (matches diverging colormap convention)
   const getCorrelationColor = (r: number): string => {
     const absR = Math.abs(r);
-    if (absR > 0.7) return r > 0 ? 'text-green-600' : 'text-red-600';
-    if (absR > 0.4) return r > 0 ? 'text-green-500' : 'text-red-500';
-    return 'text-muted-foreground';
+    if (absR < 0.4) return 'text-muted-foreground';
+    return r > 0 ? 'text-[#2a4d8f]' : 'text-[#e8594f]';
   };
 
   const getCorrelationBg = (r: number): string => {
     const absR = Math.abs(r);
-    if (absR > 0.7) return r > 0 ? 'bg-green-500/20' : 'bg-red-500/20';
-    if (absR > 0.4) return r > 0 ? 'bg-green-500/10' : 'bg-red-500/10';
+    if (absR > 0.7) return r > 0 ? 'bg-[#2a4d8f]/20' : 'bg-[#e8594f]/20';
+    if (absR > 0.4) return r > 0 ? 'bg-[#2a4d8f]/10' : 'bg-[#e8594f]/10';
     return 'bg-muted/30';
   };
 
@@ -190,7 +190,7 @@ export const CorrelationAnalysis: React.FC<CorrelationAnalysisProps> = ({ points
       {/* Legend */}
       <div className="flex items-center justify-center gap-4 mt-4 text-xs font-mono text-muted-foreground">
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-red-500/20 border border-red-500/30 rounded" />
+          <div className="w-4 h-4 rounded border" style={{ background: '#e8594f33', borderColor: '#e8594f66' }} />
           <span>Strong negative</span>
         </div>
         <div className="flex items-center gap-1">
@@ -198,7 +198,7 @@ export const CorrelationAnalysis: React.FC<CorrelationAnalysisProps> = ({ points
           <span>Weak</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-green-500/20 border border-green-500/30 rounded" />
+          <div className="w-4 h-4 rounded border" style={{ background: '#2a4d8f33', borderColor: '#2a4d8f66' }} />
           <span>Strong positive</span>
         </div>
       </div>

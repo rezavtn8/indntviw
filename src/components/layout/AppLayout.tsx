@@ -84,9 +84,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
       {/* Footer / Status Bar */}
       {footer && (
-        <footer className="border-t border-border bg-card">
-          {footer}
-        </footer>
+        <>
+          <div
+            className="h-[1px] w-full shrink-0"
+            style={{
+              background:
+                'linear-gradient(90deg, #2a4d8f 0%, #3aa0a0 50%, #e8594f 100%)',
+              opacity: 0.6,
+            }}
+            aria-hidden
+          />
+          <footer className="bg-card">{footer}</footer>
+        </>
       )}
 
       {/* Modals */}

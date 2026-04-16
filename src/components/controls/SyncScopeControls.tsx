@@ -23,16 +23,16 @@ export const SyncScopeControls: React.FC<SyncScopeControlsProps> = ({
   const isMulti = sessionCount > 1;
 
   return (
-    <div className="space-y-2 p-2 border border-border rounded-md bg-muted/20">
+    <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           {overrideColorRange ? (
-            <User className="w-3.5 h-3.5 text-foreground shrink-0" />
+            <User className="w-3 h-3 text-muted-foreground shrink-0" />
           ) : (
-            <Link2 className="w-3.5 h-3.5 text-foreground shrink-0" />
+            <Link2 className="w-3 h-3 text-muted-foreground shrink-0" />
           )}
-          <label className="font-mono text-[11px] uppercase tracking-wide truncate">
-            {overrideColorRange ? 'This sample only' : 'Synced across tabs'}
+          <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground truncate">
+            {overrideColorRange ? 'Per-Sample Range' : 'Synced Range'}
           </label>
         </div>
         <Tooltip>

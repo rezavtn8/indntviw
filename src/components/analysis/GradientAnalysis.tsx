@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { IndentationPoint } from '@/types/indentation';
 import { calculateGradientAnalysis, GradientAnalysisResult } from '@/utils/spatial3DStatistics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusChip, StatusTone } from '@/components/ui/status-chip';
 import { ArrowRight, Compass, GitBranch, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -38,11 +38,11 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
   }, [analysis]);
 
   // Anisotropy classification
-  const anisotropyClass = useMemo(() => {
-    if (analysis.anisotropyIndex > 0.7) return { label: 'Strong', color: 'bg-red-500/20 text-red-600' };
-    if (analysis.anisotropyIndex > 0.4) return { label: 'Moderate', color: 'bg-orange-500/20 text-orange-600' };
-    if (analysis.anisotropyIndex > 0.2) return { label: 'Weak', color: 'bg-yellow-500/20 text-yellow-600' };
-    return { label: 'Isotropic', color: 'bg-green-500/20 text-green-600' };
+  const anisotropyClass = useMemo((): { label: string; tone: StatusTone } => {
+    if (analysis.anisotropyIndex > 0.7) return { label: 'Strong', tone: 'warn' };
+    if (analysis.anisotropyIndex > 0.4) return { label: 'Moderate', tone: 'warn' };
+    if (analysis.anisotropyIndex > 0.2) return { label: 'Weak', tone: 'neutral' };
+    return { label: 'Isotropic', tone: 'good' };
   }, [analysis.anisotropyIndex]);
 
   // Calculate angle from gradient components (in XY plane)
@@ -83,17 +83,17 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
               <GradientComponent 
                 label="X" 
                 value={analysis.gradientDirectionX} 
-                color="bg-red-500"
+                color="#2a4d8f"
               />
               <GradientComponent 
                 label="Y" 
                 value={analysis.gradientDirectionY} 
-                color="bg-green-500"
+                color="#3aa0a0"
               />
               <GradientComponent 
                 label="Z" 
                 value={analysis.gradientDirectionZ} 
-                color="bg-blue-500"
+                color="#e8594f"
               />
             </div>
 
@@ -128,9 +128,7 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
             <CardTitle className="text-sm flex items-center gap-2">
               <Compass className="w-4 h-4" />
               Anisotropy Analysis
-              <Badge variant="secondary" className={anisotropyClass.color}>
-                {anisotropyClass.label}
-              </Badge>
+              <StatusChip tone={anisotropyClass.tone}>{anisotropyClass.label}</StatusChip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -151,7 +149,7 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
             {/* Anisotropy bar */}
             <div className="mt-2">
               <div className="text-xs text-muted-foreground mb-1">Anisotropy Scale</div>
-              <div className="h-2 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 relative">
+              <div className="h-2 rounded-full relative" style={{ background: 'linear-gradient(90deg, #3aa0a0 0%, #888 50%, #e8594f 100%)' }}>
                 <div 
                   className="absolute w-3 h-3 bg-foreground rounded-full border-2 border-background -top-0.5 transform -translate-x-1/2"
                   style={{ left: `${analysis.anisotropyIndex * 100}%` }}
@@ -179,19 +177,19 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
                 label="X Direction" 
                 value={analysis.xDirectionVariance}
                 max={Math.max(analysis.xDirectionVariance, analysis.yDirectionVariance, analysis.zDirectionVariance)}
-                color="bg-red-500"
+                color="#2a4d8f"
               />
               <VarianceBar 
                 label="Y Direction" 
                 value={analysis.yDirectionVariance}
                 max={Math.max(analysis.xDirectionVariance, analysis.yDirectionVariance, analysis.zDirectionVariance)}
-                color="bg-green-500"
+                color="#3aa0a0"
               />
               <VarianceBar 
                 label="Z Direction" 
                 value={analysis.zDirectionVariance}
                 max={Math.max(analysis.xDirectionVariance, analysis.yDirectionVariance, analysis.zDirectionVariance)}
-                color="bg-blue-500"
+                color="#e8594f"
               />
             </div>
 
@@ -254,14 +252,14 @@ interface GradientComponentProps {
 const GradientComponent: React.FC<GradientComponentProps> = ({ label, value, color }) => (
   <div className="p-2 bg-muted/30 rounded-lg text-center">
     <div className="flex items-center justify-center gap-1 mb-1">
-      <div className={`w-2 h-2 rounded ${color}`} />
+      <div className="w-2 h-2 rounded" style={{ background: color }} />
       <span className="text-xs text-muted-foreground">{label}</span>
     </div>
     <div className="font-mono text-xs">{value.toFixed(3)}</div>
     <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
       <div 
-        className={`h-full ${color}`}
-        style={{ width: `${Math.abs(value) * 100}%` }}
+        className="h-full"
+        style={{ width: `${Math.abs(value) * 100}%`, background: color }}
       />
     </div>
   </div>
@@ -282,8 +280,8 @@ const VarianceBar: React.FC<VarianceBarProps> = ({ label, value, max, color }) =
     </div>
     <div className="h-2 bg-muted rounded-full overflow-hidden">
       <div 
-        className={`h-full ${color} transition-all`}
-        style={{ width: max > 0 ? `${(value / max) * 100}%` : '0%' }}
+        className="h-full transition-all"
+        style={{ width: max > 0 ? `${(value / max) * 100}%` : '0%', background: color }}
       />
     </div>
   </div>
