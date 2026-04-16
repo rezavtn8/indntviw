@@ -33,6 +33,7 @@ import { SyncScopeControls } from '@/components/controls/SyncScopeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
+import { RenderStyleControls } from '@/components/controls/RenderStyleControls';
 import { View3DControls } from '@/components/controls/View3DControls';
 import { ZoneToolbar } from '@/components/controls/ZoneToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
