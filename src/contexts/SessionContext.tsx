@@ -161,6 +161,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       overlayPointsTransform: (ps as any).overlayPointsTransform ?? { offsetX: 0, offsetY: 0, scale: 1, opacity: 90, xStretch: 1, yStretch: 1 },
       overlayActiveLayer: (ps as any).overlayActiveLayer ?? 'points',
       overlayPointsVisible: (ps as any).overlayPointsVisible ?? true,
+      overrideColorRange: (ps as any).overrideColorRange ?? false,
     }));
 
     setFileSessions(sessions);
