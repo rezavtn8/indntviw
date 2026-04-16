@@ -77,8 +77,8 @@ export interface OverlayCanvasRef {
   getCanvasDimensions: () => { width: number; height: number };
 }
 
-const HANDLE_SIZE = 8;
-const HANDLE_HIT_SIZE = 14;
+const HANDLE_SIZE = 10;
+const HANDLE_HIT_SIZE = 16;
 
 type DragMode = 'none' | 'move-image' | 'move-points' | 'resize-image' | 'resize-points' | 'pan';
 
