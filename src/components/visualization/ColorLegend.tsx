@@ -49,11 +49,13 @@ export const ColorLegend: React.FC<ColorLegendProps> = ({
   minValue,
   maxValue,
 }) => {
-  const gradientStops = Array.from({ length: 10 }, (_, i) => {
-    const t = i / 9;
+  // Build gradient top→bottom = max→min. Sample 32 stops for a smooth ramp.
+  const gradientStops = Array.from({ length: 32 }, (_, i) => {
+    const pos = i / 31; // 0 (top) → 1 (bottom)
+    const t = 1 - pos;  // top = max value (t=1), bottom = min value (t=0)
     const { r, g, b } = interpolateColor(t, colorScheme);
-    return `rgb(${r}, ${g}, ${b}) ${t * 100}%`;
-  });
+    return `rgb(${r}, ${g}, ${b}) ${(pos * 100).toFixed(2)}%`;
+  }).join(', ');
 
   const ticks = useMemo(() => generateNiceTicks(minValue, maxValue, 5), [minValue, maxValue]);
   
@@ -91,7 +93,7 @@ export const ColorLegend: React.FC<ColorLegendProps> = ({
             <div
               className="w-4 h-full border border-foreground/30"
               style={{
-                background: `linear-gradient(to bottom, ${gradientStops.reverse().join(', ')})`,
+                background: `linear-gradient(to bottom, ${gradientStops})`,
               }}
             />
             
