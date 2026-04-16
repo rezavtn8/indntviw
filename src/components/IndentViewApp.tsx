@@ -481,29 +481,44 @@ export const IndentViewApp: React.FC = () => {
 
     if (activeView === 'overlay') {
       return (
-        <OverlayContainer>
-          {(w, h) => (
-            <OverlayCanvas
-              ref={overlayCanvasRef}
-              points={data?.points || []}
-              selectedProperty={selectedProperty}
-              colorScheme={colorScheme}
-              minValue={currentMin}
-              maxValue={currentMax}
-              imageUrl={overlayImageUrl}
-              transform={overlayTransform}
-              onTransformChange={setOverlayTransform}
-              pointSettings={overlayPointSettings}
-              pointsTransform={overlayPointsTransform}
-              onPointsTransformChange={setOverlayPointsTransform}
-              activeLayer={overlayActiveLayer}
-              onActiveLayerChange={setOverlayActiveLayer}
-              containerWidth={w}
-              containerHeight={h}
-              pointsVisible={overlayPointsVisible}
-            />
+        <div className="w-full h-full flex gap-3">
+          <div className="flex-1 h-full">
+            <OverlayContainer>
+              {(w, h) => (
+                <OverlayCanvas
+                  ref={overlayCanvasRef}
+                  points={data?.points || []}
+                  selectedProperty={selectedProperty}
+                  colorScheme={colorScheme}
+                  minValue={currentMin}
+                  maxValue={currentMax}
+                  imageUrl={overlayImageUrl}
+                  transform={overlayTransform}
+                  onTransformChange={setOverlayTransform}
+                  pointSettings={overlayPointSettings}
+                  pointsTransform={overlayPointsTransform}
+                  onPointsTransformChange={setOverlayPointsTransform}
+                  activeLayer={overlayActiveLayer}
+                  onActiveLayerChange={setOverlayActiveLayer}
+                  containerWidth={w}
+                  containerHeight={h}
+                  pointsVisible={overlayPointsVisible}
+                />
+              )}
+            </OverlayContainer>
+          </div>
+          {data && (
+            <div className="flex-shrink-0 flex items-center pr-2">
+              <ColorLegend
+                selectedProperty={selectedProperty}
+                unit={getPropertyUnit(selectedProperty)}
+                colorScheme={colorScheme}
+                minValue={currentMin}
+                maxValue={currentMax}
+              />
+            </div>
           )}
-        </OverlayContainer>
+        </div>
       );
     }
     
