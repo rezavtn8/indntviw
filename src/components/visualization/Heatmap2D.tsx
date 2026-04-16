@@ -19,6 +19,8 @@ interface Heatmap2DProps {
   selectedPointIds?: number[];
   showContours?: boolean;
   showInterpolation?: boolean;
+  pointShape?: 'circle' | 'square';
+  pointSizeMultiplier?: number;
   drawingTool?: DrawingTool;
   zones?: Zone[];
   selectedZoneId?: string | null;
@@ -47,6 +49,8 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
   selectedPointIds = [],
   showContours = false,
   showInterpolation = false,
+  pointShape = 'circle',
+  pointSizeMultiplier = 1,
   drawingTool = 'select',
   zones = [],
   selectedZoneId = null,
