@@ -527,6 +527,7 @@ export const IndentViewApp: React.FC = () => {
                   containerWidth={w}
                   containerHeight={h}
                   pointsVisible={overlayPointsVisible}
+                  onRequestUploadImage={() => overlayUploadInputRef.current?.click()}
                 />
               )}
             </OverlayContainer>
