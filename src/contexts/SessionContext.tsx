@@ -20,6 +20,14 @@ interface SessionContextValue {
   // Global settings (shared across all sessions)
   globalSelectedProperty: string;
   setGlobalSelectedProperty: (property: string) => void;
+  globalColorScheme: ColorScheme;
+  setGlobalColorScheme: (scheme: ColorScheme) => void;
+  globalCustomMin: number | null;
+  globalCustomMax: number | null;
+  setGlobalCustomMin: (val: number | null) => void;
+  setGlobalCustomMax: (val: number | null) => void;
+  resetGlobalRange: () => void;
+  autoFitGlobalRangeToAllSamples: () => void;
   
   // Treatment groups (lifted from CrossSamplePanel for persistence)
   groups: SampleGroup[];
@@ -32,6 +40,7 @@ interface SessionContextValue {
   colorScheme: FileSession['colorScheme'];
   customMin: number | null;
   customMax: number | null;
+  overrideColorRange: boolean;
   zones: FileSession['zones'];
   selectedZoneId: string | null;
   comparedZoneIds: string[];
