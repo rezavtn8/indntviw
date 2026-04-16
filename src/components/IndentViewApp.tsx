@@ -33,6 +33,7 @@ import { SyncScopeControls } from '@/components/controls/SyncScopeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
+import { RenderStyleControls } from '@/components/controls/RenderStyleControls';
 import { View3DControls } from '@/components/controls/View3DControls';
 import { ZoneToolbar } from '@/components/controls/ZoneToolbar';
 import { PointDetails } from '@/components/panels/PointDetails';
@@ -74,6 +75,7 @@ export const IndentViewApp: React.FC = () => {
 
   const {
     showContours, setShowContours, showInterpolation, setShowInterpolation,
+    pointShape, setPointShape, pointSizeMultiplier, setPointSizeMultiplier,
     showSurfaceMesh, setShowSurfaceMesh, surfaceOpacity, setSurfaceOpacity,
     showWireframe, setShowWireframe, showPointsWithSurface, setShowPointsWithSurface,
     surfaceType, setSurfaceType, flipX, setFlipX, flipY, setFlipY, flipZ, setFlipZ,
@@ -294,10 +296,18 @@ export const IndentViewApp: React.FC = () => {
             />
             
             {activeView === '2d' && (
-              <VisualizationOptions 
-                showContours={showContours} showInterpolation={showInterpolation}
-                onShowContoursChange={setShowContours} onShowInterpolationChange={setShowInterpolation} 
-              />
+              <>
+                <VisualizationOptions 
+                  showContours={showContours} showInterpolation={showInterpolation}
+                  onShowContoursChange={setShowContours} onShowInterpolationChange={setShowInterpolation} 
+                />
+                <RenderStyleControls
+                  pointShape={pointShape}
+                  onPointShapeChange={setPointShape}
+                  pointSizeMultiplier={pointSizeMultiplier}
+                  onPointSizeMultiplierChange={setPointSizeMultiplier}
+                />
+              </>
             )}
             
             {activeView === '3d' && (
@@ -574,6 +584,7 @@ export const IndentViewApp: React.FC = () => {
             points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
             minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} highlightedPoints={highlightedOutliers}
             selectedPointIds={selectedPointIds} showContours={showContours} showInterpolation={showInterpolation}
+            pointShape={pointShape} pointSizeMultiplier={pointSizeMultiplier}
             drawingTool={heatmapDrawingTool} zones={zones} selectedZoneId={selectedZoneId}
             isEditing={isEditing} onQuickDelete={handleQuickDelete}
             onPointSelect={setSelectedPoint} onPointHover={setHoveredPoint} onPointsSelected={handleSelectedPointIds} onZoneSelect={handleSelectZone} 

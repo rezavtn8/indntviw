@@ -13,6 +13,10 @@ interface VisualizationContextValue {
   setShowContours: (show: boolean) => void;
   showInterpolation: boolean;
   setShowInterpolation: (show: boolean) => void;
+  pointShape: 'circle' | 'square';
+  setPointShape: (shape: 'circle' | 'square') => void;
+  pointSizeMultiplier: number;
+  setPointSizeMultiplier: (value: number) => void;
   
   // 3D Options
   showSurfaceMesh: boolean;
@@ -82,6 +86,8 @@ export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({
   // 2D Options
   const [showContours, setShowContours] = useState(true);
   const [showInterpolation, setShowInterpolation] = useState(false);
+  const [pointShape, setPointShape] = useState<'circle' | 'square'>('circle');
+  const [pointSizeMultiplier, setPointSizeMultiplier] = useState(1);
   
   // 3D Options
   const [showSurfaceMesh, setShowSurfaceMesh] = useState(false);
@@ -234,6 +240,10 @@ export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({
     setShowContours,
     showInterpolation,
     setShowInterpolation,
+    pointShape,
+    setPointShape,
+    pointSizeMultiplier,
+    setPointSizeMultiplier,
     showSurfaceMesh,
     setShowSurfaceMesh,
     surfaceOpacity,
