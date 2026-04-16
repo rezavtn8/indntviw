@@ -1,50 +1,85 @@
 
 
-## Landing Page for IndentView
+The current landing page is functional but plain — flat sections, fake mockup, generic feature cards. To make it genuinely impressive while keeping the academic-industrial monochrome aesthetic, I'll add visual depth, scientific credibility signals, and interactive polish without breaking the minimal design language.
 
-### Concept
+## Landing Page v2 — Major Upgrades
 
-A clean, monochromatic, academic-industrial landing page that establishes IndentView as a serious scientific instrument. The design mirrors the existing black/white/grey design system already in the app. The landing page lives at `/` and the app workspace moves to `/app`.
+### 1. Hero Section (rebuilt)
+- **Eyebrow tag**: small uppercase label `[ NANOINDENTATION • DATA PLATFORM ]` above headline
+- **Larger, tighter headline** with a subtle highlighted keyword (boxed/underlined "Nanoindentation")
+- **Dual CTA**: primary "Launch Application" + secondary "View Sample Analysis" (loads sample data)
+- **Stat strip below CTA**: `2D + 3D · 6 Statistical Tests · 4 Export Formats · 0 Server Uploads`
+- **Background grid pattern** (subtle dotted/lined SVG, very faint) — evokes graph paper / measurement grid
 
-### Structure
+### 2. Live Visual Hero (replaces fake mockup)
+Instead of static fake heatmap, build an **animated SVG composition**:
+- Real-looking heatmap grid (12×12) with proper viridis-style monochrome gradient
+- Animated scanning line sweeping across (subtle, slow)
+- Side-by-side mini box-plot with proper whiskers, median line, outlier dots
+- Coordinate axes with tick marks and labels (X: 0–500 µm, Y: Hardness GPa)
+- Window chrome with realistic toolbar mimicking the actual app
 
-**Header** -- Minimal top bar with "IndentView" wordmark (font-mono, bold) on the left, and a single "Launch App →" button on the right.
+### 3. New "Trusted By Science" Bar
+Thin band under hero with monospace text:
+`PUBLICATION-READY · ISO 14577 COMPATIBLE · BROWSER-NATIVE · OPEN DATA FORMATS`
+Separated by vertical bars — looks like a scientific instrument status bar.
 
-**Hero Section** -- Large headline: *"Interactive Visualization & Statistical Analysis of Nanoindentation Data"*. Subtitle describing the platform in one sentence. A prominent "Get Started" button. Below, a static screenshot/mockup placeholder showing a 2D heatmap + box plot side by side (using a styled div with placeholder content styled to look like the app).
+### 4. Features Grid (upgraded)
+- Keep 6 features, but add:
+  - **Numbered prefix** (`01 / 02 / 03...`) in mono
+  - **Hover state**: border thickens, subtle background shift
+  - **"Learn more" arrow** on hover
+  - Larger icons with thin stroke (already 1.5, keep)
+  - Slight asymmetric layout — first card spans wider on desktop, OR keep 3-col but add accent border-top on hover
 
-**Features Grid** (3 columns, icon + title + short description) --
-1. **2D & 3D Visualization** -- Heatmaps and point clouds for spatial mapping of mechanical properties
-2. **Zone-Based Analysis** -- Define regions of interest and compare statistical distributions
-3. **Cross-Sample Comparison** -- Group samples, run statistical tests, generate publication-ready figures
-4. **Multi-Format Import** -- Support for .txt, .csv, .tsv, .xlsx files from major nanoindenter brands
-5. **Statistical Toolkit** -- Descriptive stats, box/violin plots, correlation analysis, group comparisons
-6. **Export Studio** -- High-resolution figure export with customizable layouts for journals and posters
+### 5. New "Methodology" Section (replaces basic Workflow)
+A horizontal **technical pipeline diagram** with connecting lines:
+```
+[ DATA INPUT ]──→[ PARSE ]──→[ VISUALIZE ]──→[ ANALYZE ]──→[ EXPORT ]
+```
+Each node is a bordered box with icon + label + tiny description below. Connecting arrows are dashed lines (like a process flow diagram in a paper).
 
-**How It Works** (3-step horizontal flow) --
-1. Upload → 2. Analyze → 3. Export
+### 6. New "Capabilities Matrix" Section
+A scientific-looking table showing supported analyses:
+| Analysis Type | Methods | Output |
+|---|---|---|
+| Descriptive | Mean, SD, IQR, Shapiro-Wilk | Tables, JSON |
+| Comparative | t-test, Mann-Whitney, ANOVA, Tukey | Box/Violin + p-values |
+| Spatial | Heatmap, contours, 3D surface | PNG/SVG/PDF |
+| Cross-sample | Pooled groups, zone matching | Multi-panel figures |
 
-**Footer** -- Minimal: "IndentView — Open-source nanoindentation analysis platform" with a link to launch the app.
+Mono font, tight rows, alternating row backgrounds — looks like a spec sheet.
 
-### Routing Changes
+### 7. New "Built For Researchers" Quote/Specs Block
+Two columns:
+- Left: a pull-quote styled block — *"A browser-native instrument for the quantitative analysis of nanoindentation arrays."*
+- Right: technical specs list (Browser-only • IndexedDB persistence • No backend • Open source)
 
-| Route | Content |
-|-------|---------|
-| `/` | New landing page |
-| `/app` | Current `IndentViewApp` (with all contexts/providers) |
+### 8. CTA Section (new, before footer)
+Full-width bordered block with centered content:
+- Headline: "Start analyzing in under a minute"
+- Subtitle: "No installation. No account. Drop your data file and begin."
+- Single large button + small text "Supports .txt, .csv, .tsv, .xlsx"
 
-### Files to Create/Modify
+### 9. Enhanced Footer
+Three columns:
+- Left: IndentView wordmark + tagline + version (`v1.0`)
+- Middle: Quick links (Launch App, Sample Data, Documentation)
+- Right: Tech credits (`Built with React · TypeScript · D3 · Three.js`)
+Bottom bar: copyright + monospace build hash style text
 
-1. **`src/pages/Landing.tsx`** -- New landing page component with all sections above
-2. **`src/pages/Index.tsx`** -- Change to render `IndentViewApp` (essentially becomes the `/app` route)
-3. **`src/App.tsx`** -- Add `/app` route pointing to existing `Index`, change `/` to render `Landing`
-4. **`src/pages/Landing.tsx`** uses only Tailwind classes + Lucide icons, no new dependencies
+### Technical Details
+- Single file edit: `src/pages/Landing.tsx`
+- All Tailwind + Lucide (no new deps)
+- Add subtle CSS animations via Tailwind (`animate-pulse` on scanning line, fade-in on scroll using existing tailwindcss-animate)
+- Maintain monochrome palette strictly (`black/white/grey` only — no color)
+- Keep `font-mono` for headings, regular sans for body
+- Keep `rounded-none` everywhere
+- Fully responsive (md/lg breakpoints already in place)
 
-### Design Principles
-
-- Monochrome palette matching the existing `--primary: 0 0% 0%` / `--background: 0 0% 100%` system
-- Font-mono for headings (matches the app's scientific aesthetic)
-- No gradients, no decorative colors -- clean borders, sharp corners (`radius: 0`)
-- Generous whitespace, academic typography hierarchy
-- All icons from Lucide (already installed)
-- Fully responsive
+### Design Principles Reinforced
+- **Density over emptiness** in informational sections (specs, capabilities)
+- **Generous whitespace** between sections
+- **Thin borders** as primary visual structure (not shadows or gradients)
+- **Monospace numerals** for any data/specs to feel instrument-like
 
