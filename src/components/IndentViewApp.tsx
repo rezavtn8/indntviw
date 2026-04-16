@@ -61,6 +61,7 @@ export const IndentViewApp: React.FC = () => {
 
   // Overlay state - derived from active session
   const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
+  const overlayUploadInputRef = useRef<HTMLInputElement>(null);
   const [overlayBlobUrl, setOverlayBlobUrl] = useState<string | null>(null);
   
   const prevSessionIdRef = useRef<string | null>(null);
