@@ -29,6 +29,7 @@ import { ColorLegend } from '@/components/visualization/ColorLegend';
 import { PropertySelector } from '@/components/controls/PropertySelector';
 import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
 import { RangeControls } from '@/components/controls/RangeControls';
+import { SyncScopeControls } from '@/components/controls/SyncScopeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
@@ -68,6 +69,7 @@ export const IndentViewApp: React.FC = () => {
     selectedPointIds, highlightedOutliers, exportSelectedPointIds,
     isLoading, setIsLoading,
     handleDataLoaded, handleSelectSession, handleCloseSession, updateActiveSession,
+    overrideColorRange, autoFitGlobalRangeToAllSamples,
   } = useSession();
 
   const {
@@ -78,7 +80,8 @@ export const IndentViewApp: React.FC = () => {
     heatmapDrawingTool, setHeatmapDrawingTool, drawingTool, setDrawingTool,
     exportSettings, setExportSettings, isExporting, exportCanvasRef, handleExport,
     dataMin, dataMax, currentMin, currentMax, dataBounds,
-    handlePropertyChange, handleColorSchemeChange, handleResetRange, getPropertyUnit,
+    handlePropertyChange, handleColorSchemeChange,
+    handleMinChange, handleMaxChange, handleResetRange, getPropertyUnit,
   } = useVisualization();
 
   const {
@@ -228,10 +231,16 @@ export const IndentViewApp: React.FC = () => {
             <>
               <PropertySelector availableProperties={data.propertyNames} selectedProperty={selectedProperty} onPropertyChange={handlePropertyChange} />
               <ColorSchemeSelector colorScheme={colorScheme} onColorSchemeChange={handleColorSchemeChange} />
+              <SyncScopeControls
+                overrideColorRange={overrideColorRange}
+                onOverrideChange={(v) => updateActiveSession({ overrideColorRange: v })}
+                onAutoFitAll={autoFitGlobalRangeToAllSamples}
+                sessionCount={fileSessions.length}
+              />
               <RangeControls 
                 dataMin={dataMin} dataMax={dataMax} currentMin={currentMin} currentMax={currentMax}
-                onMinChange={(val) => updateActiveSession({ customMin: val })}
-                onMaxChange={(val) => updateActiveSession({ customMax: val })}
+                onMinChange={handleMinChange}
+                onMaxChange={handleMaxChange}
                 onReset={handleResetRange} 
               />
               <Collapsible defaultOpen={false}>
@@ -271,10 +280,16 @@ export const IndentViewApp: React.FC = () => {
           <>
             <PropertySelector availableProperties={data.propertyNames} selectedProperty={selectedProperty} onPropertyChange={handlePropertyChange} />
             <ColorSchemeSelector colorScheme={colorScheme} onColorSchemeChange={handleColorSchemeChange} />
+            <SyncScopeControls
+              overrideColorRange={overrideColorRange}
+              onOverrideChange={(v) => updateActiveSession({ overrideColorRange: v })}
+              onAutoFitAll={autoFitGlobalRangeToAllSamples}
+              sessionCount={fileSessions.length}
+            />
             <RangeControls 
               dataMin={dataMin} dataMax={dataMax} currentMin={currentMin} currentMax={currentMax}
-              onMinChange={(val) => updateActiveSession({ customMin: val })}
-              onMaxChange={(val) => updateActiveSession({ customMax: val })}
+              onMinChange={handleMinChange}
+              onMaxChange={handleMaxChange}
               onReset={handleResetRange} 
             />
             

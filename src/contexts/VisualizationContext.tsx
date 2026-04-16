@@ -56,6 +56,8 @@ interface VisualizationContextValue {
   // Helpers
   handlePropertyChange: (property: string) => void;
   handleColorSchemeChange: (scheme: ColorScheme) => void;
+  handleMinChange: (val: number) => void;
+  handleMaxChange: (val: number) => void;
   handleResetRange: () => void;
   getPropertyUnit: (key: string) => string;
 }
@@ -63,7 +65,19 @@ interface VisualizationContextValue {
 const VisualizationContext = createContext<VisualizationContextValue | null>(null);
 
 export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data, selectedProperty, customMin, customMax, setGlobalSelectedProperty, updateActiveSession } = useSession();
+  const {
+    data,
+    selectedProperty,
+    customMin,
+    customMax,
+    overrideColorRange,
+    setGlobalSelectedProperty,
+    updateActiveSession,
+    setGlobalColorScheme,
+    setGlobalCustomMin,
+    setGlobalCustomMax,
+    resetGlobalRange,
+  } = useSession();
   
   // 2D Options
   const [showContours, setShowContours] = useState(true);
@@ -136,20 +150,46 @@ export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({
   const handlePropertyChange = useCallback((property: string) => {
     // Update global property (affects all tabs)
     setGlobalSelectedProperty(property);
-    // Reset custom range for active session when property changes
+    // Reset both global and per-session custom range when property changes
+    setGlobalCustomMin(null);
+    setGlobalCustomMax(null);
     updateActiveSession({ 
       customMin: null, 
       customMax: null 
     });
-  }, [setGlobalSelectedProperty, updateActiveSession]);
+  }, [setGlobalSelectedProperty, setGlobalCustomMin, setGlobalCustomMax, updateActiveSession]);
 
   const handleColorSchemeChange = useCallback((scheme: ColorScheme) => {
-    updateActiveSession({ colorScheme: scheme });
-  }, [updateActiveSession]);
+    if (overrideColorRange) {
+      updateActiveSession({ colorScheme: scheme });
+    } else {
+      setGlobalColorScheme(scheme);
+    }
+  }, [overrideColorRange, updateActiveSession, setGlobalColorScheme]);
+
+  const handleMinChange = useCallback((val: number) => {
+    if (overrideColorRange) {
+      updateActiveSession({ customMin: val });
+    } else {
+      setGlobalCustomMin(val);
+    }
+  }, [overrideColorRange, updateActiveSession, setGlobalCustomMin]);
+
+  const handleMaxChange = useCallback((val: number) => {
+    if (overrideColorRange) {
+      updateActiveSession({ customMax: val });
+    } else {
+      setGlobalCustomMax(val);
+    }
+  }, [overrideColorRange, updateActiveSession, setGlobalCustomMax]);
 
   const handleResetRange = useCallback(() => {
-    updateActiveSession({ customMin: null, customMax: null });
-  }, [updateActiveSession]);
+    if (overrideColorRange) {
+      updateActiveSession({ customMin: null, customMax: null });
+    } else {
+      resetGlobalRange();
+    }
+  }, [overrideColorRange, updateActiveSession, resetGlobalRange]);
 
   const getPropertyUnit = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -227,6 +267,8 @@ export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({
     pointRadiusDataUnits,
     handlePropertyChange,
     handleColorSchemeChange,
+    handleMinChange,
+    handleMaxChange,
     handleResetRange,
     getPropertyUnit,
   };

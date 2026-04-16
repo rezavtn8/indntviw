@@ -20,6 +20,9 @@ export interface FileSession {
   colorScheme: ColorScheme;
   customMin: number | null;
   customMax: number | null;
+  // When false (default), this session follows the global color scheme + range.
+  // When true, the per-session colorScheme/customMin/customMax above are used.
+  overrideColorRange: boolean;
   // Per-file zones and selection
   zones: Zone[];
   selectedZoneId: string | null;
@@ -52,6 +55,7 @@ export const createFileSession = (
     colorScheme: 'viridis',
     customMin: null,
     customMax: null,
+    overrideColorRange: false,
     zones: [],
     selectedZoneId: null,
     comparedZoneIds: [],

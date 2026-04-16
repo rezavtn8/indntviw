@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
-import { IndentationData } from '@/types/indentation';
+import { IndentationData, ColorScheme } from '@/types/indentation';
 import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
 import { SampleGroup } from '@/components/analysis/SampleGrouping';
 import { parseTabSeparatedData } from '@/utils/dataParser';
@@ -20,6 +20,14 @@ interface SessionContextValue {
   // Global settings (shared across all sessions)
   globalSelectedProperty: string;
   setGlobalSelectedProperty: (property: string) => void;
+  globalColorScheme: ColorScheme;
+  setGlobalColorScheme: (scheme: ColorScheme) => void;
+  globalCustomMin: number | null;
+  globalCustomMax: number | null;
+  setGlobalCustomMin: (val: number | null) => void;
+  setGlobalCustomMax: (val: number | null) => void;
+  resetGlobalRange: () => void;
+  autoFitGlobalRangeToAllSamples: () => void;
   
   // Treatment groups (lifted from CrossSamplePanel for persistence)
   groups: SampleGroup[];
@@ -32,6 +40,7 @@ interface SessionContextValue {
   colorScheme: FileSession['colorScheme'];
   customMin: number | null;
   customMax: number | null;
+  overrideColorRange: boolean;
   zones: FileSession['zones'];
   selectedZoneId: string | null;
   comparedZoneIds: string[];
@@ -60,6 +69,11 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Global selected property (shared across all sessions)
   const [globalSelectedProperty, setGlobalSelectedProperty] = useState<string>('HIT');
   
+  // Global color scheme + range (shared across all sessions unless overridden)
+  const [globalColorScheme, setGlobalColorScheme] = useState<ColorScheme>('viridis');
+  const [globalCustomMin, setGlobalCustomMin] = useState<number | null>(null);
+  const [globalCustomMax, setGlobalCustomMax] = useState<number | null>(null);
+  
   // Treatment groups (lifted from CrossSamplePanel for persistence)
   const [groups, setGroups] = useState<SampleGroup[]>([]);
 
@@ -82,15 +96,51 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return data.propertyNames[0] || 'HIT';
   }, [data, globalSelectedProperty]);
   
-  const colorScheme = activeSession?.colorScheme || 'viridis';
-  const customMin = activeSession?.customMin ?? null;
-  const customMax = activeSession?.customMax ?? null;
+  // Color scheme + range: per-session value when override is on, otherwise the global value
+  const overrideColorRange = activeSession?.overrideColorRange ?? false;
+  const colorScheme = overrideColorRange
+    ? (activeSession?.colorScheme || globalColorScheme)
+    : globalColorScheme;
+  const customMin = overrideColorRange ? (activeSession?.customMin ?? null) : globalCustomMin;
+  const customMax = overrideColorRange ? (activeSession?.customMax ?? null) : globalCustomMax;
+  
   const zones = activeSession?.zones || [];
   const selectedZoneId = activeSession?.selectedZoneId || null;
   const comparedZoneIds = activeSession?.comparedZoneIds || [];
   const selectedPointIds = activeSession?.selectedPointIds || [];
   const highlightedOutliers = activeSession?.highlightedOutliers || [];
   const exportSelectedPointIds = activeSession?.exportSelectedPointIds || [];
+
+  // Reset global range to data-driven (null = auto)
+  const resetGlobalRange = useCallback(() => {
+    setGlobalCustomMin(null);
+    setGlobalCustomMax(null);
+  }, []);
+
+  // Auto-fit global range to encompass all open samples for the current global property
+  const autoFitGlobalRangeToAllSamples = useCallback(() => {
+    if (fileSessions.length === 0) return;
+    let min = Infinity;
+    let max = -Infinity;
+    fileSessions.forEach(s => {
+      const prop = s.data.propertyNames.includes(globalSelectedProperty)
+        ? globalSelectedProperty
+        : s.data.propertyNames[0];
+      if (!prop) return;
+      s.data.points.forEach(p => {
+        const v = p.properties[prop];
+        if (v !== undefined && !isNaN(v)) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      });
+    });
+    if (isFinite(min) && isFinite(max)) {
+      setGlobalCustomMin(min);
+      setGlobalCustomMax(max);
+      toast.success(`Range fit across ${fileSessions.length} sample${fileSessions.length > 1 ? 's' : ''}`);
+    }
+  }, [fileSessions, globalSelectedProperty]);
 
   // Handle workspace loaded from persistence
   const handleWorkspaceLoaded = useCallback((workspace: PersistedWorkspace) => {
@@ -111,6 +161,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       overlayPointsTransform: (ps as any).overlayPointsTransform ?? { offsetX: 0, offsetY: 0, scale: 1, opacity: 90, xStretch: 1, yStretch: 1 },
       overlayActiveLayer: (ps as any).overlayActiveLayer ?? 'points',
       overlayPointsVisible: (ps as any).overlayPointsVisible ?? true,
+      overrideColorRange: (ps as any).overrideColorRange ?? false,
     }));
 
     setFileSessions(sessions);
@@ -266,6 +317,14 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsLoading,
     globalSelectedProperty,
     setGlobalSelectedProperty,
+    globalColorScheme,
+    setGlobalColorScheme,
+    globalCustomMin,
+    globalCustomMax,
+    setGlobalCustomMin,
+    setGlobalCustomMax,
+    resetGlobalRange,
+    autoFitGlobalRangeToAllSamples,
     groups,
     setGroups,
     data,
@@ -274,6 +333,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     colorScheme,
     customMin,
     customMax,
+    overrideColorRange,
     zones,
     selectedZoneId,
     comparedZoneIds,
