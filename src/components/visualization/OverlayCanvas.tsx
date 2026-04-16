@@ -299,7 +299,21 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     if (!sceneRef.current) return;
     const { x, y, zoom } = viewRef.current;
     sceneRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    setZoomPct(Math.round(zoom * 100));
   }, []);
+
+  const setViewZoom = useCallback((newZoom: number) => {
+    viewRef.current.zoom = Math.max(0.1, Math.min(10, newZoom));
+    applyViewTransform();
+  }, [applyViewTransform]);
+
+  const resetView = useCallback(() => {
+    viewRef.current.x = 0;
+    viewRef.current.y = 0;
+    viewRef.current.zoom = 1;
+    applyViewTransform();
+  }, [applyViewTransform]);
+
 
   // Get corners of a bounding box
   const getCorners = (bbox: { x: number; y: number; w: number; h: number }) => [
