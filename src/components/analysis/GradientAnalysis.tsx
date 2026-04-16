@@ -83,17 +83,17 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
               <GradientComponent 
                 label="X" 
                 value={analysis.gradientDirectionX} 
-                color="bg-red-500"
+                color="#2a4d8f"
               />
               <GradientComponent 
                 label="Y" 
                 value={analysis.gradientDirectionY} 
-                color="bg-green-500"
+                color="#3aa0a0"
               />
               <GradientComponent 
                 label="Z" 
                 value={analysis.gradientDirectionZ} 
-                color="bg-blue-500"
+                color="#e8594f"
               />
             </div>
 
@@ -177,19 +177,19 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
                 label="X Direction" 
                 value={analysis.xDirectionVariance}
                 max={Math.max(analysis.xDirectionVariance, analysis.yDirectionVariance, analysis.zDirectionVariance)}
-                color="bg-red-500"
+                color="#2a4d8f"
               />
               <VarianceBar 
                 label="Y Direction" 
                 value={analysis.yDirectionVariance}
                 max={Math.max(analysis.xDirectionVariance, analysis.yDirectionVariance, analysis.zDirectionVariance)}
-                color="bg-green-500"
+                color="#3aa0a0"
               />
               <VarianceBar 
                 label="Z Direction" 
                 value={analysis.zDirectionVariance}
                 max={Math.max(analysis.xDirectionVariance, analysis.yDirectionVariance, analysis.zDirectionVariance)}
-                color="bg-blue-500"
+                color="#e8594f"
               />
             </div>
 
@@ -252,14 +252,14 @@ interface GradientComponentProps {
 const GradientComponent: React.FC<GradientComponentProps> = ({ label, value, color }) => (
   <div className="p-2 bg-muted/30 rounded-lg text-center">
     <div className="flex items-center justify-center gap-1 mb-1">
-      <div className={`w-2 h-2 rounded ${color}`} />
+      <div className="w-2 h-2 rounded" style={{ background: color }} />
       <span className="text-xs text-muted-foreground">{label}</span>
     </div>
     <div className="font-mono text-xs">{value.toFixed(3)}</div>
     <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
       <div 
-        className={`h-full ${color}`}
-        style={{ width: `${Math.abs(value) * 100}%` }}
+        className="h-full"
+        style={{ width: `${Math.abs(value) * 100}%`, background: color }}
       />
     </div>
   </div>
@@ -280,8 +280,8 @@ const VarianceBar: React.FC<VarianceBarProps> = ({ label, value, max, color }) =
     </div>
     <div className="h-2 bg-muted rounded-full overflow-hidden">
       <div 
-        className={`h-full ${color} transition-all`}
-        style={{ width: max > 0 ? `${(value / max) * 100}%` : '0%' }}
+        className="h-full transition-all"
+        style={{ width: max > 0 ? `${(value / max) * 100}%` : '0%', background: color }}
       />
     </div>
   </div>
