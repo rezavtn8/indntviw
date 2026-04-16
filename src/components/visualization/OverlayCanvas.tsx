@@ -112,6 +112,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   containerWidth,
   containerHeight,
   pointsVisible = true,
+  onRequestUploadImage,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointsCanvasRef = useRef<HTMLCanvasElement>(null);
