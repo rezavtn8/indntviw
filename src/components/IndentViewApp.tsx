@@ -29,6 +29,7 @@ import { ColorLegend } from '@/components/visualization/ColorLegend';
 import { PropertySelector } from '@/components/controls/PropertySelector';
 import { ColorSchemeSelector } from '@/components/controls/ColorSchemeSelector';
 import { RangeControls } from '@/components/controls/RangeControls';
+import { SyncScopeControls } from '@/components/controls/SyncScopeControls';
 import { FileUploader } from '@/components/controls/FileUploader';
 
 import { VisualizationOptions } from '@/components/controls/VisualizationOptions';
