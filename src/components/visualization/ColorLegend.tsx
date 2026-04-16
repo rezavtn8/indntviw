@@ -93,7 +93,7 @@ export const ColorLegend: React.FC<ColorLegendProps> = ({
             <div
               className="w-4 h-full border border-foreground/30"
               style={{
-                background: `linear-gradient(to bottom, ${gradientStops.reverse().join(', ')})`,
+                background: `linear-gradient(to bottom, ${gradientStops})`,
               }}
             />
             
