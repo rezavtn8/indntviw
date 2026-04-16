@@ -74,6 +74,7 @@ export const IndentViewApp: React.FC = () => {
 
   const {
     showContours, setShowContours, showInterpolation, setShowInterpolation,
+    pointShape, setPointShape, pointSizeMultiplier, setPointSizeMultiplier,
     showSurfaceMesh, setShowSurfaceMesh, surfaceOpacity, setSurfaceOpacity,
     showWireframe, setShowWireframe, showPointsWithSurface, setShowPointsWithSurface,
     surfaceType, setSurfaceType, flipX, setFlipX, flipY, setFlipY, flipZ, setFlipZ,
