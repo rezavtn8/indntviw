@@ -122,6 +122,8 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const rafRef = useRef<number>(0);
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null);
   const prevImageUrlRef = useRef<string | null>(imageUrl);
+  const [zoomPct, setZoomPct] = useState(100);
+  const [hoveredHandle, setHoveredHandle] = useState<{ layer: OverlayActiveLayer; corner: number } | null>(null);
 
   // Refs to avoid stale closures
   const transformRef = useRef(transform);
