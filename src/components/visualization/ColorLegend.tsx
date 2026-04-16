@@ -10,36 +10,36 @@ interface ColorLegendProps {
   maxValue: number;
 }
 
-// Generate nice round tick values
+// Generate tick values that ALWAYS include the exact min and max of the
+// color scale so the legend's range matches the heatmap's range exactly.
 const generateNiceTicks = (min: number, max: number, targetCount: number = 5): number[] => {
+  if (min === max) return [min];
+
   const range = max - min;
-  if (range === 0) return [min];
-  
-  // Find a nice step size
   const roughStep = range / (targetCount - 1);
   const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
   const residual = roughStep / magnitude;
-  
+
   let niceStep: number;
   if (residual <= 1.5) niceStep = magnitude;
   else if (residual <= 3) niceStep = 2 * magnitude;
   else if (residual <= 7) niceStep = 5 * magnitude;
   else niceStep = 10 * magnitude;
-  
-  // Generate ticks
-  const niceMin = Math.ceil(min / niceStep) * niceStep;
-  const ticks: number[] = [];
-  
-  for (let tick = niceMin; tick <= max; tick += niceStep) {
-    ticks.push(tick);
+
+  // Intermediate nice ticks strictly between min and max
+  const intermediates: number[] = [];
+  const niceStart = Math.ceil(min / niceStep) * niceStep;
+  for (let tick = niceStart; tick < max; tick += niceStep) {
+    if (tick > min && tick < max) intermediates.push(tick);
   }
-  
-  // Ensure we have at least min and max represented
-  if (ticks.length === 0) {
-    return [min, max];
-  }
-  
-  return ticks;
+
+  // Drop intermediates too close to the endpoints (avoid label overlap)
+  const minGap = range * 0.08;
+  const filtered = intermediates.filter(
+    (t) => t - min > minGap && max - t > minGap
+  );
+
+  return [min, ...filtered, max];
 };
 
 export const ColorLegend: React.FC<ColorLegendProps> = ({
