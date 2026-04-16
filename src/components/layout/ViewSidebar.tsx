@@ -38,12 +38,22 @@ export const ViewSidebar: React.FC<ViewSidebarProps> = ({
                 <button
                   onClick={() => onViewChange(item.id)}
                   className={cn(
-                    'w-10 h-10 flex items-center justify-center rounded transition-colors',
+                    'relative w-10 h-10 flex items-center justify-center rounded transition-colors',
                     isActive
-                      ? 'bg-primary text-primary-foreground'
+                      ? 'text-foreground bg-muted'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   )}
+                  style={isActive ? { color: '#2a4d8f' } : undefined}
                 >
+                  {isActive && (
+                    <span
+                      className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r"
+                      style={{
+                        background:
+                          'linear-gradient(180deg, #2a4d8f 0%, #3aa0a0 50%, #e8594f 100%)',
+                      }}
+                    />
+                  )}
                   <Icon className="w-5 h-5" />
                 </button>
               </TooltipTrigger>
