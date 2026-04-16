@@ -75,6 +75,49 @@ const stats = [
   { v: '0', l: 'Server Uploads' },
 ];
 
+// Brand palette derived from the wordmark gradient (navy → teal → coral)
+const BRAND = {
+  navy: '#2a4d8f',
+  teal: '#3aa0a0',
+  coral: '#e8594f',
+  ink: '#0f1a2b',
+};
+
+const Wordmark = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+  const cls =
+    size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-sm' : 'text-base';
+  return (
+    <span
+      className={`font-sans font-bold tracking-tight ${cls} leading-none`}
+      style={{ letterSpacing: '-0.02em' }}
+    >
+      <span style={{ color: BRAND.ink }}>Indent</span>
+      <span
+        style={{
+          backgroundImage: `linear-gradient(90deg, ${BRAND.navy} 0%, ${BRAND.teal} 50%, ${BRAND.coral} 100%)`,
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+        }}
+      >
+        view
+      </span>
+    </span>
+  );
+};
+
+const BrandMark = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <div
+    className={`${className} grid grid-cols-2 grid-rows-2 gap-px p-px border`}
+    style={{ borderColor: BRAND.ink }}
+  >
+    <div style={{ background: BRAND.navy }} />
+    <div style={{ background: BRAND.teal }} />
+    <div style={{ background: BRAND.ink }} />
+    <div style={{ background: BRAND.coral }} />
+  </div>
+);
+
 const Landing = () => {
   // Generate heatmap cells with a deterministic monochrome gradient
   const cells = Array.from({ length: 144 }).map((_, i) => {
