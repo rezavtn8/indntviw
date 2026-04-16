@@ -68,6 +68,7 @@ export const IndentViewApp: React.FC = () => {
     selectedPointIds, highlightedOutliers, exportSelectedPointIds,
     isLoading, setIsLoading,
     handleDataLoaded, handleSelectSession, handleCloseSession, updateActiveSession,
+    overrideColorRange, autoFitGlobalRangeToAllSamples,
   } = useSession();
 
   const {
@@ -78,7 +79,8 @@ export const IndentViewApp: React.FC = () => {
     heatmapDrawingTool, setHeatmapDrawingTool, drawingTool, setDrawingTool,
     exportSettings, setExportSettings, isExporting, exportCanvasRef, handleExport,
     dataMin, dataMax, currentMin, currentMax, dataBounds,
-    handlePropertyChange, handleColorSchemeChange, handleResetRange, getPropertyUnit,
+    handlePropertyChange, handleColorSchemeChange,
+    handleMinChange, handleMaxChange, handleResetRange, getPropertyUnit,
   } = useVisualization();
 
   const {
