@@ -583,7 +583,7 @@ export const IndentViewApp: React.FC = () => {
       footer={
         <div className="flex items-center justify-between text-xs text-muted-foreground font-mono px-6 py-2">
           <span>{data ? `${data.points.length} points loaded` : 'No data loaded'}</span>
-          <span>IndentView</span>
+          <Wordmark size="sm" />
         </div>
       }
       modals={
