@@ -145,13 +145,8 @@ const Landing = () => {
         <header className="border-b border-border sticky top-0 z-40 bg-background/95 backdrop-blur">
           <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-3">
-              <div className="w-5 h-5 border border-foreground grid grid-cols-2 grid-rows-2 gap-px p-px">
-                <div className="bg-foreground" />
-                <div className="bg-foreground/30" />
-                <div className="bg-foreground/60" />
-                <div className="bg-foreground" />
-              </div>
-              <span className="font-sans font-bold text-base tracking-tight">IndentView</span>
+              <BrandMark className="w-5 h-5" />
+              <Wordmark size="md" />
               <span className="hidden sm:inline text-[10px] font-sans text-muted-foreground border border-border px-1.5 py-0.5">
                 v1.0
               </span>
