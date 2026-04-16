@@ -56,6 +56,8 @@ interface VisualizationContextValue {
   // Helpers
   handlePropertyChange: (property: string) => void;
   handleColorSchemeChange: (scheme: ColorScheme) => void;
+  handleMinChange: (val: number) => void;
+  handleMaxChange: (val: number) => void;
   handleResetRange: () => void;
   getPropertyUnit: (key: string) => string;
 }
