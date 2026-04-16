@@ -716,29 +716,48 @@ export const Heatmap2D: React.FC<Heatmap2DProps> = ({
                     strokeWidth="2"
                   />
                 )}
-                <circle
-                  cx={point.cx}
-                  cy={point.cy}
-                  r={isPointSelected ? pointRadius * 1.3 : pointRadius}
-                  fill={point.color}
-                  stroke={
-                    isEditing
+                {(() => {
+                  const r = (isPointSelected ? pointRadius * 1.3 : pointRadius) * pointSizeMultiplier;
+                  const strokeColor = isEditing
+                    ? 'hsl(var(--destructive))'
+                    : point.isHighlighted
                       ? 'hsl(var(--destructive))'
-                      : point.isHighlighted 
-                        ? 'hsl(var(--destructive))' 
-                        : isPointSelected
-                          ? '#3b82f6'
-                          : selectedPoint?.id === point.id 
-                            ? 'hsl(var(--foreground))' 
-                            : '#374151'
+                      : isPointSelected
+                        ? '#3b82f6'
+                        : selectedPoint?.id === point.id
+                          ? 'hsl(var(--foreground))'
+                          : '#374151';
+                  const strokeW = isEditing ? 1.5 : selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5;
+                  const commonProps = {
+                    fill: point.color,
+                    stroke: strokeColor,
+                    strokeWidth: strokeW,
+                    style: { pointerEvents: (isDrawingMode && !isEditing ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] },
+                    className: `${isEditing ? 'cursor-pointer hover:opacity-60' : isDrawingMode ? '' : 'cursor-pointer transition-all duration-150 hover:opacity-80'}`,
+                    onClick: (e: React.MouseEvent) => handlePointClick(e as React.MouseEvent<SVGElement>, point),
+                    onMouseEnter: () => !isDrawingMode && onPointHover(point),
+                    onMouseLeave: () => !isDrawingMode && onPointHover(null),
+                  };
+                  if (pointShape === 'square') {
+                    return (
+                      <rect
+                        x={point.cx - r}
+                        y={point.cy - r}
+                        width={r * 2}
+                        height={r * 2}
+                        {...commonProps}
+                      />
+                    );
                   }
-                  strokeWidth={isEditing ? 1.5 : selectedPoint?.id === point.id || point.isHighlighted || isPointSelected ? 2 : 0.5}
-                  style={{ pointerEvents: isDrawingMode && !isEditing ? 'none' : 'auto' }}
-                  className={`${isEditing ? 'cursor-pointer hover:opacity-60' : isDrawingMode ? '' : 'cursor-pointer transition-all duration-150 hover:opacity-80'}`}
-                  onClick={(e) => handlePointClick(e, point)}
-                  onMouseEnter={() => !isDrawingMode && onPointHover(point)}
-                  onMouseLeave={() => !isDrawingMode && onPointHover(null)}
-                />
+                  return (
+                    <circle
+                      cx={point.cx}
+                      cy={point.cy}
+                      r={r}
+                      {...commonProps}
+                    />
+                  );
+                })()}
                 {selectedPoint?.id === point.id && !isEditing && (
                   <circle
                     cx={point.cx}
