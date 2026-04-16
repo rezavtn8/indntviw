@@ -584,6 +584,7 @@ export const IndentViewApp: React.FC = () => {
             points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
             minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} highlightedPoints={highlightedOutliers}
             selectedPointIds={selectedPointIds} showContours={showContours} showInterpolation={showInterpolation}
+            pointShape={pointShape} pointSizeMultiplier={pointSizeMultiplier}
             drawingTool={heatmapDrawingTool} zones={zones} selectedZoneId={selectedZoneId}
             isEditing={isEditing} onQuickDelete={handleQuickDelete}
             onPointSelect={setSelectedPoint} onPointHover={setHoveredPoint} onPointsSelected={handleSelectedPointIds} onZoneSelect={handleSelectZone} 
