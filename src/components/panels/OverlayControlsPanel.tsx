@@ -135,9 +135,10 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
             onClick={() => onActiveLayerChange('image')}
             className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors ${
               activeLayer === 'image'
-                ? 'bg-[hsl(217,91%,60%)] text-primary-foreground'
+                ? 'text-white'
                 : 'bg-muted/50 text-muted-foreground hover:bg-muted'
             }`}
+            style={activeLayer === 'image' ? { background: '#2a4d8f' } : undefined}
           >
             Image
           </button>
@@ -145,9 +146,10 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
             onClick={() => onActiveLayerChange('points')}
             className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors ${
               activeLayer === 'points'
-                ? 'bg-[hsl(142,76%,46%)] text-primary-foreground'
+                ? 'text-white'
                 : 'bg-muted/50 text-muted-foreground hover:bg-muted'
             }`}
+            style={activeLayer === 'points' ? { background: '#3aa0a0' } : undefined}
           >
             Points
           </button>
