@@ -37,7 +37,8 @@ const App = () => (
         <BrowserRouter>
           <AppProviders>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/app" element={<Index />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppProviders>
