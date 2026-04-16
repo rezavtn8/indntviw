@@ -267,6 +267,8 @@ export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({
     pointRadiusDataUnits,
     handlePropertyChange,
     handleColorSchemeChange,
+    handleMinChange,
+    handleMaxChange,
     handleResetRange,
     getPropertyUnit,
   };
