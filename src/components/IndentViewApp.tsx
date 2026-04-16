@@ -230,10 +230,16 @@ export const IndentViewApp: React.FC = () => {
             <>
               <PropertySelector availableProperties={data.propertyNames} selectedProperty={selectedProperty} onPropertyChange={handlePropertyChange} />
               <ColorSchemeSelector colorScheme={colorScheme} onColorSchemeChange={handleColorSchemeChange} />
+              <SyncScopeControls
+                overrideColorRange={overrideColorRange}
+                onOverrideChange={(v) => updateActiveSession({ overrideColorRange: v })}
+                onAutoFitAll={autoFitGlobalRangeToAllSamples}
+                sessionCount={fileSessions.length}
+              />
               <RangeControls 
                 dataMin={dataMin} dataMax={dataMax} currentMin={currentMin} currentMax={currentMax}
-                onMinChange={(val) => updateActiveSession({ customMin: val })}
-                onMaxChange={(val) => updateActiveSession({ customMax: val })}
+                onMinChange={handleMinChange}
+                onMaxChange={handleMaxChange}
                 onReset={handleResetRange} 
               />
               <Collapsible defaultOpen={false}>
