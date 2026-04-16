@@ -1,6 +1,8 @@
 import React, { useMemo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
+import { BRAND } from '@/components/layout/Brand';
+import { Plus, Minus, Maximize2, Square, ImagePlus } from 'lucide-react';
 
 export interface OverlayTransform {
   offsetX: number;
