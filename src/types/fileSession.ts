@@ -55,6 +55,7 @@ export const createFileSession = (
     colorScheme: 'viridis',
     customMin: null,
     customMax: null,
+    overrideColorRange: false,
     zones: [],
     selectedZoneId: null,
     comparedZoneIds: [],
