@@ -537,13 +537,24 @@ export const IndentViewApp: React.FC = () => {
     
     if (activeView === '3d') {
       return (
-        <div ref={visualizationRef} className="w-full h-full border border-border bg-card">
+        <div ref={visualizationRef} className="w-full h-full border border-border bg-card relative">
           <Scene3D 
             points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
             minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} onPointSelect={setSelectedPoint}
             showSurface={showSurfaceMesh} surfaceOpacity={surfaceOpacity} showWireframe={showWireframe}
             showPoints={showPointsWithSurface || !showSurfaceMesh} surfaceType={surfaceType} flipX={flipX} flipY={flipY} flipZ={flipZ} 
           />
+          {data && (
+            <div className="absolute top-3 right-3 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-md px-2 py-2 shadow-sm pointer-events-none">
+              <ColorLegend
+                selectedProperty={selectedProperty}
+                unit={getPropertyUnit(selectedProperty)}
+                colorScheme={colorScheme}
+                minValue={currentMin}
+                maxValue={currentMax}
+              />
+            </div>
+          )}
         </div>
       );
     }
@@ -564,6 +575,17 @@ export const IndentViewApp: React.FC = () => {
           isEditing={isEditing} onQuickDelete={handleQuickDelete}
           onPointSelect={setSelectedPoint} onPointHover={setHoveredPoint} onPointsSelected={handleSelectedPointIds} onZoneSelect={handleSelectZone} 
         />
+        {data && (
+          <div className="absolute top-3 right-3 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-md px-2 py-2 shadow-sm pointer-events-none">
+            <ColorLegend
+              selectedProperty={selectedProperty}
+              unit={getPropertyUnit(selectedProperty)}
+              colorScheme={colorScheme}
+              minValue={currentMin}
+              maxValue={currentMax}
+            />
+          </div>
+        )}
       </div>
     );
   };
