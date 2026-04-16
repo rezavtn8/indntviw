@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
-import { IndentationData } from '@/types/indentation';
+import { IndentationData, ColorScheme } from '@/types/indentation';
 import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
 import { SampleGroup } from '@/components/analysis/SampleGrouping';
 import { parseTabSeparatedData } from '@/utils/dataParser';
