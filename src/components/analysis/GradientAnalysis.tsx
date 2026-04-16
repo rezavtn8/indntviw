@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { IndentationPoint } from '@/types/indentation';
 import { calculateGradientAnalysis, GradientAnalysisResult } from '@/utils/spatial3DStatistics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusChip, StatusTone } from '@/components/ui/status-chip';
 import { ArrowRight, Compass, GitBranch, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -38,11 +38,11 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
   }, [analysis]);
 
   // Anisotropy classification
-  const anisotropyClass = useMemo(() => {
-    if (analysis.anisotropyIndex > 0.7) return { label: 'Strong', color: 'bg-red-500/20 text-red-600' };
-    if (analysis.anisotropyIndex > 0.4) return { label: 'Moderate', color: 'bg-orange-500/20 text-orange-600' };
-    if (analysis.anisotropyIndex > 0.2) return { label: 'Weak', color: 'bg-yellow-500/20 text-yellow-600' };
-    return { label: 'Isotropic', color: 'bg-green-500/20 text-green-600' };
+  const anisotropyClass = useMemo((): { label: string; tone: StatusTone } => {
+    if (analysis.anisotropyIndex > 0.7) return { label: 'Strong', tone: 'warn' };
+    if (analysis.anisotropyIndex > 0.4) return { label: 'Moderate', tone: 'warn' };
+    if (analysis.anisotropyIndex > 0.2) return { label: 'Weak', tone: 'neutral' };
+    return { label: 'Isotropic', tone: 'good' };
   }, [analysis.anisotropyIndex]);
 
   // Calculate angle from gradient components (in XY plane)
@@ -128,9 +128,7 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
             <CardTitle className="text-sm flex items-center gap-2">
               <Compass className="w-4 h-4" />
               Anisotropy Analysis
-              <Badge variant="secondary" className={anisotropyClass.color}>
-                {anisotropyClass.label}
-              </Badge>
+              <StatusChip tone={anisotropyClass.tone}>{anisotropyClass.label}</StatusChip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -151,7 +149,7 @@ export const GradientAnalysis: React.FC<GradientAnalysisProps> = ({
             {/* Anisotropy bar */}
             <div className="mt-2">
               <div className="text-xs text-muted-foreground mb-1">Anisotropy Scale</div>
-              <div className="h-2 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 relative">
+              <div className="h-2 rounded-full relative" style={{ background: 'linear-gradient(90deg, #3aa0a0 0%, #888 50%, #e8594f 100%)' }}>
                 <div 
                   className="absolute w-3 h-3 bg-foreground rounded-full border-2 border-background -top-0.5 transform -translate-x-1/2"
                   style={{ left: `${analysis.anisotropyIndex * 100}%` }}
