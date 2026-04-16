@@ -19,7 +19,6 @@ import {
   Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import indentviewLogo from '@/assets/indentview-logo.png';
 
 const features = [
   {
@@ -103,11 +102,13 @@ const Landing = () => {
         <header className="border-b border-border sticky top-0 z-40 bg-background/95 backdrop-blur">
           <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-3">
-              <img
-                src={indentviewLogo}
-                alt="IndentView"
-                className="h-7 w-auto object-contain"
-              />
+              <div className="w-5 h-5 border border-foreground grid grid-cols-2 grid-rows-2 gap-px p-px">
+                <div className="bg-foreground" />
+                <div className="bg-foreground/30" />
+                <div className="bg-foreground/60" />
+                <div className="bg-foreground" />
+              </div>
+              <span className="font-sans font-bold text-base tracking-tight">IndentView</span>
               <span className="hidden sm:inline text-[10px] font-sans text-muted-foreground border border-border px-1.5 py-0.5">
                 v1.0
               </span>
@@ -589,11 +590,13 @@ const Landing = () => {
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <img
-                  src={indentviewLogo}
-                  alt="IndentView"
-                  className="h-6 w-auto object-contain"
-                />
+                <div className="w-4 h-4 border border-foreground grid grid-cols-2 grid-rows-2 gap-px p-px">
+                  <div className="bg-foreground" />
+                  <div className="bg-foreground/30" />
+                  <div className="bg-foreground/60" />
+                  <div className="bg-foreground" />
+                </div>
+                <span className="font-sans font-bold text-sm">IndentView</span>
                 <span className="text-[10px] font-sans text-muted-foreground border border-border px-1.5">
                   v1.0
                 </span>
