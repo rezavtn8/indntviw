@@ -628,13 +628,8 @@ const Landing = () => {
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-4 h-4 border border-foreground grid grid-cols-2 grid-rows-2 gap-px p-px">
-                  <div className="bg-foreground" />
-                  <div className="bg-foreground/30" />
-                  <div className="bg-foreground/60" />
-                  <div className="bg-foreground" />
-                </div>
-                <span className="font-sans font-bold text-sm">IndentView</span>
+                <BrandMark className="w-4 h-4" />
+                <Wordmark size="sm" />
                 <span className="text-[10px] font-sans text-muted-foreground border border-border px-1.5">
                   v1.0
                 </span>
