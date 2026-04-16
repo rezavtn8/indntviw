@@ -537,15 +537,17 @@ export const IndentViewApp: React.FC = () => {
     
     if (activeView === '3d') {
       return (
-        <div ref={visualizationRef} className="w-full h-full border border-border bg-card relative">
-          <Scene3D 
-            points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
-            minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} onPointSelect={setSelectedPoint}
-            showSurface={showSurfaceMesh} surfaceOpacity={surfaceOpacity} showWireframe={showWireframe}
-            showPoints={showPointsWithSurface || !showSurfaceMesh} surfaceType={surfaceType} flipX={flipX} flipY={flipY} flipZ={flipZ} 
-          />
+        <div className="w-full h-full flex gap-3">
+          <div ref={visualizationRef} className="flex-1 h-full border border-border bg-card">
+            <Scene3D 
+              points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
+              minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} onPointSelect={setSelectedPoint}
+              showSurface={showSurfaceMesh} surfaceOpacity={surfaceOpacity} showWireframe={showWireframe}
+              showPoints={showPointsWithSurface || !showSurfaceMesh} surfaceType={surfaceType} flipX={flipX} flipY={flipY} flipZ={flipZ} 
+            />
+          </div>
           {data && (
-            <div className="absolute top-3 right-3 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-md px-2 py-2 shadow-sm pointer-events-none">
+            <div className="flex-shrink-0 flex items-center pr-2">
               <ColorLegend
                 selectedProperty={selectedProperty}
                 unit={getPropertyUnit(selectedProperty)}
@@ -561,22 +563,24 @@ export const IndentViewApp: React.FC = () => {
     
     // Default: 2D view
     return (
-      <div ref={visualizationRef} className="w-full h-full max-h-[calc(100vh-180px)] border border-border bg-card relative">
-        {isEditing && (
-          <div className="absolute top-2 left-2 z-20 bg-destructive/90 text-destructive-foreground px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wide">
-            Edit Mode — Click point to delete
-          </div>
-        )}
-        <Heatmap2D 
-          points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
-          minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} highlightedPoints={highlightedOutliers}
-          selectedPointIds={selectedPointIds} showContours={showContours} showInterpolation={showInterpolation}
-          drawingTool={heatmapDrawingTool} zones={zones} selectedZoneId={selectedZoneId}
-          isEditing={isEditing} onQuickDelete={handleQuickDelete}
-          onPointSelect={setSelectedPoint} onPointHover={setHoveredPoint} onPointsSelected={handleSelectedPointIds} onZoneSelect={handleSelectZone} 
-        />
+      <div className="w-full h-full max-h-[calc(100vh-180px)] flex gap-3">
+        <div ref={visualizationRef} className="flex-1 h-full border border-border bg-card relative">
+          {isEditing && (
+            <div className="absolute top-2 left-2 z-20 bg-destructive/90 text-destructive-foreground px-3 py-1.5 rounded font-mono text-xs uppercase tracking-wide">
+              Edit Mode — Click point to delete
+            </div>
+          )}
+          <Heatmap2D 
+            points={data?.points || []} selectedProperty={selectedProperty} colorScheme={colorScheme}
+            minValue={currentMin} maxValue={currentMax} selectedPoint={selectedPoint} highlightedPoints={highlightedOutliers}
+            selectedPointIds={selectedPointIds} showContours={showContours} showInterpolation={showInterpolation}
+            drawingTool={heatmapDrawingTool} zones={zones} selectedZoneId={selectedZoneId}
+            isEditing={isEditing} onQuickDelete={handleQuickDelete}
+            onPointSelect={setSelectedPoint} onPointHover={setHoveredPoint} onPointsSelected={handleSelectedPointIds} onZoneSelect={handleSelectZone} 
+          />
+        </div>
         {data && (
-          <div className="absolute top-3 right-3 z-10 bg-card/90 backdrop-blur-sm border border-border rounded-md px-2 py-2 shadow-sm pointer-events-none">
+          <div className="flex-shrink-0 flex items-center pr-2">
             <ColorLegend
               selectedProperty={selectedProperty}
               unit={getPropertyUnit(selectedProperty)}
