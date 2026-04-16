@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useEffect, useState } from 'react';
 import {
   Map,
   Layers,
@@ -83,18 +84,29 @@ const BRAND = {
   ink: '#0f1a2b',
 };
 
-const Wordmark = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+const ACCENTS = [BRAND.navy, BRAND.teal, BRAND.coral, BRAND.ink];
+const BRAND_GRADIENT = `linear-gradient(90deg, ${BRAND.navy} 0%, ${BRAND.teal} 50%, ${BRAND.coral} 100%)`;
+
+const Wordmark = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' | 'xl' | 'hero' }) => {
   const cls =
-    size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-sm' : 'text-base';
+    size === 'hero'
+      ? 'text-6xl md:text-8xl'
+      : size === 'xl'
+      ? 'text-4xl md:text-5xl'
+      : size === 'lg'
+      ? 'text-2xl'
+      : size === 'sm'
+      ? 'text-sm'
+      : 'text-base';
   return (
     <span
       className={`font-sans font-bold tracking-tight ${cls} leading-none`}
-      style={{ letterSpacing: '-0.02em' }}
+      style={{ letterSpacing: '-0.03em' }}
     >
       <span style={{ color: BRAND.ink }}>Indent</span>
       <span
         style={{
-          backgroundImage: `linear-gradient(90deg, ${BRAND.navy} 0%, ${BRAND.teal} 50%, ${BRAND.coral} 100%)`,
+          backgroundImage: BRAND_GRADIENT,
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
           color: 'transparent',
@@ -119,6 +131,14 @@ const BrandMark = ({ className = 'w-5 h-5' }: { className?: string }) => (
 );
 
 const Landing = () => {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 320);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // Generate heatmap cells with a deterministic monochrome gradient
   const cells = Array.from({ length: 144 }).map((_, i) => {
     const x = i % 12;
@@ -141,75 +161,142 @@ const Landing = () => {
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground">
-        {/* Header */}
-        <header className="border-b border-border sticky top-0 z-40 bg-background/95 backdrop-blur">
-          <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
-            <div className="flex items-center gap-3">
-              <BrandMark className="w-5 h-5" />
+        {/* Sticky compact nav — appears after hero scrolls out */}
+        <header
+          className={`fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/95 backdrop-blur transition-all duration-300 ${
+            scrolled ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+          }`}
+        >
+          <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-12">
+            <div className="flex items-center gap-2.5">
+              <BrandMark className="w-4 h-4" />
               <Wordmark size="md" />
-              <span className="hidden sm:inline text-[10px] font-sans text-muted-foreground border border-border px-1.5 py-0.5">
-                v1.0
-              </span>
             </div>
+            <nav className="hidden md:flex items-center gap-6 font-sans text-xs text-muted-foreground">
+              <a href="#capabilities" className="hover:text-foreground transition-colors">
+                Capabilities
+              </a>
+              <a href="#methodology" className="hover:text-foreground transition-colors">
+                Methodology
+              </a>
+              <a href="#matrix" className="hover:text-foreground transition-colors">
+                Matrix
+              </a>
+            </nav>
             <Link to="/app">
-              <Button variant="outline" size="sm" className="rounded-none font-sans text-xs">
+              <Button
+                size="sm"
+                className="rounded-none font-sans text-xs h-8"
+                style={{ backgroundColor: BRAND.navy, color: 'white' }}
+              >
                 Launch App <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </Link>
           </div>
         </header>
 
-        {/* Hero */}
+        {/* Hero — oversized brand */}
         <section className="relative overflow-hidden border-b border-border">
-          {/* Grid background */}
+          {/* Faint dotted grid background */}
           <div
-            className="absolute inset-0 opacity-[0.04] pointer-events-none"
+            className="absolute inset-0 opacity-[0.05] pointer-events-none"
             style={{
-              backgroundImage:
-                'linear-gradient(to right, hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--foreground)) 1px, transparent 1px)',
-              backgroundSize: '32px 32px',
+              backgroundImage: `radial-gradient(${BRAND.ink} 1px, transparent 1px)`,
+              backgroundSize: '24px 24px',
             }}
           />
-          <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
-            <div className="inline-block font-sans text-[10px] tracking-[0.2em] text-muted-foreground border border-border px-3 py-1 mb-8">
+          {/* Subtle gradient wash */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.04]"
+            style={{ background: BRAND_GRADIENT }}
+          />
+          {/* Top brand stripe */}
+          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: BRAND_GRADIENT }} />
+
+          <div className="relative max-w-5xl mx-auto px-6 pt-24 md:pt-32 pb-20 text-center">
+            {/* Eyebrow */}
+            <div
+              className="inline-block font-mono text-[10px] tracking-[0.25em] px-3 py-1 mb-10 border"
+              style={{ color: BRAND.navy, borderColor: BRAND.navy + '40' }}
+            >
               [ NANOINDENTATION · DATA PLATFORM ]
             </div>
-            <h1 className="font-sans font-bold text-4xl md:text-6xl leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto">
-              Interactive Visualization &amp; Statistical Analysis of{' '}
+
+            {/* Big BrandMark */}
+            <div className="flex justify-center mb-8">
+              <BrandMark className="w-20 h-20 md:w-24 md:h-24" />
+            </div>
+
+            {/* Huge wordmark */}
+            <div className="flex flex-col items-center mb-10">
+              <Wordmark size="hero" />
+              {/* Gradient underline */}
+              <div
+                className="mt-5 h-[2px] w-48 md:w-64"
+                style={{ background: BRAND_GRADIENT }}
+              />
+            </div>
+
+            {/* Headline */}
+            <h1 className="font-sans font-bold text-3xl md:text-5xl leading-[1.1] tracking-tight mb-6 max-w-3xl mx-auto" style={{ color: BRAND.ink }}>
+              Quantitative analysis for{' '}
               <span className="relative inline-block">
-                <span className="relative z-10">Nanoindentation</span>
-                <span className="absolute inset-x-0 bottom-1 h-3 bg-foreground/10 -z-0" />
+                <span className="relative z-10">nanoindentation</span>
+                <span
+                  className="absolute inset-x-0 bottom-1 h-3 -z-0 opacity-30"
+                  style={{ background: BRAND.coral }}
+                />
               </span>{' '}
-              Data
+              arrays
             </h1>
+
+            {/* Subheadline */}
             <p className="text-muted-foreground max-w-2xl mx-auto text-base md:text-lg mb-10 leading-relaxed">
-              A browser-native instrument for rendering spatial property maps, defining regions of
-              interest, and performing comparative statistical analysis across indentation datasets.
+              IndentView is a browser-native instrument for rendering spatial property maps,
+              defining regions of interest, and performing comparative statistical analysis
+              across indentation datasets — all without leaving your browser.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
+
+            {/* Dual CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-14">
               <Link to="/app">
-                <Button className="rounded-none font-sans px-8 h-12 text-sm">
+                <Button
+                  className="rounded-none font-sans px-8 h-12 text-sm border-0 transition-colors hover:opacity-90"
+                  style={{ backgroundColor: BRAND.navy, color: 'white' }}
+                >
                   Launch Application <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <a href="#capabilities">
-                <Button variant="outline" className="rounded-none font-sans px-8 h-12 text-sm">
+                <Button
+                  variant="outline"
+                  className="rounded-none font-sans px-8 h-12 text-sm border-2"
+                  style={{ borderColor: BRAND.ink, color: BRAND.ink }}
+                >
                   View Capabilities
                 </Button>
               </a>
             </div>
 
-            {/* Stat strip */}
-            <div className="grid grid-cols-2 md:grid-cols-4 max-w-3xl mx-auto border border-border">
+            {/* Stat strip with colored dots */}
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 font-mono text-xs tracking-wide">
               {stats.map((s, i) => (
-                <div
-                  key={s.l}
-                  className={`p-4 ${i < stats.length - 1 ? 'md:border-r' : ''} ${i < 2 ? 'border-b md:border-b-0' : ''} ${i === 0 ? 'border-r' : ''} ${i === 2 ? 'border-r md:border-r' : ''} border-border`}
-                >
-                  <div className="font-sans font-bold text-lg tracking-tight">{s.v}</div>
-                  <div className="font-sans text-[10px] tracking-[0.15em] text-muted-foreground uppercase mt-1">
-                    {s.l}
+                <div key={s.l} className="flex items-center gap-5">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-1.5 h-1.5"
+                      style={{ background: ACCENTS[i % ACCENTS.length] }}
+                    />
+                    <span className="font-bold tabular-nums" style={{ color: BRAND.ink }}>
+                      {s.v}
+                    </span>
+                    <span className="text-muted-foreground uppercase tracking-[0.15em] text-[10px]">
+                      {s.l}
+                    </span>
                   </div>
+                  {i < stats.length - 1 && (
+                    <span className="text-border hidden sm:inline">·</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -222,15 +309,15 @@ const Landing = () => {
             <div className="border border-border bg-background">
               {/* Window chrome */}
               <div className="border-b border-border px-4 py-2 flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full border border-border" />
-                <div className="w-2.5 h-2.5 rounded-full border border-border" />
-                <div className="w-2.5 h-2.5 rounded-full border border-border" />
-                <span className="ml-3 text-[10px] font-sans text-muted-foreground">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.coral }} />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.teal }} />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.navy }} />
+                <span className="ml-3 text-[10px] font-mono text-muted-foreground">
                   IndentView — sample_001.txt · EIT (GPa)
                 </span>
-                <div className="ml-auto flex gap-3 text-[10px] font-sans text-muted-foreground">
+                <div className="ml-auto flex gap-3 text-[10px] font-mono text-muted-foreground">
                   <span>2D</span>
-                  <span className="text-foreground border-b border-foreground">3D</span>
+                  <span style={{ color: BRAND.navy, borderBottom: `1px solid ${BRAND.navy}` }}>3D</span>
                   <span>Analysis</span>
                   <span>Export</span>
                 </div>
@@ -239,7 +326,7 @@ const Landing = () => {
               <div className="grid grid-cols-1 md:grid-cols-5 gap-0 min-h-[340px]">
                 {/* Heatmap */}
                 <div className="md:col-span-3 border-b md:border-b-0 md:border-r border-border p-4 relative overflow-hidden">
-                  <div className="text-[10px] font-sans text-muted-foreground mb-2 flex justify-between">
+                  <div className="text-[10px] font-mono text-muted-foreground mb-2 flex justify-between">
                     <span>Hardness Map · 12×12</span>
                     <span>μm</span>
                   </div>
@@ -261,9 +348,9 @@ const Landing = () => {
                         x2="240"
                         y1="0"
                         y2="0"
-                        stroke="hsl(var(--foreground))"
-                        strokeWidth="0.5"
-                        opacity="0.6"
+                        stroke={BRAND.coral}
+                        strokeWidth="0.6"
+                        opacity="0.7"
                       >
                         <animate
                           attributeName="y1"
@@ -279,13 +366,12 @@ const Landing = () => {
                         />
                       </line>
                     </svg>
-                    {/* Axis labels */}
-                    <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[9px] font-sans text-muted-foreground">
+                    <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[9px] font-mono text-muted-foreground">
                       <span>0</span>
                       <span>250</span>
                       <span>500</span>
                     </div>
-                    <div className="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-[9px] font-sans text-muted-foreground">
+                    <div className="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-[9px] font-mono text-muted-foreground">
                       <span>500</span>
                       <span>0</span>
                     </div>
@@ -294,112 +380,53 @@ const Landing = () => {
 
                 {/* Box plot */}
                 <div className="md:col-span-2 p-4">
-                  <div className="text-[10px] font-sans text-muted-foreground mb-2">
+                  <div className="text-[10px] font-mono text-muted-foreground mb-2">
                     Distribution · GPa
                   </div>
                   <svg viewBox="0 0 200 260" className="w-full h-[260px]">
-                    {/* Y axis */}
                     <line x1="30" x2="30" y1="10" y2="230" stroke="hsl(var(--border))" />
                     <line x1="30" x2="195" y1="230" y2="230" stroke="hsl(var(--border))" />
                     {[0, 1, 2, 3, 4].map((i) => (
                       <g key={i}>
-                        <line
-                          x1="27"
-                          x2="30"
-                          y1={10 + i * 55}
-                          y2={10 + i * 55}
-                          stroke="hsl(var(--border))"
-                        />
-                        <text
-                          x="24"
-                          y={13 + i * 55}
-                          textAnchor="end"
-                          fontSize="8"
-                          fontFamily="monospace"
-                          fill="hsl(var(--muted-foreground))"
-                        >
+                        <line x1="27" x2="30" y1={10 + i * 55} y2={10 + i * 55} stroke="hsl(var(--border))" />
+                        <text x="24" y={13 + i * 55} textAnchor="end" fontSize="8" fontFamily="monospace" fill="hsl(var(--muted-foreground))">
                           {(8 - i * 1.5).toFixed(1)}
                         </text>
                       </g>
                     ))}
 
-                    {/* Box plot 1 */}
                     {[
-                      { cx: 75, top: 60, q1: 95, med: 120, q3: 145, bot: 185 },
-                      { cx: 145, top: 40, q1: 80, med: 100, q3: 130, bot: 170 },
+                      { cx: 75, top: 60, q1: 95, med: 120, q3: 145, bot: 185, color: BRAND.navy },
+                      { cx: 145, top: 40, q1: 80, med: 100, q3: 130, bot: 170, color: BRAND.teal },
                     ].map((b, i) => (
                       <g key={i}>
-                        <line
-                          x1={b.cx}
-                          x2={b.cx}
-                          y1={b.top}
-                          y2={b.bot}
-                          stroke="hsl(var(--foreground))"
-                        />
-                        <line
-                          x1={b.cx - 10}
-                          x2={b.cx + 10}
-                          y1={b.top}
-                          y2={b.top}
-                          stroke="hsl(var(--foreground))"
-                        />
-                        <line
-                          x1={b.cx - 10}
-                          x2={b.cx + 10}
-                          y1={b.bot}
-                          y2={b.bot}
-                          stroke="hsl(var(--foreground))"
-                        />
+                        <line x1={b.cx} x2={b.cx} y1={b.top} y2={b.bot} stroke={BRAND.ink} />
+                        <line x1={b.cx - 10} x2={b.cx + 10} y1={b.top} y2={b.top} stroke={BRAND.ink} />
+                        <line x1={b.cx - 10} x2={b.cx + 10} y1={b.bot} y2={b.bot} stroke={BRAND.ink} />
                         <rect
                           x={b.cx - 22}
                           y={b.q1}
                           width="44"
                           height={b.q3 - b.q1}
-                          fill={i === 0 ? 'hsl(var(--foreground) / 0.08)' : 'hsl(var(--foreground) / 0.18)'}
-                          stroke="hsl(var(--foreground))"
+                          fill={b.color}
+                          fillOpacity="0.18"
+                          stroke={b.color}
                         />
-                        <line
-                          x1={b.cx - 22}
-                          x2={b.cx + 22}
-                          y1={b.med}
-                          y2={b.med}
-                          stroke="hsl(var(--foreground))"
-                          strokeWidth="1.5"
-                        />
+                        <line x1={b.cx - 22} x2={b.cx + 22} y1={b.med} y2={b.med} stroke={b.color} strokeWidth="1.5" />
                         {[b.top - 8, b.bot + 6, b.bot + 12].map((cy, k) => (
-                          <circle
-                            key={k}
-                            cx={b.cx + (k % 2 === 0 ? -3 : 3)}
-                            cy={cy}
-                            r="1.5"
-                            fill="hsl(var(--foreground))"
-                          />
+                          <circle key={k} cx={b.cx + (k % 2 === 0 ? -3 : 3)} cy={cy} r="1.5" fill={b.color} />
                         ))}
-                        <text
-                          x={b.cx}
-                          y="248"
-                          textAnchor="middle"
-                          fontSize="9"
-                          fontFamily="monospace"
-                          fill="hsl(var(--muted-foreground))"
-                        >
+                        <text x={b.cx} y="248" textAnchor="middle" fontSize="9" fontFamily="monospace" fill="hsl(var(--muted-foreground))">
                           Zone {i + 1}
                         </text>
                       </g>
                     ))}
 
                     {/* Significance bracket */}
-                    <line x1="75" x2="145" y1="25" y2="25" stroke="hsl(var(--foreground))" />
-                    <line x1="75" x2="75" y1="25" y2="32" stroke="hsl(var(--foreground))" />
-                    <line x1="145" x2="145" y1="25" y2="32" stroke="hsl(var(--foreground))" />
-                    <text
-                      x="110"
-                      y="20"
-                      textAnchor="middle"
-                      fontSize="10"
-                      fontFamily="monospace"
-                      fill="hsl(var(--foreground))"
-                    >
+                    <line x1="75" x2="145" y1="25" y2="25" stroke={BRAND.coral} />
+                    <line x1="75" x2="75" y1="25" y2="32" stroke={BRAND.coral} />
+                    <line x1="145" x2="145" y1="25" y2="32" stroke={BRAND.coral} />
+                    <text x="110" y="20" textAnchor="middle" fontSize="10" fontFamily="monospace" fill={BRAND.coral}>
                       ***
                     </text>
                   </svg>
@@ -411,14 +438,19 @@ const Landing = () => {
 
         {/* Status bar */}
         <section className="border-b border-border bg-muted/30">
-          <div className="max-w-6xl mx-auto px-6 py-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-sans text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-            <span>Publication-Ready</span>
-            <span className="text-border">|</span>
-            <span>ISO 14577 Compatible</span>
-            <span className="text-border">|</span>
-            <span>Browser-Native</span>
-            <span className="text-border">|</span>
-            <span>Open Data Formats</span>
+          <div className="max-w-6xl mx-auto px-6 py-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
+            {[
+              { label: 'Publication-Ready', color: BRAND.navy },
+              { label: 'ISO 14577 Compatible', color: BRAND.teal },
+              { label: 'Browser-Native', color: BRAND.coral },
+              { label: 'Open Data Formats', color: BRAND.ink },
+            ].map((item, i, arr) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5" style={{ background: item.color }} />
+                <span>{item.label}</span>
+                {i < arr.length - 1 && <span className="text-border ml-2">|</span>}
+              </div>
+            ))}
           </div>
         </section>
 
@@ -426,10 +458,10 @@ const Landing = () => {
         <section id="capabilities" className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="mb-14 max-w-2xl">
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-3" style={{ color: BRAND.teal }}>
                 [ 01 — CAPABILITIES ]
               </div>
-              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3">
+              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3" style={{ color: BRAND.ink }}>
                 Built for the full analysis pipeline
               </h2>
               <p className="text-muted-foreground text-sm md:text-base">
@@ -437,37 +469,45 @@ const Landing = () => {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 border-l border-t border-border">
-              {features.map((f, i) => (
-                <div
-                  key={f.title}
-                  className="group border-r border-b border-border p-6 hover:bg-muted/40 transition-colors cursor-default relative"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <span className="font-sans text-[10px] tracking-[0.15em] text-muted-foreground">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <f.icon className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+              {features.map((f, i) => {
+                const accent = ACCENTS[i % ACCENTS.length];
+                return (
+                  <div
+                    key={f.title}
+                    className="group border-r border-b border-border p-6 hover:bg-muted/40 transition-all cursor-default relative"
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = accent)}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = '')}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <span className="font-mono text-[11px] font-bold tracking-[0.15em]" style={{ color: accent }}>
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <f.icon className="h-5 w-5" strokeWidth={1.5} style={{ color: BRAND.ink }} />
+                    </div>
+                    <h3 className="font-sans font-semibold text-sm mb-2" style={{ color: BRAND.ink }}>
+                      {f.title}
+                    </h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed mb-4">{f.desc}</p>
+                    <ArrowUpRight
+                      className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                      strokeWidth={1.5}
+                      style={{ color: accent }}
+                    />
                   </div>
-                  <h3 className="font-sans font-semibold text-sm mb-2">{f.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-4">{f.desc}</p>
-                  <ArrowUpRight
-                    className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                    strokeWidth={1.5}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
 
         {/* Methodology pipeline */}
-        <section className="border-b border-border py-20">
+        <section id="methodology" className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="mb-14 max-w-2xl">
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-3" style={{ color: BRAND.teal }}>
                 [ 02 — METHODOLOGY ]
               </div>
-              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3">
+              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3" style={{ color: BRAND.ink }}>
                 A deterministic processing pipeline
               </h2>
               <p className="text-muted-foreground text-sm md:text-base">
@@ -475,35 +515,54 @@ const Landing = () => {
               </p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-0 items-stretch">
-              {pipeline.map((p, i) => (
-                <div key={p.label} className="relative flex flex-col">
-                  <div className="border border-border p-5 h-full flex flex-col items-center text-center">
-                    <p.icon className="h-5 w-5 mb-3" strokeWidth={1.5} />
-                    <div className="font-sans font-semibold text-xs mb-1">
-                      {String(i + 1).padStart(2, '0')} · {p.label}
+              {pipeline.map((p, i) => {
+                const accent = ACCENTS[i % ACCENTS.length];
+                return (
+                  <div key={p.label} className="relative flex flex-col">
+                    <div
+                      className="border-2 p-5 h-full flex flex-col items-center text-center bg-background relative"
+                      style={{ borderColor: BRAND.ink + '15' }}
+                    >
+                      <div
+                        className="absolute top-0 left-0 right-0 h-[2px]"
+                        style={{ background: accent }}
+                      />
+                      <p.icon className="h-5 w-5 mb-3" strokeWidth={1.5} style={{ color: accent }} />
+                      <div className="font-mono font-semibold text-xs mb-1" style={{ color: BRAND.ink }}>
+                        {String(i + 1).padStart(2, '0')} · {p.label}
+                      </div>
+                      <div className="font-mono text-[10px] text-muted-foreground">{p.desc}</div>
                     </div>
-                    <div className="font-sans text-[10px] text-muted-foreground">{p.desc}</div>
+                    {i < pipeline.length - 1 && (
+                      <div className="hidden md:flex absolute top-1/2 -right-3 -translate-y-1/2 z-10 items-center">
+                        <div
+                          className="w-6 h-px"
+                          style={{
+                            backgroundImage: `linear-gradient(90deg, ${accent}, ${ACCENTS[(i + 1) % ACCENTS.length]})`,
+                          }}
+                        />
+                        <ArrowRight
+                          className="h-3 w-3 -ml-1"
+                          strokeWidth={2}
+                          style={{ color: ACCENTS[(i + 1) % ACCENTS.length] }}
+                        />
+                      </div>
+                    )}
                   </div>
-                  {i < pipeline.length - 1 && (
-                    <div className="hidden md:flex absolute top-1/2 -right-3 -translate-y-1/2 z-10 items-center">
-                      <div className="w-6 border-t border-dashed border-border" />
-                      <ArrowRight className="h-3 w-3 text-muted-foreground -ml-1" strokeWidth={1.5} />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
 
         {/* Capabilities matrix */}
-        <section className="border-b border-border py-20">
+        <section id="matrix" className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="mb-14 max-w-2xl">
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-3" style={{ color: BRAND.teal }}>
                 [ 03 — ANALYTICAL MATRIX ]
               </div>
-              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3">
+              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3" style={{ color: BRAND.ink }}>
                 Supported analyses &amp; outputs
               </h2>
             </div>
@@ -511,28 +570,36 @@ const Landing = () => {
               <table className="w-full font-sans text-xs">
                 <thead className="bg-muted/40 border-b border-border">
                   <tr>
-                    <th className="text-left p-4 font-semibold tracking-[0.1em] uppercase text-[10px]">
+                    <th className="text-left p-4 font-mono font-semibold tracking-[0.1em] uppercase text-[10px]">
                       Analysis
                     </th>
-                    <th className="text-left p-4 font-semibold tracking-[0.1em] uppercase text-[10px]">
+                    <th className="text-left p-4 font-mono font-semibold tracking-[0.1em] uppercase text-[10px]">
                       Methods
                     </th>
-                    <th className="text-left p-4 font-semibold tracking-[0.1em] uppercase text-[10px]">
+                    <th className="text-left p-4 font-mono font-semibold tracking-[0.1em] uppercase text-[10px]">
                       Output
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {capabilities.map((c, i) => (
-                    <tr
-                      key={c.type}
-                      className={`border-b border-border last:border-b-0 ${i % 2 === 1 ? 'bg-muted/20' : ''}`}
-                    >
-                      <td className="p-4 font-semibold">{c.type}</td>
-                      <td className="p-4 text-muted-foreground">{c.methods}</td>
-                      <td className="p-4 text-muted-foreground">{c.output}</td>
-                    </tr>
-                  ))}
+                  {capabilities.map((c, i) => {
+                    const accent = ACCENTS[i % ACCENTS.length];
+                    return (
+                      <tr
+                        key={c.type}
+                        className={`border-b border-border last:border-b-0 ${i % 2 === 1 ? 'bg-muted/20' : ''}`}
+                      >
+                        <td
+                          className="p-4 font-semibold border-l-[3px]"
+                          style={{ borderLeftColor: accent, color: BRAND.ink }}
+                        >
+                          {c.type}
+                        </td>
+                        <td className="p-4 text-muted-foreground font-mono">{c.methods}</td>
+                        <td className="p-4 text-muted-foreground font-mono">{c.output}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -542,17 +609,17 @@ const Landing = () => {
         {/* Quote + specs */}
         <section className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div className="border-l-2 border-foreground pl-6">
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+            <div className="pl-6 border-l-[3px]" style={{ borderLeftColor: BRAND.coral }}>
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-3" style={{ color: BRAND.teal }}>
                 [ 04 — DESIGN INTENT ]
               </div>
-              <p className="font-sans text-xl md:text-2xl leading-snug tracking-tight">
+              <p className="font-sans text-xl md:text-2xl leading-snug tracking-tight" style={{ color: BRAND.ink }}>
                 "A browser-native instrument for the quantitative analysis of nanoindentation arrays —
                 no installations, no servers, no compromises on rigor."
               </p>
             </div>
             <div>
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-4">
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-4" style={{ color: BRAND.teal }}>
                 TECHNICAL SPECIFICATIONS
               </div>
               <dl className="font-sans text-sm divide-y divide-border border-y border-border">
@@ -565,8 +632,8 @@ const Landing = () => {
                   ['Project files', '.indentview portable archive'],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between py-3">
-                    <dt className="text-muted-foreground tracking-wide text-xs">{k}</dt>
-                    <dd className="text-right">{v}</dd>
+                    <dt className="text-muted-foreground tracking-wide text-xs font-mono uppercase">{k}</dt>
+                    <dd className="text-right font-mono text-xs" style={{ color: BRAND.ink }}>{v}</dd>
                   </div>
                 ))}
               </dl>
@@ -579,15 +646,18 @@ const Landing = () => {
           <div className="max-w-4xl mx-auto px-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { icon: Upload, label: 'Upload', desc: 'Drop your indentation files' },
-                { icon: Search, label: 'Analyze', desc: 'Visualize, define zones, run statistics' },
-                { icon: FileOutput, label: 'Export', desc: 'Generate publication-ready figures' },
+                { icon: Upload, label: 'Upload', desc: 'Drop your indentation files', color: BRAND.navy },
+                { icon: Search, label: 'Analyze', desc: 'Visualize, define zones, run statistics', color: BRAND.teal },
+                { icon: FileOutput, label: 'Export', desc: 'Generate publication-ready figures', color: BRAND.coral },
               ].map((s, i) => (
                 <div key={s.label} className="text-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 border border-border mb-4">
-                    <s.icon className="h-5 w-5" strokeWidth={1.5} />
+                  <div
+                    className="inline-flex items-center justify-center w-12 h-12 border-2 mb-4"
+                    style={{ borderColor: s.color }}
+                  >
+                    <s.icon className="h-5 w-5" strokeWidth={1.5} style={{ color: s.color }} />
                   </div>
-                  <div className="font-sans font-semibold text-sm mb-1">
+                  <div className="font-sans font-semibold text-sm mb-1" style={{ color: BRAND.ink }}>
                     {i + 1}. {s.label}
                   </div>
                   <p className="text-muted-foreground text-sm">{s.desc}</p>
@@ -600,23 +670,31 @@ const Landing = () => {
         {/* CTA */}
         <section className="border-b border-border">
           <div className="max-w-6xl mx-auto px-6 py-20 text-center">
-            <div className="border border-border p-10 md:p-16 relative">
-              <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-foreground" />
-              <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-foreground" />
-              <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-foreground" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-foreground" />
-              <h2 className="font-sans font-bold text-2xl md:text-4xl tracking-tight mb-4">
+            <div className="border-2 p-10 md:p-16 relative" style={{ borderColor: BRAND.ink }}>
+              {/* Gradient top stripe */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[3px]"
+                style={{ background: BRAND_GRADIENT }}
+              />
+              <div className="absolute top-2 left-2 w-3 h-3 border-t border-l" style={{ borderColor: BRAND.navy }} />
+              <div className="absolute top-2 right-2 w-3 h-3 border-t border-r" style={{ borderColor: BRAND.coral }} />
+              <div className="absolute bottom-2 left-2 w-3 h-3 border-b border-l" style={{ borderColor: BRAND.teal }} />
+              <div className="absolute bottom-2 right-2 w-3 h-3 border-b border-r" style={{ borderColor: BRAND.ink }} />
+              <h2 className="font-sans font-bold text-2xl md:text-4xl tracking-tight mb-4" style={{ color: BRAND.ink }}>
                 Start analyzing in under a minute
               </h2>
               <p className="text-muted-foreground max-w-xl mx-auto mb-8 text-sm md:text-base">
                 No installation. No account. Drop your data file and begin.
               </p>
               <Link to="/app">
-                <Button className="rounded-none font-sans px-10 h-12 text-sm">
+                <Button
+                  className="rounded-none font-sans px-10 h-12 text-sm border-0 hover:opacity-90"
+                  style={{ backgroundColor: BRAND.navy, color: 'white' }}
+                >
                   Launch Application <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              <div className="mt-6 font-sans text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
+              <div className="mt-6 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
                 Supports .txt · .csv · .tsv · .xlsx
               </div>
             </div>
@@ -627,10 +705,10 @@ const Landing = () => {
         <footer className="py-12">
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <BrandMark className="w-4 h-4" />
-                <Wordmark size="sm" />
-                <span className="text-[10px] font-sans text-muted-foreground border border-border px-1.5">
+              <div className="flex items-center gap-3 mb-3">
+                <BrandMark className="w-6 h-6" />
+                <Wordmark size="lg" />
+                <span className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 py-0.5">
                   v1.0
                 </span>
               </div>
@@ -639,33 +717,38 @@ const Landing = () => {
               </p>
             </div>
             <div>
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3 uppercase">
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-3 uppercase" style={{ color: BRAND.teal }}>
                 Navigate
               </div>
               <ul className="space-y-2 font-sans text-xs">
                 <li>
-                  <Link to="/app" className="hover:underline underline-offset-4">
+                  <Link to="/app" className="hover:underline underline-offset-4" style={{ color: BRAND.ink }}>
                     Launch App
                   </Link>
                 </li>
                 <li>
-                  <a href="#capabilities" className="hover:underline underline-offset-4">
+                  <a href="#capabilities" className="hover:underline underline-offset-4" style={{ color: BRAND.ink }}>
                     Capabilities
+                  </a>
+                </li>
+                <li>
+                  <a href="#methodology" className="hover:underline underline-offset-4" style={{ color: BRAND.ink }}>
+                    Methodology
                   </a>
                 </li>
               </ul>
             </div>
             <div>
-              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3 uppercase">
+              <div className="font-mono text-[10px] tracking-[0.2em] mb-3 uppercase" style={{ color: BRAND.teal }}>
                 Built With
               </div>
-              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+              <p className="font-mono text-xs text-muted-foreground leading-relaxed">
                 React · TypeScript · D3 · Three.js · Tailwind
               </p>
             </div>
           </div>
           <div className="border-t border-border pt-6">
-            <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 font-sans text-[10px] text-muted-foreground tracking-wide">
+            <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 font-mono text-[10px] text-muted-foreground tracking-wide">
               <span>© {new Date().getFullYear()} IndentView · MIT License</span>
               <span>build · {Math.random().toString(16).slice(2, 10)}</span>
             </div>
