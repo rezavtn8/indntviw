@@ -13,6 +13,7 @@ import {
   DEFAULT_POINTS_TRANSFORM,
   OverlayCanvasRef,
 } from '@/components/visualization/OverlayCanvas';
+import { BRAND } from '@/components/layout/Brand';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
@@ -41,6 +42,7 @@ interface OverlayControlsPanelProps {
   canvasRef: React.RefObject<OverlayCanvasRef>;
   pointsVisible: boolean;
   onPointsVisibleChange: (v: boolean) => void;
+  uploadInputRef?: React.RefObject<HTMLInputElement>;
 }
 
 export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
@@ -57,8 +59,10 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
   canvasRef,
   pointsVisible,
   onPointsVisibleChange,
+  uploadInputRef,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const localFileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = uploadInputRef ?? localFileInputRef;
   const [exportFormat, setExportFormat] = React.useState<'png' | 'svg' | 'pdf'>('png');
   const [exportDpi, setExportDpi] = React.useState(300);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -94,11 +98,16 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
     }
   };
 
+  const handleFitPoints = () => {
+    canvasRef.current?.centerPoints();
+    onPointsTransformChange({ ...pointsTransform, scale: 1, xStretch: 1, yStretch: 1, offsetX: 0, offsetY: 0 });
+  };
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Image Upload */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-mono uppercase font-medium">Microscope Image</Label>
+        <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Microscope Image</Label>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
         <div className="flex gap-1.5">
           <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs h-7" onClick={() => fileInputRef.current?.click()}>
@@ -113,59 +122,55 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
         </div>
       </div>
 
-      {/* Points Visibility Toggle */}
-      <div className="flex items-center justify-between pt-1 border-t border-border">
-        <Label className="text-xs font-mono uppercase font-medium">Points</Label>
-        <Button
-          variant={pointsVisible ? 'outline' : 'ghost'}
-          size="sm"
-          className="h-7 px-2 gap-1 text-xs"
-          onClick={() => onPointsVisibleChange(!pointsVisible)}
-        >
-          {pointsVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-          {pointsVisible ? 'Visible' : 'Hidden'}
-        </Button>
-      </div>
-
-      {/* Layer Selector */}
-      <div className="space-y-1.5 pt-1 border-t border-border">
-        <Label className="text-xs font-mono uppercase font-medium">Active Layer</Label>
+      {/* Layer Selector — Points pill includes inline visibility toggle */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Active Layer</Label>
         <div className="flex gap-1">
           <button
             onClick={() => onActiveLayerChange('image')}
-            className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors ${
+            className="flex-1 px-2 py-1.5 rounded text-xs font-mono uppercase tracking-wider transition-colors border"
+            style={
               activeLayer === 'image'
-                ? 'text-white'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-            }`}
-            style={activeLayer === 'image' ? { background: '#2a4d8f' } : undefined}
+                ? { background: BRAND.navy, color: '#fff', borderColor: BRAND.navy }
+                : { background: 'transparent', color: 'hsl(var(--muted-foreground))', borderColor: 'hsl(var(--border))' }
+            }
           >
             Image
           </button>
           <button
             onClick={() => onActiveLayerChange('points')}
-            className={`flex-1 px-2 py-1.5 rounded text-xs font-mono transition-colors ${
+            className="flex-1 px-2 py-1.5 rounded text-xs font-mono uppercase tracking-wider transition-colors border flex items-center justify-center gap-1.5"
+            style={
               activeLayer === 'points'
-                ? 'text-white'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-            }`}
-            style={activeLayer === 'points' ? { background: '#3aa0a0' } : undefined}
+                ? { background: BRAND.teal, color: '#fff', borderColor: BRAND.teal }
+                : { background: 'transparent', color: 'hsl(var(--muted-foreground))', borderColor: 'hsl(var(--border))' }
+            }
           >
-            Points
+            <span>Points</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onPointsVisibleChange(!pointsVisible); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onPointsVisibleChange(!pointsVisible); } }}
+              className="inline-flex items-center justify-center w-4 h-4 rounded hover:bg-black/10 transition-colors cursor-pointer"
+              title={pointsVisible ? 'Hide points' : 'Show points'}
+            >
+              {pointsVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            </span>
           </button>
         </div>
       </div>
 
       {/* Context-aware layer controls */}
       {activeLayer === 'image' ? (
-        <div className="space-y-2 pt-1 border-t border-border">
-          <Label className="text-xs font-mono uppercase font-medium">Image Controls</Label>
+        <div className="space-y-2">
+          <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Image Controls</Label>
           <SliderRow label="Opacity" value={transform.opacity} min={0} max={100} step={1} onChange={v => onTransformChange({ ...transform, opacity: v })} unit="%" />
           <SliderRow label="Scale" value={transform.scale} min={0.05} max={5} step={0.01} onChange={v => onTransformChange({ ...transform, scale: v })} unit="x" />
           <SliderRow label="Rotation" value={transform.rotation} min={0} max={360} step={1} onChange={v => onTransformChange({ ...transform, rotation: v })} unit="°" />
           <SliderRow label="X Offset" value={transform.offsetX} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetX: v })} unit="px" />
           <SliderRow label="Y Offset" value={transform.offsetY} min={-500} max={500} step={1} onChange={v => onTransformChange({ ...transform, offsetY: v })} unit="px" />
-          <div className="flex gap-1">
+          <div className="flex gap-1 pt-1">
             <Button variant="outline" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => canvasRef.current?.fitImageToData()}>
               <Maximize className="w-3 h-3" /> Fit
             </Button>
@@ -178,8 +183,8 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
           </div>
         </div>
       ) : (
-        <div className="space-y-2 pt-1 border-t border-border">
-          <Label className="text-xs font-mono uppercase font-medium">Points Controls</Label>
+        <div className="space-y-2">
+          <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Points Controls</Label>
           <SliderRow label="X Stretch" value={pointsTransform.xStretch ?? 1} min={0.1} max={5} step={0.05} onChange={v => onPointsTransformChange({ ...pointsTransform, xStretch: v })} unit="x" />
           <SliderRow label="Y Stretch" value={pointsTransform.yStretch ?? 1} min={0.1} max={5} step={0.05} onChange={v => onPointsTransformChange({ ...pointsTransform, yStretch: v })} unit="x" />
           <SliderRow label="Opacity" value={pointsTransform.opacity} min={0} max={100} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, opacity: v })} unit="%" />
@@ -187,7 +192,10 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
           <SliderRow label="Size" value={pointSettings.sizeMultiplier} min={0.3} max={3} step={0.1} onChange={v => onPointSettingsChange({ ...pointSettings, sizeMultiplier: v })} unit="x" />
           <SliderRow label="X Offset" value={pointsTransform.offsetX} min={-500} max={500} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, offsetX: v })} unit="px" />
           <SliderRow label="Y Offset" value={pointsTransform.offsetY} min={-500} max={500} step={1} onChange={v => onPointsTransformChange({ ...pointsTransform, offsetY: v })} unit="px" />
-          <div className="flex gap-1">
+          <div className="flex gap-1 pt-1">
+            <Button variant="outline" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={handleFitPoints}>
+              <Maximize className="w-3 h-3" /> Fit
+            </Button>
             <Button variant="outline" size="sm" className="flex-1 text-xs h-7 gap-1" onClick={() => canvasRef.current?.centerPoints()}>
               <Crosshair className="w-3 h-3" /> Center
             </Button>
@@ -199,8 +207,8 @@ export const OverlayControlsPanel: React.FC<OverlayControlsPanelProps> = ({
       )}
 
       {/* Export */}
-      <div className="space-y-2 pt-1 border-t border-border">
-        <Label className="text-xs font-mono uppercase font-medium">Export</Label>
+      <div className="space-y-2">
+        <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Export</Label>
         <div className="flex gap-1">
           {(['png', 'svg', 'pdf'] as const).map(fmt => (
             <button
