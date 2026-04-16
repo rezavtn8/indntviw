@@ -203,7 +203,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setFileSessions([session]);
           setActiveSessionId(sessionId);
           setIsInitialized(true);
-          toast.success(`Loaded sample data: ${parsed.points.length} points`);
         }
       } catch (error) {
         console.log('No sample data found, ready for file upload');
