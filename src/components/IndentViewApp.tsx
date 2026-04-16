@@ -296,10 +296,18 @@ export const IndentViewApp: React.FC = () => {
             />
             
             {activeView === '2d' && (
-              <VisualizationOptions 
-                showContours={showContours} showInterpolation={showInterpolation}
-                onShowContoursChange={setShowContours} onShowInterpolationChange={setShowInterpolation} 
-              />
+              <>
+                <VisualizationOptions 
+                  showContours={showContours} showInterpolation={showInterpolation}
+                  onShowContoursChange={setShowContours} onShowInterpolationChange={setShowInterpolation} 
+                />
+                <RenderStyleControls
+                  pointShape={pointShape}
+                  onPointShapeChange={setPointShape}
+                  pointSizeMultiplier={pointSizeMultiplier}
+                  onPointSizeMultiplierChange={setPointSizeMultiplier}
+                />
+              </>
             )}
             
             {activeView === '3d' && (
