@@ -157,17 +157,22 @@ export const FileTabs: React.FC<FileTabsProps> = ({
                 <div
                   ref={isActive ? activeTabRef : undefined}
                   className={cn(
-                    "group flex items-center gap-2 px-3 py-1.5 font-mono text-xs cursor-pointer transition-colors border rounded-sm shrink-0",
+                    "group relative flex items-center gap-2 px-3 py-1.5 font-mono text-xs cursor-pointer transition-colors border rounded-sm shrink-0",
                     isActive
                       ? "bg-card border-border text-foreground shadow-sm"
                       : "bg-transparent border-transparent text-muted-foreground hover:bg-card/50 hover:text-foreground"
                   )}
+                  style={isActive ? { borderTopColor: '#3aa0a0', borderTopWidth: 2 } : undefined}
                   onClick={() => onSelectSession(session.id)}
                   title={session.fileName}
                 >
                   <span className="flex items-center gap-1.5">
                     {hasChanges && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" title="Unsaved changes" />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full animate-pulse"
+                        style={{ background: '#e8594f' }}
+                        title="Unsaved changes"
+                      />
                     )}
                     {truncateFileName(session.fileName)}
                   </span>

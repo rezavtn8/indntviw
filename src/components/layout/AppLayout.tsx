@@ -28,6 +28,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 }) => {
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Brand accent stripe */}
+      <div
+        className="h-[2px] w-full shrink-0"
+        style={{
+          background:
+            'linear-gradient(90deg, #2a4d8f 0%, #3aa0a0 50%, #e8594f 100%)',
+        }}
+        aria-hidden
+      />
+
       {/* Page-level drop overlay */}
       {isDraggingOverPage && (
         <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
