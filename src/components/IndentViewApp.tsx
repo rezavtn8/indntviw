@@ -558,9 +558,10 @@ export const IndentViewApp: React.FC = () => {
       isDraggingOverPage={isDraggingOverPage}
       header={
         <div className="flex items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-4">
-            <h1 className="font-mono text-xl font-bold uppercase tracking-tight">IndentView</h1>
-            <span className="border border-border px-2 py-0.5 font-mono text-xs uppercase text-muted-foreground">v1.0</span>
+          <div className="flex items-center gap-3">
+            <BrandMark className="w-6 h-6" />
+            <Wordmark size="md" />
+            <span className="border border-border px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground tracking-wider">v1.0</span>
           </div>
           <ProjectActions />
         </div>
