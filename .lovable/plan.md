@@ -1,85 +1,75 @@
 
 
-## Production Polish Pass — `/app` Visual Consistency
+## Overlay Tab — Critical Audit & Fix
 
-After auditing every view (2D, 3D, Overlay, Analysis, Export · Figure, Export · Batch), the app has good bones but suffers from **inconsistent component patterns** between tabs. Below is a focused, high-impact cleanup. Single goal: every view should feel like one product.
+### Issues found
 
-### Issues found (by severity)
+**A. Visual inconsistency with the polish pass**
+1. Bottom-center layer switcher pill still uses **bright hardcoded green/blue** (`hsl(142,76%,46%)`, `hsl(217,91%,60%)`) — the in-canvas pill was missed in the previous brand cleanup. Should match the sidebar buttons (navy/teal).
+2. The **selection bounding-box outlines** drawn over image/points use the same off-brand green/blue — they jump out and clash with everything else.
+3. Bottom-left help hint (`Click: select layer · Drag: move...`) is plain text, low contrast, easily overlapped by the layer switcher; no proper grouping.
+4. The "Color Scale" collapsible in the sidebar uses `bg-muted/30` background — flagged in prior audit as inconsistent with other section headers. Still present in Overlay's sidebar branch (separate code path from 2D/3D).
 
-**A. Layout structure breaks between views**
-1. **Overlay view** — no toolbar at all (no Edit/Export buttons, no `pts` count). Toolbar disappears on overlay only.
-2. **Analysis view** — has its OWN inner sidebar ("Analysis Controls") *in addition* to the main sidebar, creating a triple-column layout that no other view has. Mode tabs ("Single Sample" / "Cross-Sample") use a different button style than Export Studio's mode tabs.
-3. **3D view** — Spatial Analysis context panel labels overlap (e.g., `Z 6.681 - Z Mean: 6.823` collide; `Gradient: -15.7707 Correlation: -0.059` overlap; histogram axis numbers overlap).
-4. **Export Studio** — mode tabs (Figure/Batch) use yet a *third* button visual style (rounded, large, black bg).
-5. **Color legend** present in 2D/3D as right-rail strip, **missing in Overlay** despite property/colormap controls existing there.
+**B. UX / functional friction**
+5. **No zoom indicator and no "Reset View" button** for the pan/zoom (Alt+wheel/Alt+drag). Once panned/zoomed, only way back is to refresh — easy to get lost.
+6. **Discoverability of Alt-modifiers is poor** — only mentioned in tiny grey text. Users won't find pan/zoom.
+7. **Active layer is ambiguous** when both bounding boxes overlap. The active one is only slightly thicker; with off-brand colors it reads like noise rather than selection state.
+8. **Empty state** ("Upload a microscope image and load data to begin") is bare centered text — no icon, no CTA button, doesn't match the polish of other empty states.
+9. **Resize handles** are flat colored squares; small (8px), no hover feedback, identical cursor on all four corners (`nwse-resize` even on TR/BL where it should be `nesw-resize`).
+10. **Rotation control** exists in the sidebar but the bounding box doesn't rotate with the image — so "rotate" feels disconnected from the visual selection.
 
-**B. Off-brand colors hardcoded**
-6. **Overlay "Active Layer" buttons** use bright green (`hsl(142,76%,46%)`) and bright blue (`hsl(217,91%,60%)`) — completely off-palette. Should use brand navy/teal.
-7. **Spatial3D analysis cards** use raw `bg-green-500`, `text-green-600`, `bg-emerald-500` for roughness/coverage badges — clashes with the muted scientific palette. Should use neutral chips with brand-coral for warnings, brand-teal for "good".
-8. **Correlation matrix** uses red/green-500 — same issue. Should use coolwarm semantic (navy = positive, coral = negative) to match the platform's diverging colormap convention.
+**C. Toolbar / layout**
+11. Overlay now has the standard `AppToolbar` (added in prior pass) but the `pts` count + Edit button appear even though Edit Mode does nothing in Overlay (clicking points doesn't select/edit them here). Edit button should be hidden for Overlay.
+12. Image filename is never displayed — once uploaded you can't tell which file is loaded without re-checking.
 
-**C. Toolbar / button inconsistency**
-9. Toolbar `Edit` and `Export` buttons render as `ghost` variant (text only) but **Single Sample / Figure Export** mode tabs are huge filled black buttons → strong visual hierarchy mismatch. The mode tabs should be a subtle segmented control, not the loudest thing on the screen.
-10. `ZoneToolbar` only appears in 2D + Export-Figure but not in Overlay (where zones don't apply — fine) and is missing the consistent divider style.
-
-**D. Sidebar inconsistencies**
-11. Section headers use mixed case: some `font-mono uppercase` (DATA FILE, PROPERTY) but Analysis uses `Analysis Controls` (Title Case + bold). Standardize.
-12. "Synced Across Tabs" pill has its own framed border style not used elsewhere.
-13. `Color Scale` collapsible has a different background (`bg-muted/30`) than other sections.
-
-**E. Misc polish**
-14. Sample data toast `Loaded sample data: 102 points` appears inside the heatmap canvas (bottom-right) overlapping data — should be a top-corner sonner toast.
-15. Footer wordmark + `102 points loaded` look fine but lack the brand stripe accent that the top has.
-16. Toolbar `Export` button is ambiguous (can be confused with the Export view).
-
----
+**D. Sidebar control panel issues** (`OverlayControlsPanel.tsx`)
+13. Active Layer buttons were given brand colors (navy/teal) in the previous pass, but their **hover/idle state uses `bg-muted/50`** which is the same as inactive Format toggles below — visually competing rows of identical pills.
+14. **"Points Visibility" toggle** (Eye/EyeOff) is a separate row at the top — duplicates state already controlled by the Active Layer system. Should be inline with Points layer controls.
+15. Image Controls panel has **Fit / Center / Reset** buttons but Points panel only has **Center / Reset** (no Fit) — asymmetric.
+16. **Section dividers** use `border-t border-border` between every block, creating a busy stacked-card look. Should use spacing or a single subtle separator.
 
 ### Plan — atomic changes
 
-**1. Unified mode-tab component (`SegmentedTabs`)** — new tiny component, used in both Analysis (Single/Cross) and Export (Figure/Batch). Compact pill row with subtle bottom-border accent in brand teal for active tab. Replaces the two big black buttons.
+**1. Brand-align in-canvas chrome** (`OverlayCanvas.tsx`)
+- Replace bottom-center layer pill colors: Image → `BRAND.navy`, Points → `BRAND.teal`. Match the sidebar exactly.
+- Selection bounding-box strokes: Image bbox → `BRAND.navy`, Points bbox → `BRAND.teal`. Use brand-coral only on hover of resize handles (interaction affordance).
+- Improve handle: 10px squares, white fill + 2px brand-color stroke, correct cursor per corner (TL/BR = nwse-resize, TR/BL = nesw-resize).
+- Make active bbox stroke 3px, inactive 1px dashed at 40% opacity → unmistakable hierarchy.
 
-**2. Unified Analysis layout** — move Analysis's inner sidebar contents (Property selector, All Data toggle, Zones list, Plot Options) into the **main `ViewSidebar` controls panel** (same place as 2D/3D controls). Result: Analysis matches every other view's two-column structure.
+**2. Zoom controls + reset** (`OverlayCanvas.tsx`)
+- Add a small floating control cluster top-right: `+`, `−`, `Fit`, `1:1`, plus a live zoom-percent readout (`100%`).
+- On click: animate viewRef zoom and recenter pan to 0,0 for "Fit" / "1:1".
+- Replace the cryptic bottom-left hint with a clean `kbd`-styled chip group: `Alt+Drag pan · Alt+Wheel zoom`.
 
-**3. Toolbar everywhere** — render `AppToolbar` for Overlay too (with Edit/Export hidden if not applicable), so the toolbar bar is visually consistent across all 5 views.
+**3. Better empty state** (`OverlayCanvas.tsx`)
+- Centered card with overlay-icon + headline + two side-by-side CTAs:
+  - "Upload Image" (opens the file picker — wire from sidebar handler)
+  - "Load Sample Data"
+- Brand gradient hairline at the top of the card.
 
-**4. Color Legend in Overlay** — add the same right-rail `ColorLegend` to Overlay since it already has property + scheme + range controls.
+**4. Hide Edit toolbar in Overlay** (`IndentViewApp.tsx`)
+- Pass `onToggleEditing={undefined}` (or new `hideEditing` prop) to `AppToolbar` when `activeView === 'overlay'`. Keep `pts` count + filename.
+- Surface active image filename in the toolbar: `image.png · 1024×768` next to `pts` count.
 
-**5. Overlay Active Layer buttons** — replace bright green/blue with brand `navy` (Image) and `teal` (Points) with white text. Subtle, on-brand.
+**5. Sidebar cleanup** (`OverlayControlsPanel.tsx`)
+- Remove the standalone "Points Visibility" row at top. Move Eye/EyeOff toggle inline with the "Points" tab in the Active Layer selector (small icon on the right side of the Points pill).
+- Add **Fit** button to the Points controls (calls `centerPoints` + reset stretch/scale to 1).
+- Replace per-section `border-t border-border` with a single shared spacing rhythm (`space-y-4`) and `font-mono uppercase` headers (no top borders).
+- Active Layer pills: keep brand navy/teal for active, use `bg-transparent border border-border` for inactive (not `bg-muted/50`) so they don't compete with format toggles.
 
-**6. Spatial3D / Correlation / Surface / Volume / Gradient color cleanup**
-  - Replace raw `green-500/red-500/emerald-500/orange-500/yellow-500` semantic chips with a single helper using brand palette: `navy` = good/positive, `teal` = neutral-good, muted = neutral, `coral` = warning/negative.
-  - Fix label collisions in Spatial3D `Depth Statistics` & `Depth vs HIT Correlation` cards: switch from inline two-column flex to a clean two-row `dl` with proper spacing.
-
-**7. Sidebar normalization**
-  - All section headers: `font-mono text-xs uppercase tracking-wider text-muted-foreground` (already the standard for most).
-  - Drop the `Analysis Controls` H3; use a section group like the others.
-  - `Color Scale` collapsible: same trigger style as other section labels (no muted bg).
-  - "Synced Across Tabs" pill: replace framed border with the standard label + switch row used elsewhere.
-
-**8. Sample-data load notification** — switch the in-canvas pill to a real sonner toast (one line change in SessionContext).
-
-**9. Footer accent** — add a 1px brand-gradient hairline above the footer for symmetry with the top stripe.
-
-**10. Remove the second `Export` button from `AppToolbar`** when `activeView === 'export'` (it's redundant and confusing — the user is already in Export Studio).
+**6. Sidebar parity with other views** (`IndentViewApp.tsx`)
+- Replace the Overlay-specific Color Scale collapsible (`bg-muted/30` trigger) with the same trigger style used elsewhere (no muted bg) — already noted in prior pass for the non-overlay path; the Overlay branch was missed.
 
 ### Files to edit
+- `src/components/visualization/OverlayCanvas.tsx` — in-canvas branding, zoom controls, empty state, handle polish, brand-aligned bboxes.
+- `src/components/panels/OverlayControlsPanel.tsx` — sidebar cleanup, merge points-visibility into Active Layer, add Fit for points, normalize dividers.
+- `src/components/IndentViewApp.tsx` — hide Edit toolbar in Overlay, surface image filename + dimensions in toolbar, normalize the Color Scale collapsible style to match other views.
+- `src/components/layout/AppToolbar.tsx` — accept optional `hideEditing` prop (or simpler: just don't pass `onToggleEditing` when in Overlay — already supported via the `showEditingTools` check).
 
-- `src/components/IndentViewApp.tsx` — wire toolbar into Overlay; add legend to Overlay; pass Analysis-sidebar content into `ViewSidebar`; hide redundant Export button in Export view.
-- `src/components/layout/AppLayout.tsx` — footer brand-stripe hairline.
-- `src/components/panels/AnalysisPanel.tsx` — remove inner sidebar; expose its controls via prop/render-slot consumed by `ViewSidebar`; replace mode tabs with `SegmentedTabs`.
-- `src/components/panels/OverlayControlsPanel.tsx` — Active Layer button colors → brand navy/teal.
-- `src/components/analysis/Spatial3DPanel.tsx` + child cards (`DepthAnalysis`, `SurfaceAnalysis`, `VolumeAnalysis`, `GradientAnalysis`, `SpatialDistribution`, `CorrelationAnalysis`) — fix label overlap (grid layout) and swap raw green/red Tailwind classes for a brand-aware `<StatusChip>` helper.
-- `src/components/analysis/ComprehensiveBatchExport.tsx` (Export view mode tabs trigger lives in `IndentViewApp.tsx` `renderExportModeTabs`) — replace with new `SegmentedTabs`.
-- `src/components/controls/SyncScopeControls.tsx` — restyle pill to match standard sidebar row.
-- `src/contexts/SessionContext.tsx` — remove inline canvas pill for sample-load message; use `sonner` toast.
-- New file: `src/components/layout/SegmentedTabs.tsx` (shared mode-tab control).
-- New file: `src/components/ui/status-chip.tsx` (brand-palette status badge: `good | neutral | warn`).
-
-### Out of scope (will not touch in this pass)
-- Heatmap rendering, statistical computation, export logic — purely visual cleanup only.
-- Landing page (already redesigned).
-- Functional behavior of any feature.
+### Out of scope
+- Underlying overlay math (transform composition, export pipeline) — works correctly, no changes.
+- New features (e.g. multi-image stacking, scale calibration) — separate request.
 
 ### Outcome
-Every view will share: same sidebar pattern, same toolbar bar, same mode-tab control, same brand palette, same chip/badge style, same color legend placement, same brand stripe top + bottom. No more ad-hoc buttons or palette drift between tabs.
+Overlay finally feels like the same product as the other tabs: brand-aligned colors throughout (in-canvas + sidebar), discoverable zoom/pan, polished empty state, no redundant Edit button, file context surfaced, and a calmer sidebar with a clear single source of truth for layer selection + visibility.
 
