@@ -75,6 +75,49 @@ const stats = [
   { v: '0', l: 'Server Uploads' },
 ];
 
+// Brand palette derived from the wordmark gradient (navy → teal → coral)
+const BRAND = {
+  navy: '#2a4d8f',
+  teal: '#3aa0a0',
+  coral: '#e8594f',
+  ink: '#0f1a2b',
+};
+
+const Wordmark = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+  const cls =
+    size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-sm' : 'text-base';
+  return (
+    <span
+      className={`font-sans font-bold tracking-tight ${cls} leading-none`}
+      style={{ letterSpacing: '-0.02em' }}
+    >
+      <span style={{ color: BRAND.ink }}>Indent</span>
+      <span
+        style={{
+          backgroundImage: `linear-gradient(90deg, ${BRAND.navy} 0%, ${BRAND.teal} 50%, ${BRAND.coral} 100%)`,
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+        }}
+      >
+        view
+      </span>
+    </span>
+  );
+};
+
+const BrandMark = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <div
+    className={`${className} grid grid-cols-2 grid-rows-2 gap-px p-px border`}
+    style={{ borderColor: BRAND.ink }}
+  >
+    <div style={{ background: BRAND.navy }} />
+    <div style={{ background: BRAND.teal }} />
+    <div style={{ background: BRAND.ink }} />
+    <div style={{ background: BRAND.coral }} />
+  </div>
+);
+
 const Landing = () => {
   // Generate heatmap cells with a deterministic monochrome gradient
   const cells = Array.from({ length: 144 }).map((_, i) => {
@@ -102,13 +145,8 @@ const Landing = () => {
         <header className="border-b border-border sticky top-0 z-40 bg-background/95 backdrop-blur">
           <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-3">
-              <div className="w-5 h-5 border border-foreground grid grid-cols-2 grid-rows-2 gap-px p-px">
-                <div className="bg-foreground" />
-                <div className="bg-foreground/30" />
-                <div className="bg-foreground/60" />
-                <div className="bg-foreground" />
-              </div>
-              <span className="font-sans font-bold text-base tracking-tight">IndentView</span>
+              <BrandMark className="w-5 h-5" />
+              <Wordmark size="md" />
               <span className="hidden sm:inline text-[10px] font-sans text-muted-foreground border border-border px-1.5 py-0.5">
                 v1.0
               </span>
@@ -590,13 +628,8 @@ const Landing = () => {
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-4 h-4 border border-foreground grid grid-cols-2 grid-rows-2 gap-px p-px">
-                  <div className="bg-foreground" />
-                  <div className="bg-foreground/30" />
-                  <div className="bg-foreground/60" />
-                  <div className="bg-foreground" />
-                </div>
-                <span className="font-sans font-bold text-sm">IndentView</span>
+                <BrandMark className="w-4 h-4" />
+                <Wordmark size="sm" />
                 <span className="text-[10px] font-sans text-muted-foreground border border-border px-1.5">
                   v1.0
                 </span>
