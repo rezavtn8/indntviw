@@ -1,6 +1,8 @@
 import React, { useMemo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect, useState } from 'react';
 import { IndentationPoint, ColorScheme } from '@/types/indentation';
 import { getColorForValue } from '@/utils/colorScales';
+import { BRAND } from '@/components/layout/Brand';
+import { Plus, Minus, Maximize2, Square, ImagePlus } from 'lucide-react';
 
 export interface OverlayTransform {
   offsetX: number;
@@ -65,6 +67,7 @@ interface OverlayCanvasProps {
   containerWidth: number;
   containerHeight: number;
   pointsVisible?: boolean;
+  onRequestUploadImage?: () => void;
 }
 
 export interface OverlayCanvasRef {
@@ -75,8 +78,8 @@ export interface OverlayCanvasRef {
   getCanvasDimensions: () => { width: number; height: number };
 }
 
-const HANDLE_SIZE = 8;
-const HANDLE_HIT_SIZE = 14;
+const HANDLE_SIZE = 10;
+const HANDLE_HIT_SIZE = 16;
 
 type DragMode = 'none' | 'move-image' | 'move-points' | 'resize-image' | 'resize-points' | 'pan';
 
@@ -109,6 +112,7 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   containerWidth,
   containerHeight,
   pointsVisible = true,
+  onRequestUploadImage,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointsCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -118,6 +122,8 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const rafRef = useRef<number>(0);
   const [imageDimensions, setImageDimensions] = useState<{ w: number; h: number } | null>(null);
   const prevImageUrlRef = useRef<string | null>(imageUrl);
+  const [zoomPct, setZoomPct] = useState(100);
+  const [hoveredHandle, setHoveredHandle] = useState<{ layer: OverlayActiveLayer; corner: number } | null>(null);
 
   // Refs to avoid stale closures
   const transformRef = useRef(transform);
@@ -293,7 +299,21 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
     if (!sceneRef.current) return;
     const { x, y, zoom } = viewRef.current;
     sceneRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    setZoomPct(Math.round(zoom * 100));
   }, []);
+
+  const setViewZoom = useCallback((newZoom: number) => {
+    viewRef.current.zoom = Math.max(0.1, Math.min(10, newZoom));
+    applyViewTransform();
+  }, [applyViewTransform]);
+
+  const resetView = useCallback(() => {
+    viewRef.current.x = 0;
+    viewRef.current.y = 0;
+    viewRef.current.zoom = 1;
+    applyViewTransform();
+  }, [applyViewTransform]);
+
 
   // Get corners of a bounding box
   const getCorners = (bbox: { x: number; y: number; w: number; h: number }) => [
@@ -498,24 +518,39 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const renderSelectionOverlay = () => {
     const zoom = viewRef.current.zoom || 1;
     const hs = HANDLE_SIZE / zoom;
+    const cursors = ['nwse-resize', 'nesw-resize', 'nwse-resize', 'nesw-resize'];
 
-    const renderBBox = (bbox: { x: number; y: number; w: number; h: number }, color: string, isActive: boolean) => {
+    const renderBBox = (
+      bbox: { x: number; y: number; w: number; h: number },
+      color: string,
+      isActive: boolean,
+      layer: OverlayActiveLayer,
+    ) => {
       const corners = getCorners(bbox);
       return (
-        <g key={color}>
+        <g key={layer}>
           <rect
             x={bbox.x} y={bbox.y} width={bbox.w} height={bbox.h}
-            fill="none" stroke={color} strokeWidth={isActive ? 2 / zoom : 1 / zoom}
-            strokeDasharray={isActive ? 'none' : `${4 / zoom}`}
+            fill="none" stroke={color}
+            strokeWidth={isActive ? 3 / zoom : 1 / zoom}
+            strokeOpacity={isActive ? 1 : 0.4}
+            strokeDasharray={isActive ? 'none' : `${4 / zoom} ${3 / zoom}`}
           />
-          {isActive && corners.map((c, i) => (
-            <rect
-              key={i}
-              x={c.x - hs / 2} y={c.y - hs / 2} width={hs} height={hs}
-              fill={color} stroke="hsl(var(--background))" strokeWidth={1 / zoom}
-              style={{ cursor: 'nwse-resize' }}
-            />
-          ))}
+          {isActive && corners.map((c, i) => {
+            const isHovered = hoveredHandle?.layer === layer && hoveredHandle.corner === i;
+            return (
+              <rect
+                key={i}
+                x={c.x - hs / 2} y={c.y - hs / 2} width={hs} height={hs}
+                fill={isHovered ? BRAND.coral : '#ffffff'}
+                stroke={isHovered ? BRAND.coral : color}
+                strokeWidth={2 / zoom}
+                style={{ cursor: cursors[i], pointerEvents: 'auto' }}
+                onMouseEnter={() => setHoveredHandle({ layer, corner: i })}
+                onMouseLeave={() => setHoveredHandle(null)}
+              />
+            );
+          })}
         </g>
       );
     };
@@ -524,10 +559,10 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       <svg
         style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none', overflow: 'visible' }}
       >
-        {/* Points layer box */}
-        {points.length > 0 && renderBBox(pointsLayerBBox, 'hsl(142, 76%, 46%)', activeLayer === 'points')}
-        {/* Image layer box */}
-        {imageBBox && renderBBox(imageBBox, 'hsl(217, 91%, 60%)', activeLayer === 'image')}
+        {/* Points layer box (teal) */}
+        {points.length > 0 && renderBBox(pointsLayerBBox, BRAND.teal, activeLayer === 'points', 'points')}
+        {/* Image layer box (navy) */}
+        {imageBBox && renderBBox(imageBBox, BRAND.navy, activeLayer === 'image', 'image')}
       </svg>
     );
   };
@@ -665,41 +700,129 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
         {renderSelectionOverlay()}
       </div>
 
+      {/* Empty state */}
       {!imageUrl && points.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-muted-foreground font-mono text-sm">
-            Upload a microscope image and load data to begin
-          </span>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto bg-card border border-border rounded-lg shadow-sm overflow-hidden max-w-sm w-full mx-6">
+            <div
+              className="h-[2px] w-full"
+              style={{ background: `linear-gradient(90deg, ${BRAND.navy} 0%, ${BRAND.teal} 50%, ${BRAND.coral} 100%)` }}
+            />
+            <div className="p-5 flex flex-col items-center text-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: `${BRAND.navy}1a`, color: BRAND.navy }}
+              >
+                <ImagePlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-sans font-semibold text-sm text-foreground">Microscope Overlay</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload an image and load indentation data to align them.
+                </p>
+              </div>
+              {onRequestUploadImage && (
+                <button
+                  onClick={onRequestUploadImage}
+                  className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono uppercase tracking-wider text-white transition-opacity hover:opacity-90"
+                  style={{ background: BRAND.navy }}
+                >
+                  <ImagePlus className="w-3.5 h-3.5" /> Upload Image
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Layer switcher at bottom */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm">
-        <button
-          onClick={(e) => { e.stopPropagation(); onActiveLayerChange('image'); }}
-          className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${
-            activeLayer === 'image'
-              ? 'bg-[hsl(217,91%,60%)] text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-        >
-          Image
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onActiveLayerChange('points'); }}
-          className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${
-            activeLayer === 'points'
-              ? 'bg-[hsl(142,76%,46%)] text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-        >
-          Points
-        </button>
-      </div>
+      {/* Empty state — only points loaded, no image */}
+      {!imageUrl && points.length > 0 && onRequestUploadImage && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto">
+          <button
+            onClick={onRequestUploadImage}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{ background: BRAND.navy }}
+          >
+            <ImagePlus className="w-3.5 h-3.5" /> Upload Microscope Image
+          </button>
+        </div>
+      )}
 
-      <div className="absolute bottom-3 left-2 text-[10px] font-mono text-muted-foreground/60 pointer-events-none select-none">
-        Click: select layer · Drag: move · Corners: resize · Alt+drag: pan
-      </div>
+      {/* Zoom / view controls — top right */}
+      {(imageUrl || points.length > 0) && (
+        <div className="absolute top-3 right-3 flex items-center gap-1 bg-background/90 backdrop-blur-sm rounded-md border border-border shadow-sm p-0.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); setViewZoom(viewRef.current.zoom * 0.85); }}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Zoom out"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span className="px-1.5 font-mono text-[11px] text-foreground tabular-nums w-12 text-center select-none">
+            {zoomPct}%
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setViewZoom(viewRef.current.zoom * 1.15); }}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Zoom in"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+          <div className="w-px h-5 bg-border mx-0.5" />
+          <button
+            onClick={(e) => { e.stopPropagation(); resetView(); }}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Reset view (1:1)"
+          >
+            <Square className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); resetView(); fitImageToData(); }}
+            className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Fit to view"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Layer switcher — bottom center */}
+      {(imageUrl || points.length > 0) && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 bg-background/90 backdrop-blur-sm rounded-md p-1 border border-border shadow-sm">
+          <button
+            onClick={(e) => { e.stopPropagation(); onActiveLayerChange('image'); }}
+            className="px-3 py-1 rounded text-xs font-mono uppercase tracking-wider transition-colors"
+            style={
+              activeLayer === 'image'
+                ? { background: BRAND.navy, color: '#fff' }
+                : { color: 'hsl(var(--muted-foreground))' }
+            }
+          >
+            Image
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onActiveLayerChange('points'); }}
+            className="px-3 py-1 rounded text-xs font-mono uppercase tracking-wider transition-colors"
+            style={
+              activeLayer === 'points'
+                ? { background: BRAND.teal, color: '#fff' }
+                : { color: 'hsl(var(--muted-foreground))' }
+            }
+          >
+            Points
+          </button>
+        </div>
+      )}
+
+      {/* Keyboard hint — bottom left */}
+      {(imageUrl || points.length > 0) && (
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 pointer-events-none select-none">
+          <kbd className="px-1.5 py-0.5 rounded border border-border bg-background/80 backdrop-blur-sm font-mono text-[10px] text-muted-foreground">Alt + Drag</kbd>
+          <span className="text-[10px] text-muted-foreground/70 font-mono">pan</span>
+          <kbd className="ml-1 px-1.5 py-0.5 rounded border border-border bg-background/80 backdrop-blur-sm font-mono text-[10px] text-muted-foreground">Alt + Wheel</kbd>
+          <span className="text-[10px] text-muted-foreground/70 font-mono">zoom</span>
+        </div>
+      )}
     </div>
   );
 });

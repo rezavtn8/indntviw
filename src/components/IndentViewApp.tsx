@@ -61,6 +61,7 @@ export const IndentViewApp: React.FC = () => {
 
   // Overlay state - derived from active session
   const overlayCanvasRef = useRef<OverlayCanvasRef>(null);
+  const overlayUploadInputRef = useRef<HTMLInputElement>(null);
   const [overlayBlobUrl, setOverlayBlobUrl] = useState<string | null>(null);
   
   const prevSessionIdRef = useRef<string | null>(null);
@@ -246,8 +247,8 @@ export const IndentViewApp: React.FC = () => {
                 onReset={handleResetRange} 
               />
               <Collapsible defaultOpen={false}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                  <span className="font-mono text-xs uppercase font-medium">Color Scale</span>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Color Scale</span>
                   <ChevronDown className="w-4 h-4" />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-3">
@@ -270,6 +271,7 @@ export const IndentViewApp: React.FC = () => {
             canvasRef={overlayCanvasRef}
             pointsVisible={overlayPointsVisible}
             onPointsVisibleChange={(v) => updateActiveSession({ overlayPointsVisible: v })}
+            uploadInputRef={overlayUploadInputRef}
           />
         </>
       );
@@ -328,8 +330,8 @@ export const IndentViewApp: React.FC = () => {
             )}
             
             <Collapsible defaultOpen={false}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                <span className="font-mono text-xs uppercase font-medium">Color Scale</span>
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Color Scale</span>
                 <ChevronDown className="w-4 h-4" />
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-3">
@@ -374,9 +376,14 @@ export const IndentViewApp: React.FC = () => {
 
   const renderToolbar = () => {
     // Hide redundant export button when already in Export Studio
-    const toolbarProps = activeView === 'export'
-      ? { ...toolbarEditProps, visualizationRef: undefined as any, selectedProperty: undefined as any }
-      : toolbarEditProps;
+    let toolbarProps: typeof toolbarEditProps & { visualizationRef?: any; selectedProperty?: any; onToggleEditing?: any } = toolbarEditProps;
+    if (activeView === 'export') {
+      toolbarProps = { ...toolbarEditProps, visualizationRef: undefined as any, selectedProperty: undefined as any };
+    }
+    // Hide Edit button in Overlay (clicking points doesn't edit them here)
+    if (activeView === 'overlay') {
+      toolbarProps = { ...toolbarProps, onToggleEditing: undefined };
+    }
 
     if (activeView === '2d') {
       return (
@@ -407,7 +414,24 @@ export const IndentViewApp: React.FC = () => {
         </AppToolbar>
       );
     }
-    
+
+    if (activeView === 'overlay') {
+      return (
+        <AppToolbar {...toolbarProps}>
+          <div className="text-xs font-mono text-muted-foreground flex items-center gap-1.5">
+            {overlayImageUrl ? (
+              <>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: 'hsl(var(--muted-foreground))' }} />
+                <span>image loaded</span>
+              </>
+            ) : (
+              <span className="opacity-60">no image</span>
+            )}
+          </div>
+        </AppToolbar>
+      );
+    }
+
     return <AppToolbar {...toolbarProps} />;
   };
 
@@ -503,6 +527,7 @@ export const IndentViewApp: React.FC = () => {
                   containerWidth={w}
                   containerHeight={h}
                   pointsVisible={overlayPointsVisible}
+                  onRequestUploadImage={() => overlayUploadInputRef.current?.click()}
                 />
               )}
             </OverlayContainer>
