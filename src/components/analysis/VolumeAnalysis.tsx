@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { IndentationPoint } from '@/types/indentation';
 import { calculateVolumeAnalysis, VolumeAnalysisResult } from '@/utils/spatial3DStatistics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusChip, StatusTone } from '@/components/ui/status-chip';
 import { Box, Grid3X3, Droplets, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
@@ -17,11 +17,11 @@ export const VolumeAnalysis: React.FC<VolumeAnalysisProps> = ({ points }) => {
     [points]
   );
 
-  const coverageClass = useMemo(() => {
-    if (analysis.pointCoverage > 80) return { label: 'Excellent', color: 'bg-green-500/20 text-green-600' };
-    if (analysis.pointCoverage > 50) return { label: 'Good', color: 'bg-emerald-500/20 text-emerald-600' };
-    if (analysis.pointCoverage > 25) return { label: 'Moderate', color: 'bg-yellow-500/20 text-yellow-600' };
-    return { label: 'Sparse', color: 'bg-red-500/20 text-red-600' };
+  const coverageClass = useMemo((): { label: string; tone: StatusTone } => {
+    if (analysis.pointCoverage > 80) return { label: 'Excellent', tone: 'good' };
+    if (analysis.pointCoverage > 50) return { label: 'Good', tone: 'good' };
+    if (analysis.pointCoverage > 25) return { label: 'Moderate', tone: 'neutral' };
+    return { label: 'Sparse', tone: 'warn' };
   }, [analysis.pointCoverage]);
 
   return (
@@ -89,9 +89,7 @@ export const VolumeAnalysis: React.FC<VolumeAnalysisProps> = ({ points }) => {
             <CardTitle className="text-sm flex items-center gap-2">
               <Grid3X3 className="w-4 h-4" />
               Grid Coverage
-              <Badge variant="secondary" className={coverageClass.color}>
-                {coverageClass.label}
-              </Badge>
+              <StatusChip tone={coverageClass.tone}>{coverageClass.label}</StatusChip>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
