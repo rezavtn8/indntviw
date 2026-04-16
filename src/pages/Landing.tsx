@@ -108,13 +108,13 @@ const Landing = () => {
                 <div className="bg-foreground/60" />
                 <div className="bg-foreground" />
               </div>
-              <span className="font-mono font-bold text-base tracking-tight">IndentView</span>
-              <span className="hidden sm:inline text-[10px] font-mono text-muted-foreground border border-border px-1.5 py-0.5">
+              <span className="font-sans font-bold text-base tracking-tight">IndentView</span>
+              <span className="hidden sm:inline text-[10px] font-sans text-muted-foreground border border-border px-1.5 py-0.5">
                 v1.0
               </span>
             </div>
             <Link to="/app">
-              <Button variant="outline" size="sm" className="rounded-none font-mono text-xs">
+              <Button variant="outline" size="sm" className="rounded-none font-sans text-xs">
                 Launch App <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </Link>
@@ -133,10 +133,10 @@ const Landing = () => {
             }}
           />
           <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
-            <div className="inline-block font-mono text-[10px] tracking-[0.2em] text-muted-foreground border border-border px-3 py-1 mb-8">
+            <div className="inline-block font-sans text-[10px] tracking-[0.2em] text-muted-foreground border border-border px-3 py-1 mb-8">
               [ NANOINDENTATION · DATA PLATFORM ]
             </div>
-            <h1 className="font-mono font-bold text-4xl md:text-6xl leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto">
+            <h1 className="font-sans font-bold text-4xl md:text-6xl leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto">
               Interactive Visualization &amp; Statistical Analysis of{' '}
               <span className="relative inline-block">
                 <span className="relative z-10">Nanoindentation</span>
@@ -150,12 +150,12 @@ const Landing = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
               <Link to="/app">
-                <Button className="rounded-none font-mono px-8 h-12 text-sm">
+                <Button className="rounded-none font-sans px-8 h-12 text-sm">
                   Launch Application <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <a href="#capabilities">
-                <Button variant="outline" className="rounded-none font-mono px-8 h-12 text-sm">
+                <Button variant="outline" className="rounded-none font-sans px-8 h-12 text-sm">
                   View Capabilities
                 </Button>
               </a>
@@ -168,8 +168,8 @@ const Landing = () => {
                   key={s.l}
                   className={`p-4 ${i < stats.length - 1 ? 'md:border-r' : ''} ${i < 2 ? 'border-b md:border-b-0' : ''} ${i === 0 ? 'border-r' : ''} ${i === 2 ? 'border-r md:border-r' : ''} border-border`}
                 >
-                  <div className="font-mono font-bold text-lg tracking-tight">{s.v}</div>
-                  <div className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase mt-1">
+                  <div className="font-sans font-bold text-lg tracking-tight">{s.v}</div>
+                  <div className="font-sans text-[10px] tracking-[0.15em] text-muted-foreground uppercase mt-1">
                     {s.l}
                   </div>
                 </div>
@@ -187,10 +187,10 @@ const Landing = () => {
                 <div className="w-2.5 h-2.5 rounded-full border border-border" />
                 <div className="w-2.5 h-2.5 rounded-full border border-border" />
                 <div className="w-2.5 h-2.5 rounded-full border border-border" />
-                <span className="ml-3 text-[10px] font-mono text-muted-foreground">
+                <span className="ml-3 text-[10px] font-sans text-muted-foreground">
                   IndentView — sample_001.txt · EIT (GPa)
                 </span>
-                <div className="ml-auto flex gap-3 text-[10px] font-mono text-muted-foreground">
+                <div className="ml-auto flex gap-3 text-[10px] font-sans text-muted-foreground">
                   <span>2D</span>
                   <span className="text-foreground border-b border-foreground">3D</span>
                   <span>Analysis</span>
@@ -201,7 +201,7 @@ const Landing = () => {
               <div className="grid grid-cols-1 md:grid-cols-5 gap-0 min-h-[340px]">
                 {/* Heatmap */}
                 <div className="md:col-span-3 border-b md:border-b-0 md:border-r border-border p-4 relative overflow-hidden">
-                  <div className="text-[10px] font-mono text-muted-foreground mb-2 flex justify-between">
+                  <div className="text-[10px] font-sans text-muted-foreground mb-2 flex justify-between">
                     <span>Hardness Map · 12×12</span>
                     <span>μm</span>
                   </div>
@@ -242,12 +242,12 @@ const Landing = () => {
                       </line>
                     </svg>
                     {/* Axis labels */}
-                    <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[9px] font-mono text-muted-foreground">
+                    <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[9px] font-sans text-muted-foreground">
                       <span>0</span>
                       <span>250</span>
                       <span>500</span>
                     </div>
-                    <div className="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-[9px] font-mono text-muted-foreground">
+                    <div className="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-[9px] font-sans text-muted-foreground">
                       <span>500</span>
                       <span>0</span>
                     </div>
@@ -256,7 +256,7 @@ const Landing = () => {
 
                 {/* Box plot */}
                 <div className="md:col-span-2 p-4">
-                  <div className="text-[10px] font-mono text-muted-foreground mb-2">
+                  <div className="text-[10px] font-sans text-muted-foreground mb-2">
                     Distribution · GPa
                   </div>
                   <svg viewBox="0 0 200 260" className="w-full h-[260px]">
@@ -373,7 +373,7 @@ const Landing = () => {
 
         {/* Status bar */}
         <section className="border-b border-border bg-muted/30">
-          <div className="max-w-6xl mx-auto px-6 py-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
+          <div className="max-w-6xl mx-auto px-6 py-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-sans text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
             <span>Publication-Ready</span>
             <span className="text-border">|</span>
             <span>ISO 14577 Compatible</span>
@@ -388,10 +388,10 @@ const Landing = () => {
         <section id="capabilities" className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="mb-14 max-w-2xl">
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
                 [ 01 — CAPABILITIES ]
               </div>
-              <h2 className="font-mono font-bold text-2xl md:text-3xl tracking-tight mb-3">
+              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3">
                 Built for the full analysis pipeline
               </h2>
               <p className="text-muted-foreground text-sm md:text-base">
@@ -405,12 +405,12 @@ const Landing = () => {
                   className="group border-r border-b border-border p-6 hover:bg-muted/40 transition-colors cursor-default relative"
                 >
                   <div className="flex items-start justify-between mb-4">
-                    <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground">
+                    <span className="font-sans text-[10px] tracking-[0.15em] text-muted-foreground">
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <f.icon className="h-5 w-5 text-foreground" strokeWidth={1.5} />
                   </div>
-                  <h3 className="font-mono font-semibold text-sm mb-2">{f.title}</h3>
+                  <h3 className="font-sans font-semibold text-sm mb-2">{f.title}</h3>
                   <p className="text-muted-foreground text-sm leading-relaxed mb-4">{f.desc}</p>
                   <ArrowUpRight
                     className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
@@ -426,10 +426,10 @@ const Landing = () => {
         <section className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="mb-14 max-w-2xl">
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
                 [ 02 — METHODOLOGY ]
               </div>
-              <h2 className="font-mono font-bold text-2xl md:text-3xl tracking-tight mb-3">
+              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3">
                 A deterministic processing pipeline
               </h2>
               <p className="text-muted-foreground text-sm md:text-base">
@@ -441,10 +441,10 @@ const Landing = () => {
                 <div key={p.label} className="relative flex flex-col">
                   <div className="border border-border p-5 h-full flex flex-col items-center text-center">
                     <p.icon className="h-5 w-5 mb-3" strokeWidth={1.5} />
-                    <div className="font-mono font-semibold text-xs mb-1">
+                    <div className="font-sans font-semibold text-xs mb-1">
                       {String(i + 1).padStart(2, '0')} · {p.label}
                     </div>
-                    <div className="font-mono text-[10px] text-muted-foreground">{p.desc}</div>
+                    <div className="font-sans text-[10px] text-muted-foreground">{p.desc}</div>
                   </div>
                   {i < pipeline.length - 1 && (
                     <div className="hidden md:flex absolute top-1/2 -right-3 -translate-y-1/2 z-10 items-center">
@@ -462,15 +462,15 @@ const Landing = () => {
         <section className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="mb-14 max-w-2xl">
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
                 [ 03 — ANALYTICAL MATRIX ]
               </div>
-              <h2 className="font-mono font-bold text-2xl md:text-3xl tracking-tight mb-3">
+              <h2 className="font-sans font-bold text-2xl md:text-3xl tracking-tight mb-3">
                 Supported analyses &amp; outputs
               </h2>
             </div>
             <div className="border border-border overflow-x-auto">
-              <table className="w-full font-mono text-xs">
+              <table className="w-full font-sans text-xs">
                 <thead className="bg-muted/40 border-b border-border">
                   <tr>
                     <th className="text-left p-4 font-semibold tracking-[0.1em] uppercase text-[10px]">
@@ -505,19 +505,19 @@ const Landing = () => {
         <section className="border-b border-border py-20">
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="border-l-2 border-foreground pl-6">
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3">
                 [ 04 — DESIGN INTENT ]
               </div>
-              <p className="font-mono text-xl md:text-2xl leading-snug tracking-tight">
+              <p className="font-sans text-xl md:text-2xl leading-snug tracking-tight">
                 "A browser-native instrument for the quantitative analysis of nanoindentation arrays —
                 no installations, no servers, no compromises on rigor."
               </p>
             </div>
             <div>
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-4">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-4">
                 TECHNICAL SPECIFICATIONS
               </div>
-              <dl className="font-mono text-sm divide-y divide-border border-y border-border">
+              <dl className="font-sans text-sm divide-y divide-border border-y border-border">
                 {[
                   ['Runtime', 'Browser (Chromium / Firefox / Safari)'],
                   ['Persistence', 'IndexedDB · localStorage'],
@@ -549,7 +549,7 @@ const Landing = () => {
                   <div className="inline-flex items-center justify-center w-12 h-12 border border-border mb-4">
                     <s.icon className="h-5 w-5" strokeWidth={1.5} />
                   </div>
-                  <div className="font-mono font-semibold text-sm mb-1">
+                  <div className="font-sans font-semibold text-sm mb-1">
                     {i + 1}. {s.label}
                   </div>
                   <p className="text-muted-foreground text-sm">{s.desc}</p>
@@ -567,18 +567,18 @@ const Landing = () => {
               <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-foreground" />
               <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-foreground" />
               <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-foreground" />
-              <h2 className="font-mono font-bold text-2xl md:text-4xl tracking-tight mb-4">
+              <h2 className="font-sans font-bold text-2xl md:text-4xl tracking-tight mb-4">
                 Start analyzing in under a minute
               </h2>
               <p className="text-muted-foreground max-w-xl mx-auto mb-8 text-sm md:text-base">
                 No installation. No account. Drop your data file and begin.
               </p>
               <Link to="/app">
-                <Button className="rounded-none font-mono px-10 h-12 text-sm">
+                <Button className="rounded-none font-sans px-10 h-12 text-sm">
                   Launch Application <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              <div className="mt-6 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
+              <div className="mt-6 font-sans text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
                 Supports .txt · .csv · .tsv · .xlsx
               </div>
             </div>
@@ -596,20 +596,20 @@ const Landing = () => {
                   <div className="bg-foreground/60" />
                   <div className="bg-foreground" />
                 </div>
-                <span className="font-mono font-bold text-sm">IndentView</span>
-                <span className="text-[10px] font-mono text-muted-foreground border border-border px-1.5">
+                <span className="font-sans font-bold text-sm">IndentView</span>
+                <span className="text-[10px] font-sans text-muted-foreground border border-border px-1.5">
                   v1.0
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground font-mono leading-relaxed">
+              <p className="text-xs text-muted-foreground font-sans leading-relaxed">
                 Open-source nanoindentation analysis platform.
               </p>
             </div>
             <div>
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-3 uppercase">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3 uppercase">
                 Navigate
               </div>
-              <ul className="space-y-2 font-mono text-xs">
+              <ul className="space-y-2 font-sans text-xs">
                 <li>
                   <Link to="/app" className="hover:underline underline-offset-4">
                     Launch App
@@ -623,16 +623,16 @@ const Landing = () => {
               </ul>
             </div>
             <div>
-              <div className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground mb-3 uppercase">
+              <div className="font-sans text-[10px] tracking-[0.2em] text-muted-foreground mb-3 uppercase">
                 Built With
               </div>
-              <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
                 React · TypeScript · D3 · Three.js · Tailwind
               </p>
             </div>
           </div>
           <div className="border-t border-border pt-6">
-            <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 font-mono text-[10px] text-muted-foreground tracking-wide">
+            <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 font-sans text-[10px] text-muted-foreground tracking-wide">
               <span>© {new Date().getFullYear()} IndentView · MIT License</span>
               <span>build · {Math.random().toString(16).slice(2, 10)}</span>
             </div>
