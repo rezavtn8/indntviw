@@ -20,6 +20,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import appPreview from '@/assets/app-preview.png';
 
 const features = [
   {
@@ -303,135 +304,134 @@ const Landing = () => {
           </div>
         </section>
 
-        {/* Live visual mockup */}
-        <section className="border-b border-border">
-          <div className="max-w-6xl mx-auto px-6 py-16">
-            <div className="border border-border bg-background">
-              {/* Window chrome */}
-              <div className="border-b border-border px-4 py-2 flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.coral }} />
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.teal }} />
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.navy }} />
-                <span className="ml-3 text-[10px] font-mono text-muted-foreground">
-                  IndentView — sample_001.txt · EIT (GPa)
-                </span>
-                <div className="ml-auto flex gap-3 text-[10px] font-mono text-muted-foreground">
-                  <span>2D</span>
-                  <span style={{ color: BRAND.navy, borderBottom: `1px solid ${BRAND.navy}` }}>3D</span>
-                  <span>Analysis</span>
-                  <span>Export</span>
-                </div>
+        {/* App screenshot showcase */}
+        <section className="border-b border-border relative overflow-hidden">
+          {/* Soft gradient backdrop */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.06]"
+            style={{ background: BRAND_GRADIENT }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.04]"
+            style={{
+              backgroundImage: `radial-gradient(${BRAND.ink} 1px, transparent 1px)`,
+              backgroundSize: '24px 24px',
+            }}
+          />
+
+          <div className="relative max-w-6xl mx-auto px-6 py-20">
+            {/* Section eyebrow */}
+            <div className="text-center mb-10">
+              <div
+                className="inline-block font-mono text-[10px] tracking-[0.25em] px-3 py-1 mb-4 border"
+                style={{ color: BRAND.navy, borderColor: BRAND.navy + '40' }}
+              >
+                [ THE INTERFACE ]
               </div>
+              <h2
+                className="font-sans font-bold text-2xl md:text-4xl tracking-tight"
+                style={{ color: BRAND.ink }}
+              >
+                Built for analysis, not assembly
+              </h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto mt-3 text-sm md:text-base">
+                A focused workspace for spatial property maps, zone definition, and
+                statistical comparison — every tool one click away.
+              </p>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-0 min-h-[340px]">
-                {/* Heatmap */}
-                <div className="md:col-span-3 border-b md:border-b-0 md:border-r border-border p-4 relative overflow-hidden">
-                  <div className="text-[10px] font-mono text-muted-foreground mb-2 flex justify-between">
-                    <span>Hardness Map · 12×12</span>
-                    <span>μm</span>
-                  </div>
-                  <div className="relative aspect-square max-h-[280px] mx-auto">
-                    <svg viewBox="0 0 240 240" className="w-full h-full">
-                      {cells.map((c, i) => (
-                        <rect
-                          key={i}
-                          x={c.x * 20}
-                          y={c.y * 20}
-                          width={19}
-                          height={19}
-                          fill={`hsl(0 0% ${c.lightness}%)`}
-                        />
-                      ))}
-                      {/* Scanning line */}
-                      <line
-                        x1="0"
-                        x2="240"
-                        y1="0"
-                        y2="0"
-                        stroke={BRAND.coral}
-                        strokeWidth="0.6"
-                        opacity="0.7"
-                      >
-                        <animate
-                          attributeName="y1"
-                          values="0;240;0"
-                          dur="6s"
-                          repeatCount="indefinite"
-                        />
-                        <animate
-                          attributeName="y2"
-                          values="0;240;0"
-                          dur="6s"
-                          repeatCount="indefinite"
-                        />
-                      </line>
-                    </svg>
-                    <div className="absolute -bottom-5 left-0 right-0 flex justify-between text-[9px] font-mono text-muted-foreground">
-                      <span>0</span>
-                      <span>250</span>
-                      <span>500</span>
-                    </div>
-                    <div className="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-[9px] font-mono text-muted-foreground">
-                      <span>500</span>
-                      <span>0</span>
-                    </div>
+            {/* Framed screenshot */}
+            <div className="relative">
+              {/* Soft glow shadow */}
+              <div
+                className="absolute -inset-4 blur-2xl opacity-30 pointer-events-none"
+                style={{ background: BRAND_GRADIENT }}
+                aria-hidden
+              />
+
+              <div
+                className="relative bg-background border-2 shadow-2xl overflow-hidden"
+                style={{ borderColor: BRAND.ink }}
+              >
+                {/* Brand stripe */}
+                <div
+                  className="h-[3px] w-full"
+                  style={{ background: BRAND_GRADIENT }}
+                />
+
+                {/* Window chrome */}
+                <div
+                  className="border-b px-4 py-2.5 flex items-center gap-2"
+                  style={{ borderColor: BRAND.ink + '20', background: '#fafafa' }}
+                >
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: BRAND.coral }}
+                  />
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: BRAND.teal }}
+                  />
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: BRAND.navy }}
+                  />
+                  <span
+                    className="ml-3 text-[11px] font-mono"
+                    style={{ color: BRAND.ink + 'aa' }}
+                  >
+                    indentview.app — CFA #3_Complex.TXT · Hardness (HIT)
+                  </span>
+                  <div className="ml-auto hidden sm:flex gap-3 text-[10px] font-mono text-muted-foreground">
+                    <span style={{ color: BRAND.navy, fontWeight: 600 }}>2D</span>
+                    <span>3D</span>
+                    <span>Analysis</span>
+                    <span>Export</span>
                   </div>
                 </div>
 
-                {/* Box plot */}
-                <div className="md:col-span-2 p-4">
-                  <div className="text-[10px] font-mono text-muted-foreground mb-2">
-                    Distribution · GPa
-                  </div>
-                  <svg viewBox="0 0 200 260" className="w-full h-[260px]">
-                    <line x1="30" x2="30" y1="10" y2="230" stroke="hsl(var(--border))" />
-                    <line x1="30" x2="195" y1="230" y2="230" stroke="hsl(var(--border))" />
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <g key={i}>
-                        <line x1="27" x2="30" y1={10 + i * 55} y2={10 + i * 55} stroke="hsl(var(--border))" />
-                        <text x="24" y={13 + i * 55} textAnchor="end" fontSize="8" fontFamily="monospace" fill="hsl(var(--muted-foreground))">
-                          {(8 - i * 1.5).toFixed(1)}
-                        </text>
-                      </g>
-                    ))}
-
-                    {[
-                      { cx: 75, top: 60, q1: 95, med: 120, q3: 145, bot: 185, color: BRAND.navy },
-                      { cx: 145, top: 40, q1: 80, med: 100, q3: 130, bot: 170, color: BRAND.teal },
-                    ].map((b, i) => (
-                      <g key={i}>
-                        <line x1={b.cx} x2={b.cx} y1={b.top} y2={b.bot} stroke={BRAND.ink} />
-                        <line x1={b.cx - 10} x2={b.cx + 10} y1={b.top} y2={b.top} stroke={BRAND.ink} />
-                        <line x1={b.cx - 10} x2={b.cx + 10} y1={b.bot} y2={b.bot} stroke={BRAND.ink} />
-                        <rect
-                          x={b.cx - 22}
-                          y={b.q1}
-                          width="44"
-                          height={b.q3 - b.q1}
-                          fill={b.color}
-                          fillOpacity="0.18"
-                          stroke={b.color}
-                        />
-                        <line x1={b.cx - 22} x2={b.cx + 22} y1={b.med} y2={b.med} stroke={b.color} strokeWidth="1.5" />
-                        {[b.top - 8, b.bot + 6, b.bot + 12].map((cy, k) => (
-                          <circle key={k} cx={b.cx + (k % 2 === 0 ? -3 : 3)} cy={cy} r="1.5" fill={b.color} />
-                        ))}
-                        <text x={b.cx} y="248" textAnchor="middle" fontSize="9" fontFamily="monospace" fill="hsl(var(--muted-foreground))">
-                          Zone {i + 1}
-                        </text>
-                      </g>
-                    ))}
-
-                    {/* Significance bracket */}
-                    <line x1="75" x2="145" y1="25" y2="25" stroke={BRAND.coral} />
-                    <line x1="75" x2="75" y1="25" y2="32" stroke={BRAND.coral} />
-                    <line x1="145" x2="145" y1="25" y2="32" stroke={BRAND.coral} />
-                    <text x="110" y="20" textAnchor="middle" fontSize="10" fontFamily="monospace" fill={BRAND.coral}>
-                      ***
-                    </text>
-                  </svg>
-                </div>
+                {/* Screenshot */}
+                <img
+                  src={appPreview}
+                  alt="IndentView 2D heatmap interface showing a Viridis-colored nanoindentation point map with sidebar controls"
+                  className="block w-full h-auto"
+                  loading="lazy"
+                />
               </div>
+            </div>
+
+            {/* Annotation row below screenshot */}
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { num: '01', label: 'Property & Color Scheme', desc: 'Switch properties (HIT, EIT…) and palettes synced across views.', color: BRAND.navy },
+                { num: '02', label: 'Interactive Heatmap', desc: 'Pan, zoom, lasso-select zones and edit points in place.', color: BRAND.teal },
+                { num: '03', label: 'Live Color Legend', desc: 'Right-side scale bar reflects the active range and palette.', color: BRAND.coral },
+              ].map((a) => (
+                <div
+                  key={a.num}
+                  className="border border-border bg-background/80 backdrop-blur-sm p-4 relative"
+                >
+                  <div
+                    className="absolute top-0 left-0 w-full h-[2px]"
+                    style={{ background: a.color }}
+                  />
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span
+                      className="font-mono text-[11px] font-bold tracking-[0.15em]"
+                      style={{ color: a.color }}
+                    >
+                      {a.num}
+                    </span>
+                    <span
+                      className="font-sans font-semibold text-sm"
+                      style={{ color: BRAND.ink }}
+                    >
+                      {a.label}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground text-xs leading-relaxed">{a.desc}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
