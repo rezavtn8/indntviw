@@ -247,8 +247,8 @@ export const IndentViewApp: React.FC = () => {
                 onReset={handleResetRange} 
               />
               <Collapsible defaultOpen={false}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                  <span className="font-mono text-xs uppercase font-medium">Color Scale</span>
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/40 transition-colors">
+                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Color Scale</span>
                   <ChevronDown className="w-4 h-4" />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-3">
@@ -271,6 +271,7 @@ export const IndentViewApp: React.FC = () => {
             canvasRef={overlayCanvasRef}
             pointsVisible={overlayPointsVisible}
             onPointsVisibleChange={(v) => updateActiveSession({ overlayPointsVisible: v })}
+            uploadInputRef={overlayUploadInputRef}
           />
         </>
       );
