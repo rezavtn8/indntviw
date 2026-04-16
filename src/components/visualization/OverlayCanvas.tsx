@@ -518,24 +518,39 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
   const renderSelectionOverlay = () => {
     const zoom = viewRef.current.zoom || 1;
     const hs = HANDLE_SIZE / zoom;
+    const cursors = ['nwse-resize', 'nesw-resize', 'nwse-resize', 'nesw-resize'];
 
-    const renderBBox = (bbox: { x: number; y: number; w: number; h: number }, color: string, isActive: boolean) => {
+    const renderBBox = (
+      bbox: { x: number; y: number; w: number; h: number },
+      color: string,
+      isActive: boolean,
+      layer: OverlayActiveLayer,
+    ) => {
       const corners = getCorners(bbox);
       return (
-        <g key={color}>
+        <g key={layer}>
           <rect
             x={bbox.x} y={bbox.y} width={bbox.w} height={bbox.h}
-            fill="none" stroke={color} strokeWidth={isActive ? 2 / zoom : 1 / zoom}
-            strokeDasharray={isActive ? 'none' : `${4 / zoom}`}
+            fill="none" stroke={color}
+            strokeWidth={isActive ? 3 / zoom : 1 / zoom}
+            strokeOpacity={isActive ? 1 : 0.4}
+            strokeDasharray={isActive ? 'none' : `${4 / zoom} ${3 / zoom}`}
           />
-          {isActive && corners.map((c, i) => (
-            <rect
-              key={i}
-              x={c.x - hs / 2} y={c.y - hs / 2} width={hs} height={hs}
-              fill={color} stroke="hsl(var(--background))" strokeWidth={1 / zoom}
-              style={{ cursor: 'nwse-resize' }}
-            />
-          ))}
+          {isActive && corners.map((c, i) => {
+            const isHovered = hoveredHandle?.layer === layer && hoveredHandle.corner === i;
+            return (
+              <rect
+                key={i}
+                x={c.x - hs / 2} y={c.y - hs / 2} width={hs} height={hs}
+                fill={isHovered ? BRAND.coral : '#ffffff'}
+                stroke={isHovered ? BRAND.coral : color}
+                strokeWidth={2 / zoom}
+                style={{ cursor: cursors[i], pointerEvents: 'auto' }}
+                onMouseEnter={() => setHoveredHandle({ layer, corner: i })}
+                onMouseLeave={() => setHoveredHandle(null)}
+              />
+            );
+          })}
         </g>
       );
     };
@@ -544,10 +559,10 @@ export const OverlayCanvas = forwardRef<OverlayCanvasRef, OverlayCanvasProps>(({
       <svg
         style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none', overflow: 'visible' }}
       >
-        {/* Points layer box */}
-        {points.length > 0 && renderBBox(pointsLayerBBox, 'hsl(142, 76%, 46%)', activeLayer === 'points')}
-        {/* Image layer box */}
-        {imageBBox && renderBBox(imageBBox, 'hsl(217, 91%, 60%)', activeLayer === 'image')}
+        {/* Points layer box (teal) */}
+        {points.length > 0 && renderBBox(pointsLayerBBox, BRAND.teal, activeLayer === 'points', 'points')}
+        {/* Image layer box (navy) */}
+        {imageBBox && renderBBox(imageBBox, BRAND.navy, activeLayer === 'image', 'image')}
       </svg>
     );
   };
