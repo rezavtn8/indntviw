@@ -67,6 +67,7 @@ interface OverlayCanvasProps {
   containerWidth: number;
   containerHeight: number;
   pointsVisible?: boolean;
+  onRequestUploadImage?: () => void;
 }
 
 export interface OverlayCanvasRef {
