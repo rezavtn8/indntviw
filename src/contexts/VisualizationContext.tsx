@@ -63,7 +63,19 @@ interface VisualizationContextValue {
 const VisualizationContext = createContext<VisualizationContextValue | null>(null);
 
 export const VisualizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data, selectedProperty, customMin, customMax, setGlobalSelectedProperty, updateActiveSession } = useSession();
+  const {
+    data,
+    selectedProperty,
+    customMin,
+    customMax,
+    overrideColorRange,
+    setGlobalSelectedProperty,
+    updateActiveSession,
+    setGlobalColorScheme,
+    setGlobalCustomMin,
+    setGlobalCustomMax,
+    resetGlobalRange,
+  } = useSession();
   
   // 2D Options
   const [showContours, setShowContours] = useState(true);
