@@ -2,14 +2,22 @@ import React from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Link2, User, Wand2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Link2, User, Wand2, ChevronDown } from 'lucide-react';
 
 interface SyncScopeControlsProps {
   /** True when the active session uses its own per-tab color scheme + range. */
   overrideColorRange: boolean;
   onOverrideChange: (override: boolean) => void;
   /** Auto-fit the global range to encompass all open samples. */
-  onAutoFitAll: () => void;
+  onAutoFitAll: (mode?: 'robust' | 'absolute') => void;
   /** How many tabs are open — controls whether multi-sample helpers are shown. */
   sessionCount: number;
 }
@@ -50,16 +58,54 @@ export const SyncScopeControls: React.FC<SyncScopeControlsProps> = ({
         </Tooltip>
       </div>
 
-      {!overrideColorRange && isMulti && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAutoFitAll}
-          className="w-full h-7 font-mono text-[11px] gap-1.5"
-        >
-          <Wand2 className="w-3 h-3" />
-          Auto-fit to all {sessionCount} samples
-        </Button>
+      {isMulti && (
+        <div className="flex gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onAutoFitAll('robust')}
+            className="flex-1 h-7 font-mono text-[11px] gap-1.5"
+            title="Fit to 1st–99th percentile of all samples (ignores extreme outliers)"
+          >
+            <Wand2 className="w-3 h-3" />
+            Fit to all {sessionCount}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-7 p-0"
+                title="Fit options"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="font-mono text-xs">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Fit range
+              </DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onAutoFitAll('robust')}>
+                <Wand2 className="w-3 h-3 mr-2" />
+                Robust (1–99%)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAutoFitAll('absolute')}>
+                <Wand2 className="w-3 h-3 mr-2" />
+                Absolute (min–max)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5 text-[10px] text-muted-foreground max-w-[220px] leading-relaxed">
+                Robust ignores outliers for clearer color contrast. Absolute uses the full data extent.
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
+      {isMulti && overrideColorRange && (
+        <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
+          Auto-fit will switch this sample back to the synced range.
+        </p>
       )}
     </div>
   );
