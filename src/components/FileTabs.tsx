@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, ChevronDown, FileText } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ChevronDown, FileText, Pencil, ArrowLeftRight } from 'lucide-react';
 import { FileSession } from '@/types/fileSession';
 import { cn } from '@/lib/utils';
 import {
@@ -22,6 +22,8 @@ interface FileTabsProps {
   activeSessionId: string | null;
   onSelectSession: (sessionId: string) => void;
   onCloseSession: (sessionId: string) => void;
+  onRenameSession: (sessionId: string, newName: string) => void;
+  onReorderSessions: (fromIndex: number, toIndex: number) => void;
 }
 
 export const FileTabs: React.FC<FileTabsProps> = ({
@@ -29,24 +31,30 @@ export const FileTabs: React.FC<FileTabsProps> = ({
   activeSessionId,
   onSelectSession,
   onCloseSession,
+  onRenameSession,
+  onReorderSessions,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const truncateFileName = (name: string, maxLength: number = 20): string => {
+  const truncateFileName = (name: string, maxLength: number = 22): string => {
     if (name.length <= maxLength) return name;
     const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
     const baseName = name.slice(0, name.length - ext.length);
-    const truncatedBase = baseName.slice(0, maxLength - ext.length - 3);
+    const truncatedBase = baseName.slice(0, Math.max(1, maxLength - ext.length - 3));
     return `${truncatedBase}...${ext}`;
   };
 
   const checkScrollability = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    
     setCanScrollLeft(container.scrollLeft > 0);
     setCanScrollRight(
       container.scrollLeft < container.scrollWidth - container.clientWidth - 1
@@ -56,45 +64,74 @@ export const FileTabs: React.FC<FileTabsProps> = ({
   const scrollBy = (direction: 'left' | 'right') => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    
-    const scrollAmount = 150;
     container.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      left: direction === 'left' ? -150 : 150,
       behavior: 'smooth',
     });
   };
 
-  // Check scrollability on mount and when sessions change
   useEffect(() => {
     checkScrollability();
     window.addEventListener('resize', checkScrollability);
     return () => window.removeEventListener('resize', checkScrollability);
   }, [checkScrollability, sessions.length]);
 
-  // Auto-scroll active tab into view
   useEffect(() => {
-    if (activeTabRef.current && scrollContainerRef.current) {
+    if (activeTabRef.current && scrollContainerRef.current && !renamingId) {
       activeTabRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
         inline: 'center',
       });
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, renamingId]);
+
+  // Focus rename input when entering rename mode
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      const dotIdx = renameValue.lastIndexOf('.');
+      if (dotIdx > 0) {
+        renameInputRef.current.setSelectionRange(0, dotIdx);
+      } else {
+        renameInputRef.current.select();
+      }
+    }
+  }, [renamingId]);
+
+  const startRename = (session: FileSession) => {
+    setRenamingId(session.id);
+    setRenameValue(session.fileName);
+  };
+
+  const commitRename = () => {
+    if (renamingId) {
+      const trimmed = renameValue.trim();
+      const original = sessions.find(s => s.id === renamingId)?.fileName;
+      if (trimmed && trimmed !== original) {
+        onRenameSession(renamingId, trimmed);
+      }
+    }
+    setRenamingId(null);
+    setRenameValue('');
+  };
+
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameValue('');
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (renamingId) return; // don't trigger global shortcuts while editing
       const isMod = e.metaKey || e.ctrlKey;
-      
-      // Cmd/Ctrl + W to close current tab
+
       if (isMod && e.key === 'w' && activeSessionId) {
         e.preventDefault();
         onCloseSession(activeSessionId);
       }
-      
-      // Cmd/Ctrl + Tab to cycle tabs (forward)
-      // Cmd/Ctrl + Shift + Tab to cycle tabs (backward)
+
       if (isMod && e.key === 'Tab' && sessions.length > 1) {
         e.preventDefault();
         const currentIndex = sessions.findIndex(s => s.id === activeSessionId);
@@ -103,11 +140,29 @@ export const FileTabs: React.FC<FileTabsProps> = ({
           : (currentIndex + 1) % sessions.length;
         onSelectSession(sessions[nextIndex].id);
       }
+
+      // F2 to rename active tab
+      if (e.key === 'F2' && activeSessionId) {
+        e.preventDefault();
+        const session = sessions.find(s => s.id === activeSessionId);
+        if (session) startRename(session);
+      }
+
+      // Cmd/Ctrl + Shift + Arrow to move active tab
+      if (isMod && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && activeSessionId) {
+        const idx = sessions.findIndex(s => s.id === activeSessionId);
+        if (idx === -1) return;
+        const target = e.key === 'ArrowLeft' ? idx - 1 : idx + 1;
+        if (target >= 0 && target < sessions.length) {
+          e.preventDefault();
+          onReorderSessions(idx, target);
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeSessionId, sessions, onSelectSession, onCloseSession]);
+  }, [activeSessionId, sessions, onSelectSession, onCloseSession, onReorderSessions, renamingId]);
 
   const handleCloseAll = () => {
     sessions.forEach(session => onCloseSession(session.id));
@@ -119,6 +174,50 @@ export const FileTabs: React.FC<FileTabsProps> = ({
         onCloseSession(session.id);
       }
     });
+  };
+
+  // Drag handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (renamingId) {
+      e.preventDefault();
+      return;
+    }
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    if (dragIndex === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragIndex !== null && dragIndex !== index) {
+      onReorderSessions(dragIndex, index);
+    }
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const moveSession = (sessionId: string, direction: -1 | 1) => {
+    const idx = sessions.findIndex(s => s.id === sessionId);
+    if (idx === -1) return;
+    const target = idx + direction;
+    if (target < 0 || target >= sessions.length) return;
+    onReorderSessions(idx, target);
   };
 
   if (sessions.length === 0) return null;
@@ -136,7 +235,6 @@ export const FileTabs: React.FC<FileTabsProps> = ({
         </button>
       )}
 
-      {/* Left fade gradient */}
       {canScrollLeft && (
         <div className="absolute left-8 top-0 bottom-0 w-4 bg-gradient-to-r from-secondary/50 to-transparent pointer-events-none z-10" />
       )}
@@ -147,56 +245,124 @@ export const FileTabs: React.FC<FileTabsProps> = ({
         onScroll={checkScrollability}
         className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1"
       >
-        {sessions.map((session) => {
+        {sessions.map((session, index) => {
           const isActive = session.id === activeSessionId;
           const hasChanges = session.data.points !== session.originalData.points;
+          const isRenaming = renamingId === session.id;
+          const isDragging = dragIndex === index;
+          const isDragOver = dragOverIndex === index && dragIndex !== null && dragIndex !== index;
+          const isFirst = index === 0;
+          const isLast = index === sessions.length - 1;
 
           return (
             <ContextMenu key={session.id}>
               <ContextMenuTrigger asChild>
                 <div
                   ref={isActive ? activeTabRef : undefined}
+                  draggable={!isRenaming}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
                   className={cn(
-                    "group relative flex items-center gap-2 px-3 py-1.5 font-mono text-xs cursor-pointer transition-colors border rounded-sm shrink-0",
+                    "group relative flex items-center gap-1.5 pl-2 pr-1.5 py-1.5 font-mono text-xs cursor-pointer transition-all border rounded-sm shrink-0 select-none",
                     isActive
                       ? "bg-card border-border text-foreground shadow-sm"
-                      : "bg-transparent border-transparent text-muted-foreground hover:bg-card/50 hover:text-foreground"
+                      : "bg-transparent border-transparent text-muted-foreground hover:bg-card/50 hover:text-foreground",
+                    isDragging && "opacity-40",
+                    isDragOver && "ring-2 ring-primary ring-offset-1 ring-offset-secondary/50"
                   )}
                   style={isActive ? { borderTopColor: '#3aa0a0', borderTopWidth: 2 } : undefined}
-                  onClick={() => onSelectSession(session.id)}
-                  title={session.fileName}
+                  onClick={() => !isRenaming && onSelectSession(session.id)}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    startRename(session);
+                  }}
+                  title={isRenaming ? undefined : `${session.fileName}\nDouble-click to rename · Drag to reorder`}
                 >
-                  <span className="flex items-center gap-1.5">
-                    {hasChanges && (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full animate-pulse"
-                        style={{ background: '#e8594f' }}
-                        title="Unsaved changes"
-                      />
-                    )}
-                    {truncateFileName(session.fileName)}
-                  </span>
-                  <button
-                    className="p-0.5 rounded hover:bg-destructive/20 transition-colors opacity-60 hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCloseSession(session.id);
-                    }}
-                    title="Close tab"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  {hasChanges && !isRenaming && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
+                      style={{ background: '#e8594f' }}
+                      title="Unsaved changes"
+                    />
+                  )}
+                  {isRenaming ? (
+                    <input
+                      ref={renameInputRef}
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          commitRename();
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          cancelRename();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-background border border-primary rounded px-1 py-0 font-mono text-xs outline-none min-w-[80px]"
+                      style={{ width: `${Math.max(8, renameValue.length + 1)}ch` }}
+                    />
+                  ) : (
+                    <span>{truncateFileName(session.fileName)}</span>
+                  )}
+                  {!isRenaming && (
+                    <button
+                      className="p-0.5 rounded hover:bg-destructive/20 transition-colors opacity-60 hover:opacity-100 shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseSession(session.id);
+                      }}
+                      title="Close tab"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="bg-popover border-border">
+              <ContextMenuContent className="bg-popover border-border font-mono text-xs">
+                <ContextMenuItem onClick={() => startRename(session)}>
+                  <Pencil className="w-3 h-3 mr-2" />
+                  Rename
+                  <span className="ml-auto text-[10px] text-muted-foreground">F2</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => moveSession(session.id, -1)} disabled={isFirst}>
+                  <ChevronLeft className="w-3 h-3 mr-2" />
+                  Move Left
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => moveSession(session.id, 1)} disabled={isLast}>
+                  <ChevronRight className="w-3 h-3 mr-2" />
+                  Move Right
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => onReorderSessions(index, 0)}
+                  disabled={isFirst}
+                >
+                  <ArrowLeftRight className="w-3 h-3 mr-2" />
+                  Move to Start
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => onReorderSessions(index, sessions.length - 1)}
+                  disabled={isLast}
+                >
+                  <ArrowLeftRight className="w-3 h-3 mr-2" />
+                  Move to End
+                </ContextMenuItem>
+                <ContextMenuSeparator />
                 <ContextMenuItem onClick={() => onCloseSession(session.id)}>
+                  <X className="w-3 h-3 mr-2" />
                   Close
                 </ContextMenuItem>
                 <ContextMenuItem onClick={handleCloseOthers} disabled={sessions.length <= 1}>
                   Close Others
                 </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={handleCloseAll}>
+                <ContextMenuItem onClick={handleCloseAll} className="text-destructive">
                   Close All
                 </ContextMenuItem>
               </ContextMenuContent>
@@ -205,12 +371,10 @@ export const FileTabs: React.FC<FileTabsProps> = ({
         })}
       </div>
 
-      {/* Right fade gradient */}
       {canScrollRight && (
         <div className="absolute right-24 top-0 bottom-0 w-4 bg-gradient-to-l from-secondary/50 to-transparent pointer-events-none z-10" />
       )}
 
-      {/* Right scroll button */}
       {canScrollRight && (
         <button
           onClick={() => scrollBy('right')}
@@ -230,7 +394,7 @@ export const FileTabs: React.FC<FileTabsProps> = ({
             <ChevronDown className="w-3 h-3" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56 bg-popover border-border">
+        <DropdownMenuContent align="end" className="w-64 bg-popover border-border">
           <div className="px-2 py-1.5 text-xs font-mono text-muted-foreground">
             Open Files ({sessions.length})
           </div>
