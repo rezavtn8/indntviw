@@ -651,7 +651,8 @@ export const IndentViewApp: React.FC = () => {
       fileTabs={
         <FileTabs 
           sessions={fileSessions} activeSessionId={activeSessionId} 
-          onSelectSession={handleSelectSession} onCloseSession={handleCloseSession} 
+          onSelectSession={handleSelectSession} onCloseSession={handleCloseSession}
+          onRenameSession={renameSession} onReorderSessions={reorderSessions}
         />
       }
       sidebar={
