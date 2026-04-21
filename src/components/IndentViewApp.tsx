@@ -71,6 +71,7 @@ export const IndentViewApp: React.FC = () => {
     selectedPointIds, highlightedOutliers, exportSelectedPointIds,
     isLoading, setIsLoading,
     handleDataLoaded, handleSelectSession, handleCloseSession, updateActiveSession,
+    renameSession, reorderSessions,
     overrideColorRange, autoFitGlobalRangeToAllSamples,
   } = useSession();
 
@@ -650,7 +651,8 @@ export const IndentViewApp: React.FC = () => {
       fileTabs={
         <FileTabs 
           sessions={fileSessions} activeSessionId={activeSessionId} 
-          onSelectSession={handleSelectSession} onCloseSession={handleCloseSession} 
+          onSelectSession={handleSelectSession} onCloseSession={handleCloseSession}
+          onRenameSession={renameSession} onReorderSessions={reorderSessions}
         />
       }
       sidebar={
