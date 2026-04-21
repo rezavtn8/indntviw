@@ -269,7 +269,7 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {!hasMembers && (
-                        <AlertCircle className="w-3 h-3 text-amber-500" titleAccess="Empty group" />
+                        <AlertCircle className="w-3 h-3 text-amber-500" aria-label="Empty group" />
                       )}
                       <span className="font-mono text-[10px] tabular-nums text-muted-foreground px-1">
                         {group.sessionIds.length}
