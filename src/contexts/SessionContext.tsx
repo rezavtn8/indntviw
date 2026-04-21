@@ -52,6 +52,8 @@ interface SessionContextValue {
   handleDataLoaded: (newData: IndentationData, fileName: string) => void;
   handleSelectSession: (sessionId: string) => void;
   handleCloseSession: (sessionId: string) => void;
+  renameSession: (sessionId: string, newName: string) => void;
+  reorderSessions: (fromIndex: number, toIndex: number) => void;
   updateActiveSession: (updates: Partial<FileSession>) => void;
   clearWorkspace: () => Promise<void>;
   saveProjectFile: () => Promise<void>;
