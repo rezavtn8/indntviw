@@ -108,15 +108,9 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
   const totalAssigned = sessions.length - ungroupedSessions.length;
 
   return (
-    <div className="space-y-3">
-      {/* Header / summary */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Users className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            Treatment Groups
-          </span>
-        </div>
+    <div className="space-y-2">
+      {/* Summary line — outer Collapsible already shows the "Treatment Groups" label */}
+      <div className="flex items-center justify-end">
         <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
           {totalAssigned}/{sessions.length} assigned
         </span>

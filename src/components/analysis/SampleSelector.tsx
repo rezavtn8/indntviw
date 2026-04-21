@@ -1,7 +1,6 @@
 import React from 'react';
 import { FileSession } from '@/types/fileSession';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 
 interface SampleSelectorProps {
@@ -23,57 +22,78 @@ export const SampleSelector: React.FC<SampleSelectorProps> = ({
     }
   };
 
-  const selectAll = () => {
-    onSelectionChange(sessions.map(s => s.id));
-  };
+  const selectAll = () => onSelectionChange(sessions.map(s => s.id));
+  const clearAll = () => onSelectionChange([]);
 
-  const clearAll = () => {
-    onSelectionChange([]);
-  };
+  const selectedCount = selectedSessionIds.length;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-xs uppercase text-muted-foreground">
-          Samples ({sessions.length})
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          Samples
+          <span className="ml-1.5 tabular-nums text-foreground/70">
+            {selectedCount}/{sessions.length}
+          </span>
         </span>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={selectAll} className="h-6 px-2 text-xs font-mono">
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={selectAll}
+            className="h-5 px-1.5 text-[10px] font-mono"
+          >
             All
           </Button>
-          <Button variant="ghost" size="sm" onClick={clearAll} className="h-6 px-2 text-xs font-mono text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAll}
+            className="h-5 px-1.5 text-[10px] font-mono text-muted-foreground"
+          >
             Clear
           </Button>
         </div>
       </div>
 
-      <ScrollArea className="h-48">
-        <div className="space-y-1 pr-2">
-          {sessions.map((session, idx) => (
-            <label
-              key={session.id}
-              className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${
-                selectedSessionIds.includes(session.id) ? 'bg-primary/10' : 'hover:bg-muted/50'
-              }`}
-            >
-              <Checkbox
-                checked={selectedSessionIds.includes(session.id)}
-                onCheckedChange={() => toggleSession(session.id)}
-              />
-              <div
-                className="w-3 h-3 rounded"
-                style={{ backgroundColor: getSampleColor(idx) }}
-              />
-              <div className="flex-1 min-w-0">
-                <span className="font-mono text-sm truncate block">{session.fileName}</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {session.data.points.length} points
-                </span>
-              </div>
-            </label>
-          ))}
+      {/* Native scroll container — nested Radix ScrollAreas inside another ScrollArea
+          fail to constrain height, which previously hid most samples. */}
+      <div className="h-56 overflow-y-auto rounded-md border border-border bg-muted/10">
+        <div className="p-1 space-y-0.5">
+          {sessions.map((session, idx) => {
+            const checked = selectedSessionIds.includes(session.id);
+            return (
+              <label
+                key={session.id}
+                className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer transition-colors ${
+                  checked ? 'bg-primary/10' : 'hover:bg-muted/50'
+                }`}
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={() => toggleSession(session.id)}
+                  className="h-3.5 w-3.5"
+                />
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: getSampleColor(idx) }}
+                />
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="font-mono text-[11px] truncate block leading-tight"
+                    title={session.fileName}
+                  >
+                    {session.fileName.replace(/\.[^/.]+$/, '')}
+                  </span>
+                  <span className="font-mono text-[9px] text-muted-foreground tabular-nums">
+                    {session.data.points.length} pts
+                  </span>
+                </div>
+              </label>
+            );
+          })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };
