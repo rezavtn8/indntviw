@@ -460,37 +460,56 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
 // SampleRow: a compact, full-width row showing sample dot + name + assign menu.
 // -----------------------------------------------------------------------------
 interface SampleRowProps {
+  checked: boolean;
   name: string;
   colorDot: string;
   groups: SampleGroup[];
   currentGroupId: string | null;
+  assignmentLabel: string;
+  showDragHandle?: boolean;
+  onToggleChecked: (checked: boolean) => void;
   onAssign: (groupId: string | null) => void;
 }
 
 const SampleRow: React.FC<SampleRowProps> = ({
+  checked,
   name,
   colorDot,
   groups,
   currentGroupId,
+  assignmentLabel,
+  showDragHandle = true,
+  onToggleChecked,
   onAssign,
 }) => {
   return (
     <div
       className={cn(
-        'group flex items-center gap-1.5 px-1.5 py-1 rounded',
-        'hover:bg-muted/50 transition-colors',
+        'group grid grid-cols-[auto,auto,1fr,auto] items-center gap-2 rounded-md border px-2 py-2 transition-colors',
+        checked ? 'border-primary/30 bg-primary/10' : 'border-transparent bg-background/50 hover:border-border hover:bg-muted/40',
       )}
     >
+      <Checkbox
+        checked={checked}
+        onCheckedChange={(value) => onToggleChecked(value === true)}
+        className="h-3.5 w-3.5"
+      />
+      {showDragHandle ? <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" /> : <div className="h-3.5 w-3.5" />}
       <div
         className="w-2 h-2 rounded-full shrink-0"
         style={{ backgroundColor: colorDot }}
       />
-      <span
-        className="font-mono text-[11px] truncate flex-1 min-w-0"
-        title={name}
-      >
-        {name}
-      </span>
+      <div className="min-w-0">
+        <span
+          className="block truncate font-mono text-[11px]"
+          title={name}
+        >
+          {name}
+        </span>
+        <span className="block truncate font-mono text-[10px] text-muted-foreground">
+          {assignmentLabel}
+        </span>
+      </div>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
