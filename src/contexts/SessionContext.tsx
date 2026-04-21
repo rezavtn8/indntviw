@@ -318,6 +318,28 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [activeSessionId]);
 
+  const renameSession = useCallback((sessionId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setFileSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, fileName: trimmed } : s
+    ));
+  }, []);
+
+  const reorderSessions = useCallback((fromIndex: number, toIndex: number) => {
+    setFileSessions(prev => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 || fromIndex >= prev.length ||
+        toIndex < 0 || toIndex >= prev.length
+      ) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   const clearWorkspace = useCallback(async () => {
     await storageService.clearWorkspace();
     setFileSessions([]);
