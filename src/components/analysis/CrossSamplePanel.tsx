@@ -88,7 +88,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   return (
     <div className="h-full flex">
       {/* Left Sidebar - Sample Selection */}
-      <div className="w-72 min-w-72 border-r-2 border-border bg-card flex flex-col overflow-hidden">
+      <div className="w-80 min-w-80 border-r-2 border-border bg-card flex flex-col overflow-hidden">
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-4">
             <h3 className="font-mono text-sm font-bold uppercase tracking-wider">
