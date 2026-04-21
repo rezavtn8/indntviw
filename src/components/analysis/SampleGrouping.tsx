@@ -173,7 +173,7 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
               {ungroupedSessions.length}
             </span>
           </div>
-          <ScrollArea className="h-24">
+          <div className="h-28 overflow-y-auto">
             <div className="p-1.5 space-y-1">
               {ungroupedSessions.length === 0 ? (
                 <p className="text-[10px] text-muted-foreground italic text-center py-2">
@@ -195,12 +195,12 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
                 })
               )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
 
-      {/* Groups list */}
-      <ScrollArea className="h-72">
+      {/* Groups list — native scroll (nested Radix ScrollArea inside another ScrollArea collapses) */}
+      <div className="max-h-96 overflow-y-auto">
         <div className="space-y-2 pr-1">
           {groups.length === 0 ? (
             <div className="text-center py-6 px-3 border border-dashed border-border rounded-md">
