@@ -428,6 +428,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     handleDataLoaded,
     handleSelectSession,
     handleCloseSession,
+    renameSession,
+    reorderSessions,
     updateActiveSession,
     clearWorkspace,
     saveProjectFile,
