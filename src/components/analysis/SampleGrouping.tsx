@@ -321,7 +321,7 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
             })
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };
