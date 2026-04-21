@@ -27,7 +27,7 @@ interface SessionContextValue {
   setGlobalCustomMin: (val: number | null) => void;
   setGlobalCustomMax: (val: number | null) => void;
   resetGlobalRange: () => void;
-  autoFitGlobalRangeToAllSamples: () => void;
+  autoFitGlobalRangeToAllSamples: (mode?: 'robust' | 'absolute') => void;
   
   // Treatment groups (lifted from CrossSamplePanel for persistence)
   groups: SampleGroup[];
@@ -117,29 +117,91 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setGlobalCustomMax(null);
   }, []);
 
-  // Auto-fit global range to encompass all open samples for the current global property
-  const autoFitGlobalRangeToAllSamples = useCallback(() => {
-    if (fileSessions.length === 0) return;
-    let min = Infinity;
-    let max = -Infinity;
+  // Auto-fit global range to encompass all open samples for the current global property.
+  // Uses 1st-99th percentile by default to ignore extreme outliers that wash out the color scale.
+  const autoFitGlobalRangeToAllSamples = useCallback((mode: 'robust' | 'absolute' = 'robust') => {
+    if (fileSessions.length === 0) {
+      toast.error('No samples open');
+      return;
+    }
+    const allValues: number[] = [];
+    let samplesWithProperty = 0;
+    let samplesMissingProperty = 0;
+    let propertyNameForToast = globalSelectedProperty;
+
     fileSessions.forEach(s => {
       const prop = s.data.propertyNames.includes(globalSelectedProperty)
         ? globalSelectedProperty
-        : s.data.propertyNames[0];
-      if (!prop) return;
+        : null;
+      if (!prop) {
+        samplesMissingProperty += 1;
+        return;
+      }
+      let added = 0;
       s.data.points.forEach(p => {
         const v = p.properties[prop];
-        if (v !== undefined && !isNaN(v)) {
-          if (v < min) min = v;
-          if (v > max) max = v;
+        if (v !== undefined && v !== null && !isNaN(v)) {
+          allValues.push(v);
+          added += 1;
         }
       });
+      if (added > 0) samplesWithProperty += 1;
     });
-    if (isFinite(min) && isFinite(max)) {
-      setGlobalCustomMin(min);
-      setGlobalCustomMax(max);
-      toast.success(`Range fit across ${fileSessions.length} sample${fileSessions.length > 1 ? 's' : ''}`);
+
+    if (allValues.length === 0) {
+      toast.error(`No "${propertyNameForToast}" values found across open samples`);
+      return;
     }
+
+    let min: number;
+    let max: number;
+    if (mode === 'absolute' || allValues.length < 20) {
+      min = Math.min(...allValues);
+      max = Math.max(...allValues);
+    } else {
+      const sorted = [...allValues].sort((a, b) => a - b);
+      const percentile = (p: number) => {
+        const idx = (sorted.length - 1) * p;
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        if (lo === hi) return sorted[lo];
+        return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+      };
+      min = percentile(0.01);
+      max = percentile(0.99);
+      // Guard against degenerate ranges
+      if (min === max) {
+        min = sorted[0];
+        max = sorted[sorted.length - 1];
+      }
+    }
+
+    if (!isFinite(min) || !isFinite(max) || min === max) {
+      toast.error('Could not compute a valid range');
+      return;
+    }
+
+    setGlobalCustomMin(min);
+    setGlobalCustomMax(max);
+
+    // Clear per-session overrides so the synced range actually applies everywhere
+    setFileSessions(prev =>
+      prev.map(s =>
+        s.overrideColorRange
+          ? { ...s, overrideColorRange: false, customMin: null, customMax: null }
+          : s
+      )
+    );
+
+    const fmt = (v: number) =>
+      Math.abs(v) >= 1000 || (Math.abs(v) > 0 && Math.abs(v) < 0.01)
+        ? v.toExponential(2)
+        : v.toFixed(2);
+    const modeLabel = mode === 'robust' ? '1–99%' : 'min–max';
+    const skipped = samplesMissingProperty > 0 ? ` (${samplesMissingProperty} skipped)` : '';
+    toast.success(
+      `${propertyNameForToast}: ${fmt(min)} – ${fmt(max)} across ${samplesWithProperty} sample${samplesWithProperty > 1 ? 's' : ''}${skipped} · ${modeLabel}`
+    );
   }, [fileSessions, globalSelectedProperty]);
 
   // Handle workspace loaded from persistence
