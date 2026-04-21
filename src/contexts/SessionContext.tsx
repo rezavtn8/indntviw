@@ -27,7 +27,7 @@ interface SessionContextValue {
   setGlobalCustomMin: (val: number | null) => void;
   setGlobalCustomMax: (val: number | null) => void;
   resetGlobalRange: () => void;
-  autoFitGlobalRangeToAllSamples: () => void;
+  autoFitGlobalRangeToAllSamples: (mode?: 'robust' | 'absolute') => void;
   
   // Treatment groups (lifted from CrossSamplePanel for persistence)
   groups: SampleGroup[];
