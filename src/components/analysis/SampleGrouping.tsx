@@ -390,7 +390,7 @@ export const SampleGrouping: React.FC<SampleGroupingProps> = ({ sessions, groups
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {!hasMembers && (
-                        <AlertCircle className="w-3 h-3 text-amber-500" aria-label="Empty group" />
+                        <AlertCircle className="w-3 h-3 text-muted-foreground" aria-label="Empty group" />
                       )}
                       <span className="font-mono text-[10px] tabular-nums text-muted-foreground px-1">
                         {group.sessionIds.length}
@@ -485,7 +485,7 @@ const SampleRow: React.FC<SampleRowProps> = ({
   return (
     <div
       className={cn(
-        'group grid grid-cols-[auto,auto,1fr,auto] items-center gap-2 rounded-md border px-2 py-2 transition-colors',
+        'group grid grid-cols-[auto,auto,auto,1fr,auto] items-center gap-2 rounded-md border px-2 py-2 transition-colors',
         checked ? 'border-primary/30 bg-primary/10' : 'border-transparent bg-background/50 hover:border-border hover:bg-muted/40',
       )}
     >

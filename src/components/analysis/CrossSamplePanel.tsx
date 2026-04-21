@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileSession } from '@/types/fileSession';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { calculateDescriptiveStats, getPropertyValues } from '@/utils/advancedStatistics';
@@ -38,11 +38,49 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   // Get groups from context (persisted)
   const { groups, setGroups } = useSession();
   
-  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() => fileSessions.map(session => session.id));
   const [showViolin, setShowViolin] = useState(false);
   const [showJitter, setShowJitter] = useState(true);
   const [blackAndWhite, setBlackAndWhite] = useState(false);
-  const [groupingOpen, setGroupingOpen] = useState(false);
+  const [groupingOpen, setGroupingOpen] = useState(true);
+
+  useEffect(() => {
+    const sessionIds = fileSessions.map(session => session.id);
+    setSelectedSessionIds(prev => {
+      const valid = prev.filter(id => sessionIds.includes(id));
+      if (valid.length === 0) return sessionIds;
+      const additions = sessionIds.filter(id => !valid.includes(id));
+      return additions.length > 0 ? [...valid, ...additions] : valid;
+    });
+  }, [fileSessions]);
+
+  const selectedSampleSessions = useMemo(
+    () => fileSessions.filter(session => selectedSessionIds.includes(session.id)),
+    [fileSessions, selectedSessionIds],
+  );
+
+  const scopedGroups = useMemo(() => {
+    const selectedSet = new Set(selectedSessionIds);
+    return groups.map(group => ({
+      ...group,
+      sessionIds: group.sessionIds.filter(id => selectedSet.has(id)),
+    }));
+  }, [groups, selectedSessionIds]);
+
+  const handleGroupsChange = (nextScopedGroups: SampleGroup[]) => {
+    const selectedSet = new Set(selectedSessionIds);
+    const previousById = new Map(groups.map(group => [group.id, group]));
+
+    setGroups(
+      nextScopedGroups.map(group => ({
+        ...group,
+        sessionIds: [
+          ...(previousById.get(group.id)?.sessionIds.filter(id => !selectedSet.has(id)) ?? []),
+          ...group.sessionIds,
+        ],
+      })),
+    );
+  };
 
   const getPropertyLabel = (key: string): string => {
     const config = PROPERTY_CONFIGS.find(c => c.key === key);
@@ -51,8 +89,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
 
   // Prepare sample data for analysis
   const sampleData = useMemo(() => {
-    return fileSessions
-      .filter(session => selectedSessionIds.includes(session.id))
+      return selectedSampleSessions
       .map((session, idx) => {
         // Find original index for consistent coloring
         const colorIndex = fileSessions.findIndex(s => s.id === session.id);
@@ -65,7 +102,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
           stats: calculateDescriptiveStats(values),
         };
       });
-  }, [fileSessions, selectedSessionIds, selectedProperty]);
+  }, [fileSessions, selectedSampleSessions, selectedProperty]);
 
   if (fileSessions.length < 2) {
     return (
@@ -86,84 +123,89 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   }
 
   return (
-    <div className="h-full flex">
+      <div className="h-full flex min-h-0">
       {/* Left Sidebar - Sample Selection */}
-      <div className="w-80 min-w-80 border-r-2 border-border bg-card flex flex-col overflow-hidden">
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4">
+      <div className="w-96 min-w-96 border-r-2 border-border bg-card flex flex-col overflow-hidden">
+        <div className="border-b border-border px-4 py-4 space-y-4">
+          <div className="space-y-1">
             <h3 className="font-mono text-sm font-bold uppercase tracking-wider">
               Cross-Sample Analysis
             </h3>
+            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/80">
+              First define which samples belong in the comparison set. Then assign only those included samples to treatment groups.
+            </p>
+          </div>
 
-            {/* Property Selector */}
-            <div>
-              <Label className="font-mono text-xs uppercase text-muted-foreground mb-2 block">
-                Property
-              </Label>
-              <Select value={selectedProperty} onValueChange={onPropertyChange}>
-                <SelectTrigger className="font-mono text-sm w-full truncate">
-                  <SelectValue className="truncate" />
-                </SelectTrigger>
-                <SelectContent>
-                  {propertyNames.map(prop => (
-                    <SelectItem key={prop} value={prop} className="font-mono text-sm">
-                      {getPropertyLabel(prop)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label className="font-mono text-xs uppercase text-muted-foreground mb-2 block">
+              Property
+            </Label>
+            <Select value={selectedProperty} onValueChange={onPropertyChange}>
+              <SelectTrigger className="font-mono text-sm w-full truncate">
+                <SelectValue className="truncate" />
+              </SelectTrigger>
+              <SelectContent>
+                {propertyNames.map(prop => (
+                  <SelectItem key={prop} value={prop} className="font-mono text-sm">
+                    {getPropertyLabel(prop)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-            {/* Sample Selection */}
+        <div className="flex-1 min-h-0 px-4 py-4 flex flex-col gap-4 overflow-hidden">
+          <div className="min-h-0 flex-[1.05] overflow-hidden">
             <SampleSelector
               sessions={fileSessions}
               selectedSessionIds={selectedSessionIds}
               onSelectionChange={setSelectedSessionIds}
             />
+          </div>
 
-            {/* Sample Grouping */}
-            <Collapsible open={groupingOpen} onOpenChange={setGroupingOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  <span className="font-mono text-sm font-medium">Treatment Groups</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {groups.length > 0 && (
-                    <span className="text-xs text-muted-foreground">{groups.length}</span>
-                  )}
-                  <ChevronDown className={`w-4 h-4 transition-transform ${groupingOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
+          <Collapsible open={groupingOpen} onOpenChange={setGroupingOpen} className="min-h-0 flex flex-1 flex-col overflow-hidden rounded-md border border-border bg-muted/10">
+            <CollapsibleTrigger className="flex items-center justify-between border-b border-border/70 px-3 py-2 hover:bg-muted/40 transition-colors">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                <span className="font-mono text-sm font-medium">Treatment Groups</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {scopedGroups.length}
+                </span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${groupingOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="min-h-0 flex-1 overflow-hidden data-[state=closed]:hidden">
+              <div className="h-full p-3 overflow-hidden">
                 <SampleGrouping
-                  sessions={fileSessions}
-                  groups={groups}
-                  onGroupsChange={setGroups}
+                  sessions={selectedSampleSessions}
+                  groups={scopedGroups}
+                  onGroupsChange={handleGroupsChange}
                 />
-              </CollapsibleContent>
-            </Collapsible>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
-            {/* Plot Options */}
-            <div className="pt-4 border-t border-border space-y-3">
-              <Label className="font-mono text-xs uppercase text-muted-foreground block">
-                Plot Options
-              </Label>
-              <div className="flex items-center justify-between">
-                <Label className="font-mono text-xs cursor-pointer">Show Violin</Label>
-                <Switch checked={showViolin} onCheckedChange={setShowViolin} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
-                <Switch checked={showJitter} onCheckedChange={setShowJitter} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label className="font-mono text-xs cursor-pointer">B&W Mode</Label>
-                <Switch checked={blackAndWhite} onCheckedChange={setBlackAndWhite} />
-              </div>
+          <div className="rounded-md border border-border bg-background/60 p-3 space-y-3">
+            <Label className="font-mono text-xs uppercase text-muted-foreground block">
+              Plot Options
+            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="font-mono text-xs cursor-pointer">Show Violin</Label>
+              <Switch checked={showViolin} onCheckedChange={setShowViolin} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="font-mono text-xs cursor-pointer">Show Points</Label>
+              <Switch checked={showJitter} onCheckedChange={setShowJitter} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="font-mono text-xs cursor-pointer">B&W Mode</Label>
+              <Switch checked={blackAndWhite} onCheckedChange={setBlackAndWhite} />
             </div>
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -234,9 +276,9 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                 {groups.length > 0 && (
                   <div>
                     <h4 className="font-mono text-sm font-bold uppercase mb-3">Within-Group Analysis</h4>
-                    <IntraGroupAnalysis
-                      fileSessions={fileSessions}
-                      groups={groups}
+                     <IntraGroupAnalysis
+                       fileSessions={selectedSampleSessions}
+                       groups={scopedGroups}
                       selectedProperty={selectedProperty}
                     />
                   </div>
@@ -245,29 +287,29 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                 {/* Between-Group Comparison */}
                 <div className={groups.length > 0 ? "pt-4 border-t border-border" : ""}>
                   <h4 className="font-mono text-sm font-bold uppercase mb-3">Between-Group Comparison</h4>
-                  <GroupComparison
-                    fileSessions={fileSessions}
-                    groups={groups}
+                   <GroupComparison
+                     fileSessions={selectedSampleSessions}
+                     groups={scopedGroups}
                     selectedProperty={selectedProperty}
                   />
                 </div>
 
-                {groups.length >= 2 && (
+                 {scopedGroups.filter(group => group.sessionIds.length > 0).length >= 2 && (
                   <div className="pt-4 border-t border-border">
                     <h4 className="font-mono text-sm font-bold uppercase mb-3">Zone Comparison Between Groups</h4>
                     <ZoneBetweenGroupsAnalysis
-                      fileSessions={fileSessions}
-                      groups={groups}
+                       fileSessions={selectedSampleSessions}
+                       groups={scopedGroups}
                       selectedProperty={selectedProperty}
                     />
                   </div>
                 )}
-                {groups.length > 0 && (
+                 {scopedGroups.length > 0 && (
                   <div className="pt-4 border-t border-border">
                     <h4 className="font-mono text-sm font-bold uppercase mb-3">Zone Analysis within Groups</h4>
                     <GroupZoneAnalysis
-                      fileSessions={fileSessions}
-                      groups={groups}
+                       fileSessions={selectedSampleSessions}
+                       groups={scopedGroups}
                       selectedProperty={selectedProperty}
                     />
                   </div>
@@ -285,7 +327,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SmartZoneAnalysis
-                      fileSessions={fileSessions}
+                       fileSessions={selectedSampleSessions}
                       selectedProperty={selectedProperty}
                     />
                   </CollapsibleContent>
@@ -294,7 +336,7 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                 <div className="pt-4 border-t border-border">
                   <h4 className="font-mono text-sm font-bold uppercase mb-3">Manual Zone Selection</h4>
                   <ZoneAcrossSamplesPanel
-                    fileSessions={fileSessions}
+                     fileSessions={selectedSampleSessions}
                     selectedProperty={selectedProperty}
                   />
                 </div>
