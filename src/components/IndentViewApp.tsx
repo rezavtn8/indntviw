@@ -71,6 +71,7 @@ export const IndentViewApp: React.FC = () => {
     selectedPointIds, highlightedOutliers, exportSelectedPointIds,
     isLoading, setIsLoading,
     handleDataLoaded, handleSelectSession, handleCloseSession, updateActiveSession,
+    renameSession, reorderSessions,
     overrideColorRange, autoFitGlobalRangeToAllSamples,
   } = useSession();
 
