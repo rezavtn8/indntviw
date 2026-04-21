@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileSession } from '@/types/fileSession';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
