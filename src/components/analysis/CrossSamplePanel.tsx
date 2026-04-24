@@ -9,6 +9,7 @@ import { CrossSampleStats } from './CrossSampleStats';
 import { CrossSamplePlots } from './CrossSamplePlots';
 import { CrossSampleTests } from './CrossSampleTests';
 import { GroupComparison } from './GroupComparison';
+import { SampleLevelGroupComparison } from './SampleLevelGroupComparison';
 import { IntraGroupAnalysis } from './IntraGroupAnalysis';
 import { GroupZoneAnalysis } from './GroupZoneAnalysis';
 import { ZoneBetweenGroupsAnalysis } from './ZoneBetweenGroupsAnalysis';
