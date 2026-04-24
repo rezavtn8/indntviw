@@ -441,8 +441,8 @@ export const SampleLevelGroupComparison: React.FC<Props> = ({
                       <span>{r.group1} vs {r.group2}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">p = {formatP(r.pValue)}</span>
-                        <Badge variant={r.significant ? 'default' : 'secondary'} className="text-[10px]">
-                          {r.significant ? 'Sig' : 'n.s.'}
+                        <Badge variant={r.isSignificant ? 'default' : 'secondary'} className="text-[10px]">
+                          {r.isSignificant ? 'Sig' : 'n.s.'}
                         </Badge>
                       </div>
                     </div>
