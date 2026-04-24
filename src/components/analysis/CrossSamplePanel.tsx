@@ -9,6 +9,7 @@ import { CrossSampleStats } from './CrossSampleStats';
 import { CrossSamplePlots } from './CrossSamplePlots';
 import { CrossSampleTests } from './CrossSampleTests';
 import { GroupComparison } from './GroupComparison';
+import { SampleLevelGroupComparison } from './SampleLevelGroupComparison';
 import { IntraGroupAnalysis } from './IntraGroupAnalysis';
 import { GroupZoneAnalysis } from './GroupZoneAnalysis';
 import { ZoneBetweenGroupsAnalysis } from './ZoneBetweenGroupsAnalysis';
@@ -284,12 +285,26 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                   </div>
                 )}
 
-                {/* Between-Group Comparison */}
+                {/* Between-Group Comparison (pooled) */}
                 <div className={groups.length > 0 ? "pt-4 border-t border-border" : ""}>
-                  <h4 className="font-mono text-sm font-bold uppercase mb-3">Between-Group Comparison</h4>
+                  <h4 className="font-mono text-sm font-bold uppercase mb-3">
+                    Between-Group Comparison <span className="text-muted-foreground font-normal normal-case">(pooled — n = points)</span>
+                  </h4>
                    <GroupComparison
                      fileSessions={selectedSampleSessions}
                      groups={scopedGroups}
+                    selectedProperty={selectedProperty}
+                  />
+                </div>
+
+                {/* Sample-Level Comparison (per-sample summaries) */}
+                <div className="pt-4 border-t border-border">
+                  <h4 className="font-mono text-sm font-bold uppercase mb-3">
+                    Sample-Level Comparison <span className="text-muted-foreground font-normal normal-case">(per-sample — n = samples)</span>
+                  </h4>
+                  <SampleLevelGroupComparison
+                    fileSessions={selectedSampleSessions}
+                    groups={scopedGroups}
                     selectedProperty={selectedProperty}
                   />
                 </div>
