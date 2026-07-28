@@ -6,14 +6,9 @@ import {
   calculateDescriptiveStats,
   getPropertyValues,
   shapiroWilkTest,
-  welchTTest,
-  mannWhitneyU,
-  calculateEffectSize,
-  oneWayANOVA,
-  kruskalWallis,
-  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
+import { ComparisonReport } from './ComparisonReport';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -181,30 +176,6 @@ export const SampleLevelGroupComparison: React.FC<Props> = ({
     }));
   }, [showSampleColors, groupSummaries, sampleSummaries]);
 
-  const twoGroupTests = useMemo(() => {
-    if (groupSummaries.length !== 2) return null;
-    const [a, b] = groupSummaries;
-    if (a.values.length < 2 || b.values.length < 2) return null;
-    return {
-      welch: welchTTest(a.values, b.values),
-      mw: mannWhitneyU(a.values, b.values),
-      effect: calculateEffectSize(a.values, b.values),
-      a, b,
-    };
-  }, [groupSummaries]);
-
-  const multiGroupTests = useMemo(() => {
-    if (groupSummaries.length < 3) return null;
-    const valid = groupSummaries.filter(g => g.values.length >= 2);
-    if (valid.length < 3) return null;
-    const arrays = valid.map(g => g.values);
-    return {
-      anova: oneWayANOVA(arrays),
-      kw: kruskalWallis(arrays),
-      tukey: pairwisePostHoc(valid.map(g => ({ name: g.group.name, values: g.values }))),
-    };
-  }, [groupSummaries]);
-
   const propertyLabel = PROPERTY_CONFIGS.find(c => c.key === selectedProperty)?.label || selectedProperty;
   const lowReplicate = groupSummaries.some(g => g.sampleCount < 3);
 
@@ -361,98 +332,15 @@ export const SampleLevelGroupComparison: React.FC<Props> = ({
         showSampleCount
       />
 
-      {/* Two-group test results */}
-      {twoGroupTests && (
-        <Card className="p-4 space-y-3">
-          <h4 className="font-mono text-xs font-bold uppercase tracking-wider">
-            Two-Group Comparison ({twoGroupTests.a.group.name} vs {twoGroupTests.b.group.name})
-          </h4>
-          <div className="grid grid-cols-2 gap-3 font-mono text-xs">
-            <div className="p-2 rounded border border-border bg-muted/20">
-              <div className="text-muted-foreground uppercase text-[10px] mb-1">Welch's t-test</div>
-              <div>t = {twoGroupTests.welch.statistic.toFixed(3)}</div>
-              <div>df = {twoGroupTests.welch.df.toFixed(2)}</div>
-              <div className="flex items-center gap-2">
-                p = {formatP(twoGroupTests.welch.pValue)}
-                <Badge variant={twoGroupTests.welch.pValue < 0.05 ? 'default' : 'secondary'} className="text-[10px]">
-                  {twoGroupTests.welch.pValue < 0.05 ? 'Significant' : 'n.s.'}
-                </Badge>
-              </div>
-            </div>
-            <div className="p-2 rounded border border-border bg-muted/20">
-              <div className="text-muted-foreground uppercase text-[10px] mb-1">Mann–Whitney U</div>
-              <div>U = {twoGroupTests.mw.uStatistic.toFixed(2)}</div>
-              <div>z = {twoGroupTests.mw.zScore.toFixed(3)}</div>
-              <div className="flex items-center gap-2">
-                p = {formatP(twoGroupTests.mw.pValue)}
-                <Badge variant={twoGroupTests.mw.pValue < 0.05 ? 'default' : 'secondary'} className="text-[10px]">
-                  {twoGroupTests.mw.pValue < 0.05 ? 'Significant' : 'n.s.'}
-                </Badge>
-              </div>
-            </div>
-            <div className="col-span-2 p-2 rounded border border-border bg-muted/20">
-              <div className="text-muted-foreground uppercase text-[10px] mb-1">Effect Size</div>
-              <div>Cohen's d = {twoGroupTests.effect.cohensD.toFixed(3)} ({twoGroupTests.effect.interpretation})</div>
-              <div>Hedges' g = {twoGroupTests.effect.hedgesG.toFixed(3)}</div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Multi-group test results */}
-      {multiGroupTests && (
-        <Card className="p-4 space-y-3">
-          <h4 className="font-mono text-xs font-bold uppercase tracking-wider">
-            Multi-Group Comparison
-          </h4>
-          <div className="grid grid-cols-2 gap-3 font-mono text-xs">
-            <div className="p-2 rounded border border-border bg-muted/20">
-              <div className="text-muted-foreground uppercase text-[10px] mb-1">One-way ANOVA</div>
-              <div>F = {multiGroupTests.anova.fStatistic.toFixed(3)}</div>
-              <div>df = ({multiGroupTests.anova.dfBetween}, {multiGroupTests.anova.dfWithin})</div>
-              <div className="flex items-center gap-2">
-                p = {formatP(multiGroupTests.anova.pValue)}
-                <Badge variant={multiGroupTests.anova.pValue < 0.05 ? 'default' : 'secondary'} className="text-[10px]">
-                  {multiGroupTests.anova.pValue < 0.05 ? 'Significant' : 'n.s.'}
-                </Badge>
-              </div>
-            </div>
-            <div className="p-2 rounded border border-border bg-muted/20">
-              <div className="text-muted-foreground uppercase text-[10px] mb-1">Kruskal–Wallis H</div>
-              <div>H = {multiGroupTests.kw.hStatistic.toFixed(3)}</div>
-              <div>df = {multiGroupTests.kw.df}</div>
-              <div className="flex items-center gap-2">
-                p = {formatP(multiGroupTests.kw.pValue)}
-                <Badge variant={multiGroupTests.kw.pValue < 0.05 ? 'default' : 'secondary'} className="text-[10px]">
-                  {multiGroupTests.kw.pValue < 0.05 ? 'Significant' : 'n.s.'}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          {multiGroupTests.tukey.length > 0 && (
-            <div>
-              <div className="text-muted-foreground uppercase text-[10px] font-mono mb-1">
-                Pairwise post-hoc (Holm)
-              </div>
-              <ScrollArea className="h-32 border border-border rounded">
-                <div className="p-2 space-y-1">
-                  {multiGroupTests.tukey.map((r, i) => (
-                    <div key={i} className="flex items-center justify-between font-mono text-[11px]">
-                      <span>{r.group1} vs {r.group2}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">p = {formatP(r.pValue)}</span>
-                        <Badge variant={r.isSignificant ? 'default' : 'secondary'} className="text-[10px]">
-                          {r.isSignificant ? 'Sig' : 'n.s.'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-        </Card>
-      )}
+      <ComparisonReport
+        groups={groupSummaries
+          .filter(g => g.values.length >= 2)
+          .map(g => ({ name: g.group.name, values: g.values, color: g.group.color }))}
+        title="Sample-Level Group Tests"
+        unit="samples"
+        emptyHint="Each group needs at least 2 samples with data for a sample-level comparison."
+        compact
+      />
 
       {/* Per-sample audit table */}
       <Card className="p-3 space-y-2">

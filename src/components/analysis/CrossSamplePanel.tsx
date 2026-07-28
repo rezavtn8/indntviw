@@ -3,7 +3,7 @@ import { FileSession } from '@/types/fileSession';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { calculateDescriptiveStats, getPropertyValues } from '@/utils/advancedStatistics';
 import { useSession } from '@/contexts/SessionContext';
-import { SampleSelector, getSampleColor } from './SampleSelector';
+import { SampleSelector } from './SampleSelector';
 import { SampleGrouping, SampleGroup } from './SampleGrouping';
 import { CrossSampleStats } from './CrossSampleStats';
 import { CrossSamplePlots } from './CrossSamplePlots';
@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SegmentedTabs } from '@/components/layout';
-import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin, Sparkles } from 'lucide-react';
+import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin } from 'lucide-react';
 
 interface CrossSamplePanelProps {
   fileSessions: FileSession[];

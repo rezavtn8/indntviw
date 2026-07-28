@@ -5,15 +5,9 @@ import { PROPERTY_CONFIGS } from '@/types/indentation';
 import {
   calculateDescriptiveStats,
   getPropertyValues,
-  welchTTest,
-  mannWhitneyU,
-  calculateEffectSize,
-  oneWayANOVA,
-  kruskalWallis,
-  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
-import { Badge } from '@/components/ui/badge';
+import { ComparisonReport } from './ComparisonReport';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -147,28 +141,6 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
     return `${selectedZoneName}-${groupZoneData.map(d => `${d.group.id}:${d.values.length}`).join('|')}`;
   }, [selectedZoneName, groupZoneData]);
 
-  const twoGroupTests = useMemo(() => {
-    if (groupZoneData.length !== 2) return null;
-    const [g1, g2] = groupZoneData;
-    return {
-      welch: welchTTest(g1.values, g2.values),
-      mannWhitney: mannWhitneyU(g1.values, g2.values),
-      effectSize: calculateEffectSize(g1.values, g2.values),
-    };
-  }, [groupZoneData]);
-
-  const multiGroupTests = useMemo(() => {
-    if (groupZoneData.length < 2) return null;
-    const valueArrays = groupZoneData.map(g => g.values);
-    const namedGroups = groupZoneData.map(g => ({ name: g.group.name, values: g.values }));
-    return {
-      anova: oneWayANOVA(valueArrays),
-      kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: groupZoneData.length > 2 ? pairwisePostHoc(namedGroups) : null,
-    };
-  }, [groupZoneData]);
-
-  const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
     if (Math.abs(val) >= 1000) return val.toFixed(1);
     if (Math.abs(val) < 0.01) return val.toExponential(2);
@@ -298,94 +270,12 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
         </div>
       )}
 
-      {/* Two-Group Tests */}
-      {twoGroupTests && (
-        <div className="border border-border rounded p-2 space-y-2">
-          <h4 className="font-mono text-xs font-bold uppercase">Two-Group Comparison</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">Welch's t</span>
-                <Badge variant={twoGroupTests.welch.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {twoGroupTests.welch.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                t = {formatValue(twoGroupTests.welch.statistic)}, p = {formatP(twoGroupTests.welch.pValue)}
-              </div>
-            </div>
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">Mann-Whitney</span>
-                <Badge variant={twoGroupTests.mannWhitney.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {twoGroupTests.mannWhitney.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                U = {formatValue(twoGroupTests.mannWhitney.uStatistic)}, p = {formatP(twoGroupTests.mannWhitney.pValue)}
-              </div>
-            </div>
-          </div>
-          <div className="p-2 bg-muted/30 rounded">
-            <span className="font-mono text-[10px] font-bold">Effect Size: </span>
-            <Badge variant="outline" className="text-[9px] h-4 px-1 capitalize ml-1">
-              {twoGroupTests.effectSize.interpretation}
-            </Badge>
-            <span className="text-[10px] font-mono text-muted-foreground ml-2">
-              Cohen's d = {twoGroupTests.effectSize.cohensD.toFixed(2)}, Hedges' g = {twoGroupTests.effectSize.hedgesG.toFixed(2)}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Multi-Group Tests */}
-      {multiGroupTests && groupZoneData.length > 2 && (
-        <div className="border border-border rounded p-2 space-y-2">
-          <h4 className="font-mono text-xs font-bold uppercase">Multi-Group Comparison ({groupZoneData.length} groups)</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">ANOVA</span>
-                <Badge variant={multiGroupTests.anova.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {multiGroupTests.anova.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                F = {formatValue(multiGroupTests.anova.fStatistic)}, p = {formatP(multiGroupTests.anova.pValue)}
-              </div>
-            </div>
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">Kruskal-Wallis</span>
-                <Badge variant={multiGroupTests.kruskalWallis.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {multiGroupTests.kruskalWallis.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                H = {formatValue(multiGroupTests.kruskalWallis.hStatistic)}, p = {formatP(multiGroupTests.kruskalWallis.pValue)}
-              </div>
-            </div>
-          </div>
-
-          {/* Post-hoc */}
-          {multiGroupTests.postHoc && multiGroupTests.postHoc.length > 0 && (
-            <div className="pt-2 border-t border-border">
-              <span className="font-mono text-[10px] font-bold">Pairwise post-hoc (Holm):</span>
-              <div className="mt-1 grid grid-cols-1 gap-1">
-                {multiGroupTests.postHoc.map((ph, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-[10px] font-mono">
-                    <span className="text-muted-foreground">{ph.group1} vs {ph.group2}:</span>
-                    <Badge variant={ph.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                      {ph.isSignificant ? 'Sig' : 'NS'}
-                    </Badge>
-                    <span className="text-muted-foreground">p = {formatP(ph.pValue)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <ComparisonReport
+        groups={groupZoneData.map(g => ({ name: `${g.group.name} · ${g.zoneName}`, values: g.values, color: g.color }))}
+        title="Zone Comparison Between Groups"
+        unit="indents"
+        compact
+      />
     </div>
   );
 };

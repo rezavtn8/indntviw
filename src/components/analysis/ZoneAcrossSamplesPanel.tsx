@@ -5,22 +5,16 @@ import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { 
   calculateDescriptiveStats, 
   getPropertyValues,
-  welchTTest,
-  mannWhitneyU,
-  calculateEffectSize,
-  oneWayANOVA,
-  kruskalWallis,
-  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { ComparisonReport } from './ComparisonReport';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { BoxViolinPlots } from './BoxViolinPlots';
-import { Plus, X, GitCompare, AlertCircle, CheckCircle, XCircle, ListPlus } from 'lucide-react';
+import { Plus, X, GitCompare, AlertCircle, ListPlus } from 'lucide-react';
 import { getSampleColor } from './SampleSelector';
 
 interface ZoneSelection {
@@ -141,28 +135,6 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
     }));
   }, [zoneData]);
 
-  const twoZoneTests = useMemo(() => {
-    if (zoneData.length !== 2) return null;
-    const [z1, z2] = zoneData;
-    return {
-      welch: welchTTest(z1.values, z2.values),
-      mannWhitney: mannWhitneyU(z1.values, z2.values),
-      effectSize: calculateEffectSize(z1.values, z2.values),
-    };
-  }, [zoneData]);
-
-  const multiZoneTests = useMemo(() => {
-    if (zoneData.length < 2) return null;
-    const valueArrays = zoneData.map(z => z.values);
-    const namedGroups = zoneData.map(z => ({ name: z.label, values: z.values }));
-    return {
-      anova: oneWayANOVA(valueArrays),
-      kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: zoneData.length > 2 ? pairwisePostHoc(namedGroups) : null,
-    };
-  }, [zoneData]);
-
-  const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
     if (Math.abs(val) >= 1000) return val.toFixed(1);
     if (Math.abs(val) < 0.01) return val.toExponential(2);
@@ -325,94 +297,12 @@ export const ZoneAcrossSamplesPanel: React.FC<ZoneAcrossSamplesPanelProps> = ({
         </div>
       )}
 
-      {/* Two-Zone Tests */}
-      {twoZoneTests && (
-        <div className="border border-border rounded p-2 space-y-2">
-          <h4 className="font-mono text-xs font-bold uppercase">Two-Zone Comparison</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">Welch's t</span>
-                <Badge variant={twoZoneTests.welch.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {twoZoneTests.welch.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                p = {formatP(twoZoneTests.welch.pValue)}
-              </div>
-            </div>
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">Mann-Whitney</span>
-                <Badge variant={twoZoneTests.mannWhitney.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {twoZoneTests.mannWhitney.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                p = {formatP(twoZoneTests.mannWhitney.pValue)}
-              </div>
-            </div>
-          </div>
-          <div className="p-2 bg-muted/30 rounded">
-            <span className="font-mono text-[10px] font-bold">Effect: </span>
-            <Badge variant="outline" className="text-[9px] h-4 px-1 capitalize ml-1">
-              {twoZoneTests.effectSize.interpretation}
-            </Badge>
-            <span className="text-[10px] font-mono text-muted-foreground ml-2">
-              d={twoZoneTests.effectSize.cohensD.toFixed(2)}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Multi-Zone Tests */}
-      {multiZoneTests && zoneData.length > 2 && (
-        <div className="border border-border rounded p-2 space-y-2">
-          <h4 className="font-mono text-xs font-bold uppercase">Multi-Zone ({zoneData.length})</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">ANOVA</span>
-                <Badge variant={multiZoneTests.anova.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {multiZoneTests.anova.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                F={multiZoneTests.anova.fStatistic.toFixed(2)}, p={formatP(multiZoneTests.anova.pValue)}
-              </div>
-            </div>
-            <div className="p-2 bg-muted/30 rounded space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold">Kruskal-W</span>
-                <Badge variant={multiZoneTests.kruskalWallis.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                  {multiZoneTests.kruskalWallis.isSignificant ? 'Sig' : 'NS'}
-                </Badge>
-              </div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                H={multiZoneTests.kruskalWallis.hStatistic.toFixed(2)}, p={formatP(multiZoneTests.kruskalWallis.pValue)}
-              </div>
-            </div>
-          </div>
-          {multiZoneTests.postHoc && multiZoneTests.postHoc.length > 0 && (
-            <div className="space-y-1">
-              <span className="font-mono text-[10px] font-bold">Post-hoc (Holm)</span>
-              <ScrollArea className="h-24">
-                <div className="space-y-1">
-                  {multiZoneTests.postHoc.map((ph, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-1 bg-muted/20 rounded text-[10px] font-mono">
-                      <span className="truncate max-w-[120px]">{ph.group1} vs {ph.group2}</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground">p={formatP(ph.pValue)}</span>
-                        {ph.isSignificant ? <CheckCircle className="w-3 h-3 text-primary" /> : <XCircle className="w-3 h-3 text-muted-foreground" />}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-        </div>
-      )}
+      <ComparisonReport
+        groups={zoneData.map(z => ({ name: z.label, values: z.values, color: getSampleColor(z.colorIndex) }))}
+        title="Zone Comparison"
+        unit="indents"
+        compact
+      />
     </div>
   );
 };

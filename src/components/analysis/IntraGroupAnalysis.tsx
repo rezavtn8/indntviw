@@ -5,17 +5,10 @@ import { PROPERTY_CONFIGS } from '@/types/indentation';
 import {
   calculateDescriptiveStats,
   getPropertyValues,
-  welchTTest,
-  mannWhitneyU,
-  calculateEffectSize,
-  oneWayANOVA,
-  kruskalWallis,
-  pairwisePostHoc,
-  shapiroWilkTest,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { getSampleColor } from './SampleSelector';
+import { ComparisonReport } from './ComparisonReport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -23,8 +16,8 @@ import { Switch } from '@/components/ui/switch';
 import { BoxViolinPlots } from './BoxViolinPlots';
 import { SmartZoneAnalysis } from './SmartZoneAnalysis';
 import { IntraGroupZoneComparison } from './IntraGroupZoneComparison';
-import { StatsTable, StatsTableRow } from './StatsTable';
-import { CheckCircle, XCircle, BarChart3, FlaskConical, MapPin } from 'lucide-react';
+import { StatsTable } from './StatsTable';
+import { BarChart3, FlaskConical, MapPin } from 'lucide-react';
 
 interface SampleData {
   id: string;
@@ -60,7 +53,6 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
     return groups[0].id;
   }, [groups, selectedGroupId]);
 
-  const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
     if (Math.abs(val) >= 1000) return val.toFixed(1);
     if (Math.abs(val) < 0.01) return val.toExponential(2);
@@ -105,36 +97,8 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
   }, [sampleData]);
 
   // Normality tests for each sample
-  const normalityTests = useMemo(() => {
-    return sampleData.map(s => ({
-      name: s.name,
-      test: shapiroWilkTest(s.values),
-    }));
-  }, [sampleData]);
-
   // Two-sample tests (if exactly 2 samples in group)
-  const twoSampleTests = useMemo(() => {
-    if (sampleData.length !== 2) return null;
-    const [s1, s2] = sampleData;
-    return {
-      welch: welchTTest(s1.values, s2.values),
-      mannWhitney: mannWhitneyU(s1.values, s2.values),
-      effectSize: calculateEffectSize(s1.values, s2.values),
-    };
-  }, [sampleData]);
-
   // Multi-sample tests (if 2+ samples in group)
-  const multiSampleTests = useMemo(() => {
-    if (sampleData.length < 2) return null;
-    const valueArrays = sampleData.map(s => s.values);
-    const namedGroups = sampleData.map(s => ({ name: s.name, values: s.values }));
-    return {
-      anova: oneWayANOVA(valueArrays),
-      kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: sampleData.length > 2 ? pairwisePostHoc(namedGroups) : null,
-    };
-  }, [sampleData]);
-
   if (groups.length === 0) {
     return (
       <div className="border border-border rounded p-4 text-center">
@@ -266,117 +230,12 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
 
           {/* Tests Tab */}
           <TabsContent value="tests" className="space-y-3 mt-0">
-            {/* Normality Tests */}
-            <div className="border border-border rounded p-2 space-y-2">
-              <h5 className="font-mono text-xs font-bold uppercase">Normality Tests (Shapiro-Wilk)</h5>
-              <div className="space-y-1">
-                {normalityTests.map(({ name, test }) => (
-                  <div key={name} className="flex items-center justify-between p-1.5 bg-muted/20 rounded text-[10px] font-mono">
-                    <span className="truncate max-w-[120px]">{name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">W={test.shapiroWilk.statistic.toFixed(3)}</span>
-                      <span className="text-muted-foreground">p={formatP(test.shapiroWilk.pValue)}</span>
-                      <Badge variant={test.isNormal ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                        {test.isNormal ? 'Normal' : 'Non-normal'}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Two-Sample Tests */}
-            {twoSampleTests && (
-              <div className="border border-border rounded p-2 space-y-2">
-                <h5 className="font-mono text-xs font-bold uppercase">Two-Sample Comparison</h5>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 bg-muted/30 rounded space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold">Welch's t</span>
-                      <Badge variant={twoSampleTests.welch.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                        {twoSampleTests.welch.isSignificant ? 'Sig' : 'NS'}
-                      </Badge>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground">
-                      t={twoSampleTests.welch.statistic.toFixed(2)}, p={formatP(twoSampleTests.welch.pValue)}
-                    </div>
-                  </div>
-                  <div className="p-2 bg-muted/30 rounded space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold">Mann-Whitney</span>
-                      <Badge variant={twoSampleTests.mannWhitney.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                        {twoSampleTests.mannWhitney.isSignificant ? 'Sig' : 'NS'}
-                      </Badge>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground">
-                      p={formatP(twoSampleTests.mannWhitney.pValue)}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-2 bg-muted/30 rounded">
-                  <span className="font-mono text-[10px] font-bold">Effect: </span>
-                  <Badge variant="outline" className="text-[9px] h-4 px-1 capitalize ml-1">
-                    {twoSampleTests.effectSize.interpretation}
-                  </Badge>
-                  <span className="text-[10px] font-mono text-muted-foreground ml-2">
-                    d={twoSampleTests.effectSize.cohensD.toFixed(2)}, g={twoSampleTests.effectSize.hedgesG.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Multi-Sample Tests */}
-            {multiSampleTests && sampleData.length > 2 && (
-              <div className="border border-border rounded p-2 space-y-2">
-                <h5 className="font-mono text-xs font-bold uppercase">Multi-Sample Comparison ({sampleData.length} samples)</h5>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 bg-muted/30 rounded space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold">ANOVA</span>
-                      <Badge variant={multiSampleTests.anova.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                        {multiSampleTests.anova.isSignificant ? 'Sig' : 'NS'}
-                      </Badge>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground">
-                      F={multiSampleTests.anova.fStatistic.toFixed(2)}, p={formatP(multiSampleTests.anova.pValue)}
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground">
-                      η²={multiSampleTests.anova.etaSquared.toFixed(3)}
-                    </div>
-                  </div>
-                  <div className="p-2 bg-muted/30 rounded space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold">Kruskal-Wallis</span>
-                      <Badge variant={multiSampleTests.kruskalWallis.isSignificant ? "default" : "secondary"} className="text-[9px] h-4 px-1">
-                        {multiSampleTests.kruskalWallis.isSignificant ? 'Sig' : 'NS'}
-                      </Badge>
-                    </div>
-                    <div className="text-[10px] font-mono text-muted-foreground">
-                      H={multiSampleTests.kruskalWallis.hStatistic.toFixed(2)}, p={formatP(multiSampleTests.kruskalWallis.pValue)}
-                    </div>
-                  </div>
-                </div>
-                {multiSampleTests.postHoc && multiSampleTests.postHoc.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="font-mono text-[10px] font-bold">Post-hoc (Holm)</span>
-                    <ScrollArea className="h-24">
-                      <div className="space-y-1">
-                        {multiSampleTests.postHoc.map((ph, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-1 bg-muted/20 rounded text-[10px] font-mono">
-                            <span className="truncate max-w-[100px]">{ph.group1} vs {ph.group2}</span>
-                            <div className="flex items-center gap-1">
-                              <span className="text-muted-foreground">Δ={ph.meanDiff.toFixed(2)}</span>
-                              <span className="text-muted-foreground">p={formatP(ph.pValue)}</span>
-                              {ph.isSignificant ? <CheckCircle className="w-3 h-3 text-primary" /> : <XCircle className="w-3 h-3 text-muted-foreground" />}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-              </div>
-            )}
+            <ComparisonReport
+              groups={sampleData.map(sd => ({ name: sd.name, values: sd.values, color: getSampleColor(sd.colorIndex) }))}
+              title="Within-Group Sample Tests"
+              unit="indents"
+              compact
+            />
           </TabsContent>
 
           {/* Zones Tab */}

@@ -10,18 +10,12 @@ import { FileSession } from '@/types/fileSession';
 import {
   calculateDescriptiveStats,
   DescriptiveStats,
-  welchTTest,
-  mannWhitneyU,
-  oneWayANOVA,
-  kruskalWallis,
-  pairwisePostHoc,
-  calculateEffectSize,
-  shapiroWilkTest,
   getPropertyValues,
 } from '@/utils/advancedStatistics';
 import { getPointsInZone } from '@/utils/zoneUtils';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { BoxViolinPlots } from './BoxViolinPlots';
+import { ComparisonReport } from './ComparisonReport';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -64,7 +58,6 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
   blendOverlap = false,
   smallDots = false,
 }) => {
-  const formatP = (p: number): string => (p < 0.001 ? '<0.001' : p.toFixed(3));
   const formatValue = (val: number): string => {
     if (Math.abs(val) >= 1000) return val.toFixed(1);
     if (Math.abs(val) >= 1) return val.toFixed(2);
@@ -121,46 +114,6 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
   }, [pooledZones]);
 
   // Statistical tests
-  const statisticalTests = useMemo(() => {
-    if (pooledZones.length < 2) return null;
-
-    const groups = pooledZones.map(z => z.values);
-
-    // Normality tests
-    const normalityTests = pooledZones.map(z => ({
-      name: z.displayName,
-      ...shapiroWilkTest(z.values),
-    }));
-
-    const allNormal = normalityTests.every(t => t.isNormal);
-
-    if (pooledZones.length === 2) {
-      // Two-group comparison
-      const welch = welchTTest(groups[0], groups[1]);
-      const mannWhitney = mannWhitneyU(groups[0], groups[1]);
-      const effectSize = calculateEffectSize(groups[0], groups[1]);
-
-      return {
-        normalityTests,
-        allNormal,
-        twoGroup: { welch, mannWhitney, effectSize },
-        multiGroup: null,
-      };
-    } else {
-      // Multi-group comparison
-      const anova = oneWayANOVA(groups);
-      const kw = kruskalWallis(groups);
-      const tukey = pairwisePostHoc(pooledZones.map(z => ({ name: z.displayName, values: z.values })));
-
-      return {
-        normalityTests,
-        allNormal,
-        twoGroup: null,
-        multiGroup: { anova, kw, tukey },
-      };
-    }
-  }, [pooledZones]);
-
   const unit = PROPERTY_CONFIGS.find(c => c.key === selectedProperty)?.unit || '';
 
   if (groupSessions.length === 0) {
@@ -251,123 +204,12 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
         </ScrollArea>
       </div>
 
-      {/* Statistical Tests */}
-      {statisticalTests && (
-        <div className="border border-border rounded overflow-hidden">
-          <div className="bg-muted/30 px-3 py-2 border-b border-border">
-            <h6 className="font-mono text-xs font-bold uppercase">Statistical Tests</h6>
-          </div>
-          <div className="p-3 space-y-3 text-xs" style={FONT_STYLE}>
-            {/* Normality */}
-            <div>
-              <p className="font-bold text-muted-foreground mb-1">Normality (Shapiro-Wilk)</p>
-              <div className="flex flex-wrap gap-2">
-                {statisticalTests.normalityTests.map(t => (
-                  <Badge
-                    key={t.name}
-                    variant={t.isNormal ? 'outline' : 'secondary'}
-                    className="font-mono text-xs"
-                  >
-                    {t.name}: W={t.shapiroWilk.statistic.toFixed(3)}, p={formatP(t.shapiroWilk.pValue)}
-                    {t.isNormal ? ' ✓' : ' ✗'}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Two-group tests */}
-            {statisticalTests.twoGroup && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-bold text-muted-foreground mb-1">Welch's t-test</p>
-                    <p className="font-mono">
-                      t({statisticalTests.twoGroup.welch.df.toFixed(1)}) = {statisticalTests.twoGroup.welch.statistic.toFixed(3)},
-                      p = {formatP(statisticalTests.twoGroup.welch.pValue)}
-                      {statisticalTests.twoGroup.welch.isSignificant && (
-                        <Badge variant="destructive" className="ml-2 text-xs">Significant</Badge>
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-muted-foreground mb-1">Mann-Whitney U</p>
-                    <p className="font-mono">
-                      U = {statisticalTests.twoGroup.mannWhitney.uStatistic.toFixed(1)},
-                      z = {statisticalTests.twoGroup.mannWhitney.zScore.toFixed(3)},
-                      p = {formatP(statisticalTests.twoGroup.mannWhitney.pValue)}
-                      {statisticalTests.twoGroup.mannWhitney.isSignificant && (
-                        <Badge variant="destructive" className="ml-2 text-xs">Significant</Badge>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="font-bold text-muted-foreground mb-1">Effect Size</p>
-                  <p className="font-mono">
-                    Cohen's d = {statisticalTests.twoGroup.effectSize.cohensD.toFixed(3)},
-                    Hedges' g = {statisticalTests.twoGroup.effectSize.hedgesG.toFixed(3)}
-                    <Badge variant="outline" className="ml-2 text-xs capitalize">
-                      {statisticalTests.twoGroup.effectSize.interpretation}
-                    </Badge>
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Multi-group tests */}
-            {statisticalTests.multiGroup && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-bold text-muted-foreground mb-1">One-way ANOVA</p>
-                    <p className="font-mono">
-                      F({statisticalTests.multiGroup.anova.dfBetween}, {statisticalTests.multiGroup.anova.dfWithin}) = {statisticalTests.multiGroup.anova.fStatistic.toFixed(3)},
-                      p = {formatP(statisticalTests.multiGroup.anova.pValue)}
-                      {statisticalTests.multiGroup.anova.isSignificant && (
-                        <Badge variant="destructive" className="ml-2 text-xs">Significant</Badge>
-                      )}
-                    </p>
-                    <p className="text-muted-foreground mt-1">
-                      η² = {statisticalTests.multiGroup.anova.etaSquared.toFixed(3)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-muted-foreground mb-1">Kruskal-Wallis H</p>
-                    <p className="font-mono">
-                      H({statisticalTests.multiGroup.kw.df}) = {statisticalTests.multiGroup.kw.hStatistic.toFixed(3)},
-                      p = {formatP(statisticalTests.multiGroup.kw.pValue)}
-                      {statisticalTests.multiGroup.kw.isSignificant && (
-                        <Badge variant="destructive" className="ml-2 text-xs">Significant</Badge>
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Pairwise post-hoc */}
-                {statisticalTests.multiGroup.anova.isSignificant && statisticalTests.multiGroup.tukey.length > 0 && (
-                  <div>
-                    <p className="font-bold text-muted-foreground mb-1">Pairwise post-hoc (Holm)</p>
-                    <ScrollArea className="h-24">
-                      <div className="space-y-1">
-                        {statisticalTests.multiGroup.tukey.map((t, i) => (
-                          <div key={i} className="font-mono flex items-center gap-2">
-                            <span>{t.group1} vs {t.group2}:</span>
-                            <span>Δ = {formatValue(t.meanDiff)}</span>
-                            <span>p = {formatP(t.pValue)}</span>
-                            {t.isSignificant && (
-                              <Badge variant="destructive" className="text-xs">*</Badge>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <ComparisonReport
+        groups={pooledZones.map((z, i) => ({ name: z.displayName, values: z.values, color: ZONE_COLORS[i % ZONE_COLORS.length] }))}
+        title="Zone Tests Within Group"
+        unit="indents"
+        compact
+      />
     </div>
   );
 };
