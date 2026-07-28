@@ -31,7 +31,13 @@ export interface PersistedSession {
 }
 
 export interface PersistedWorkspace {
+  /** Schema version of this file format — not the app version. */
   version: number;
+  /**
+   * App version that wrote this workspace, for provenance. Optional so that
+   * files written by earlier builds still load.
+   */
+  appVersion?: string;
   savedAt: number;
   sessions: PersistedSession[];
   activeSessionId: string | null;

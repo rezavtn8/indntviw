@@ -20,6 +20,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { APP_VERSION_LABEL } from '@/version';
 import appPreview from '@/assets/app-preview.png';
 
 const features = [
@@ -636,7 +637,7 @@ const Landing = () => {
           </div>
           <div className="border-t border-border pt-6">
             <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 font-mono text-[10px] text-muted-foreground tracking-wide">
-              <span>© {new Date().getFullYear()} IndentView</span>
+              <span>© {new Date().getFullYear()} IndentView · {APP_VERSION_LABEL}</span>
               <span>All processing happens locally in your browser.</span>
             </div>
           </div>

@@ -1,4 +1,4 @@
-# IndentView
+# IndentView 2.3
 
 Visualization and statistical analysis for instrumented indentation data.
 

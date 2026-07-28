@@ -53,6 +53,7 @@ import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, Image, Package } from 'lucide-react';
+import { APP_VERSION_LABEL } from '@/version';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'overlay' | 'analysis' | 'export'>('2d');
@@ -643,7 +644,7 @@ export const IndentViewApp: React.FC = () => {
           <div className="flex items-center gap-3">
             <BrandMark className="w-6 h-6" />
             <Wordmark size="md" />
-            <span className="border border-border px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground tracking-wider">v1.0</span>
+            <span className="border border-border px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground tracking-wider">{APP_VERSION_LABEL}</span>
           </div>
           <ProjectActions />
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { APP_VERSION } from '@/version';
 import { storageService, PersistedWorkspace, toPersistedSession } from '@/utils/storageService';
 import { FileSession } from '@/types/fileSession';
 import { SampleGroup } from '@/components/analysis/SampleGrouping';
@@ -99,6 +100,7 @@ export const useWorkspacePersistence = ({
 
     const workspace: PersistedWorkspace = {
       version: WORKSPACE_VERSION,
+      appVersion: APP_VERSION,
       savedAt: Date.now(),
       sessions: fileSessions.map(toPersistedSession),
       activeSessionId,

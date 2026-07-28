@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
+import { APP_VERSION } from '@/version';
 import { IndentationData, ColorScheme } from '@/types/indentation';
 import { FileSession, createFileSession, generateSessionId } from '@/types/fileSession';
 import { SampleGroup } from '@/components/analysis/SampleGrouping';
@@ -357,6 +358,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const workspace: PersistedWorkspace = {
         version: 1,
+        appVersion: APP_VERSION,
         savedAt: Date.now(),
         sessions: fileSessions.map(toPersistedSession),
         activeSessionId,
