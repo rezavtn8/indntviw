@@ -3,7 +3,7 @@ import { FileSession } from '@/types/fileSession';
 import { Zone } from '@/types/zones';
 import { PROPERTY_CONFIGS } from '@/types/indentation';
 import { getPointsInZone } from '@/utils/zoneUtils';
-import { calculateDescriptiveStats, getPropertyValues, welchTTest, mannWhitneyU, calculateEffectSize, oneWayANOVA, kruskalWallis, tukeyHSD, DescriptiveStats } from '@/utils/advancedStatistics';
+import { calculateDescriptiveStats, getPropertyValues, welchTTest, mannWhitneyU, calculateEffectSize, oneWayANOVA, kruskalWallis, pairwisePostHoc, DescriptiveStats } from '@/utils/advancedStatistics';
 import { BoxViolinPlots } from './BoxViolinPlots';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -132,7 +132,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
       type: 'multi-zone' as const,
       anova: oneWayANOVA(allGroups),
       kruskalWallis: kruskalWallis(allGroups),
-      tukey: tukeyHSD(matchedZoneGroups.map(g => ({ name: g.zoneName, values: g.combinedValues }))),
+      tukey: pairwisePostHoc(matchedZoneGroups.map(g => ({ name: g.zoneName, values: g.combinedValues }))),
     };
   }, [matchedZoneGroups]);
 
@@ -163,7 +163,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
           type: 'multi-sample' as const,
           anova: oneWayANOVA(allValues),
           kruskalWallis: kruskalWallis(allValues),
-          tukey: tukeyHSD(group.matches.map((m, idx) => ({ name: labels[idx], values: m.values }))),
+          tukey: pairwisePostHoc(group.matches.map((m, idx) => ({ name: labels[idx], values: m.values }))),
         },
       };
     });
@@ -357,7 +357,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
                     </div>
                     {crossZoneTests.tukey.length > 0 && (
                       <div className="p-3 bg-muted/30 rounded-lg">
-                        <p className="font-mono text-xs text-muted-foreground mb-2">Tukey's HSD Post-hoc</p>
+                        <p className="font-mono text-xs text-muted-foreground mb-2">Pairwise post-hoc (Holm)</p>
                         <div className="space-y-1 max-h-32 overflow-y-auto">
                           {crossZoneTests.tukey.map((result, idx) => (
                             <div key={idx} className="flex justify-between items-center text-xs font-mono">
@@ -469,7 +469,7 @@ export const SmartZoneAnalysis: React.FC<SmartZoneAnalysisPanelProps> = ({
                           </div>
                           {zoneTests.tests.tukey.length > 0 && (
                             <div className="p-2 bg-muted/30 rounded">
-                              <p className="font-mono text-xs text-muted-foreground mb-1">Tukey HSD</p>
+                              <p className="font-mono text-xs text-muted-foreground mb-1">Pairwise post-hoc (Holm)</p>
                               <div className="space-y-0.5 max-h-24 overflow-y-auto">
                                 {zoneTests.tests.tukey.map((result, idx) => (
                                   <div key={idx} className="flex justify-between text-xs font-mono">

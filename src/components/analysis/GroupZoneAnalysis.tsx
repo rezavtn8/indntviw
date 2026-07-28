@@ -11,7 +11,7 @@ import {
   calculateEffectSize,
   oneWayANOVA,
   kruskalWallis,
-  tukeyHSD,
+  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -180,7 +180,7 @@ export const GroupZoneAnalysis: React.FC<GroupZoneAnalysisProps> = ({
     return {
       anova: oneWayANOVA(valueArrays),
       kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: zoneData.length > 2 ? tukeyHSD(namedGroups) : null,
+      postHoc: zoneData.length > 2 ? pairwisePostHoc(namedGroups) : null,
     };
   }, [zoneData]);
 
@@ -443,7 +443,7 @@ export const GroupZoneAnalysis: React.FC<GroupZoneAnalysisProps> = ({
           </div>
           {multiZoneTests.postHoc && multiZoneTests.postHoc.length > 0 && (
             <div className="space-y-1">
-              <span className="font-mono text-[10px] font-bold">Post-hoc (Tukey)</span>
+              <span className="font-mono text-[10px] font-bold">Post-hoc (Holm)</span>
               <ScrollArea className="h-24">
                 <div className="space-y-1">
                   {multiZoneTests.postHoc.map((ph, idx) => (

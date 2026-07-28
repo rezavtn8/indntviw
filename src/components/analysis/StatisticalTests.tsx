@@ -5,7 +5,7 @@ import {
   oneWayANOVA,
   kruskalWallis,
   calculateEffectSize,
-  tukeyHSD,
+  pairwisePostHoc,
   shapiroWilkTest,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
@@ -62,7 +62,7 @@ export const StatisticalTests: React.FC<StatisticalTestsProps> = ({ data, select
     return {
       anova: oneWayANOVA(groups),
       kruskalWallis: kruskalWallis(groups),
-      postHoc: data.length > 2 ? tukeyHSD(namedGroups) : null,
+      postHoc: data.length > 2 ? pairwisePostHoc(namedGroups) : null,
     };
   }, [data]);
 
@@ -257,7 +257,7 @@ export const StatisticalTests: React.FC<StatisticalTestsProps> = ({ data, select
           {/* Post-hoc Tests */}
           {multiGroupTests.postHoc && multiGroupTests.postHoc.length > 0 && (
             <div className="mt-4">
-              <h5 className="font-mono text-sm font-bold mb-2">Post-hoc Pairwise Comparisons (Tukey HSD)</h5>
+              <h5 className="font-mono text-sm font-bold mb-2">Pairwise post-hoc (Holm-corrected)</h5>
               <div className="space-y-1">
                 {multiGroupTests.postHoc.map((ph, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 bg-muted/20 rounded text-xs font-mono">

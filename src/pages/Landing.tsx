@@ -65,7 +65,7 @@ const pipeline = [
 
 const capabilities = [
   { type: 'Descriptive', methods: 'Mean, SD, IQR, Shapiro-Wilk', output: 'Tables, JSON' },
-  { type: 'Comparative', methods: "t-test, Mann-Whitney, ANOVA, Tukey", output: 'Box / violin plots with p-values' },
+  { type: 'Comparative', methods: "t-test, Mann-Whitney, ANOVA, Holm post-hoc", output: 'Box / violin plots with p-values' },
   { type: 'Spatial', methods: 'Heatmap, contours, 3D surface', output: 'PNG / SVG / PDF' },
   { type: 'Cross-sample', methods: 'Pooled groups, zone matching', output: 'Multi-panel figures' },
 ];

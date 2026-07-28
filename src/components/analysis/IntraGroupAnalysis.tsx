@@ -10,7 +10,7 @@ import {
   calculateEffectSize,
   oneWayANOVA,
   kruskalWallis,
-  tukeyHSD,
+  pairwisePostHoc,
   shapiroWilkTest,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
@@ -131,7 +131,7 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
     return {
       anova: oneWayANOVA(valueArrays),
       kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: sampleData.length > 2 ? tukeyHSD(namedGroups) : null,
+      postHoc: sampleData.length > 2 ? pairwisePostHoc(namedGroups) : null,
     };
   }, [sampleData]);
 
@@ -358,7 +358,7 @@ export const IntraGroupAnalysis: React.FC<IntraGroupAnalysisProps> = ({
                 </div>
                 {multiSampleTests.postHoc && multiSampleTests.postHoc.length > 0 && (
                   <div className="space-y-1">
-                    <span className="font-mono text-[10px] font-bold">Post-hoc (Tukey HSD)</span>
+                    <span className="font-mono text-[10px] font-bold">Post-hoc (Holm)</span>
                     <ScrollArea className="h-24">
                       <div className="space-y-1">
                         {multiSampleTests.postHoc.map((ph, idx) => (

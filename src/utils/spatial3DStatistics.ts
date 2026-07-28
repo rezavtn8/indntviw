@@ -1,4 +1,6 @@
 import { IndentationPoint } from '@/types/indentation';
+import { minOf, maxOf } from './numeric';
+import { normalCDF } from './advancedStatistics';
 
 // ============= DEPTH ANALYSIS =============
 
@@ -89,14 +91,29 @@ export function calculateDepthAnalysis(
 
 // ============= SURFACE ANALYSIS =============
 
+/**
+ * Height-scatter descriptors for the indent Z coordinates.
+ *
+ * IMPORTANT — these are NOT ISO 4287 surface roughness parameters, and must not
+ * be reported as such. ISO 4287 Ra/Rq/Rz are defined on a densely sampled
+ * profile with a specified sampling length and cut-off filter. What we have
+ * here is the recorded Z position of each indent — typically tens to hundreds
+ * of scattered points across the sample, unfiltered and irregularly spaced.
+ *
+ * The formulae below are the same arithmetic, so the numbers are useful for
+ * comparing height scatter *between samples measured the same way*, and for
+ * spotting stage tilt or poor sample mounting. They are not comparable to
+ * roughness values from a profilometer or AFM. The UI labels them as
+ * "Z-height scatter" for this reason.
+ */
 export interface SurfaceAnalysisResult {
-  // Roughness parameters
-  Ra: number;  // Arithmetic average roughness
-  Rq: number;  // RMS roughness
-  Rz: number;  // Peak-to-valley height
-  Rsk: number; // Skewness
-  Rku: number; // Kurtosis
-  
+  // Height-scatter descriptors (ISO 4287 arithmetic, non-ISO sampling)
+  Ra: number;  // Mean absolute deviation of Z from the mean plane
+  Rq: number;  // RMS deviation of Z
+  Rz: number;  // Peak-to-valley Z range
+  Rsk: number; // Skewness of the Z distribution
+  Rku: number; // Kurtosis of the Z distribution
+
   // Surface statistics
   surfaceArea: number;        // Estimated surface area
   projectedArea: number;      // XY projected area
@@ -224,8 +241,10 @@ export interface SpatialDistributionResult {
   moransI: number;              // -1 to 1, positive = clustered values
   moransIZScore: number;
   
-  // Clustering
-  clusterCount: number;
+  // Significance of the spatial autocorrelation
+  moransIPValue: number;
+
+  // Hot/cold spots: points beyond +/-2 SD of the property mean
   hotspotCount: number;
   coldspotCount: number;
 }
@@ -238,8 +257,8 @@ export function calculateSpatialDistribution(
     return {
       pointDensity: 0, densityVariance: 0,
       meanNearestNeighborDist: 0, nnRatio: 1,
-      moransI: 0, moransIZScore: 0,
-      clusterCount: 0, hotspotCount: 0, coldspotCount: 0
+      moransI: 0, moransIZScore: 0, moransIPValue: 1,
+      hotspotCount: 0, coldspotCount: 0
     };
   }
 
@@ -283,7 +302,7 @@ export function calculateSpatialDistribution(
   const densityVariance = localDensities.reduce((sum, d) => sum + (d - meanLocalDensity) ** 2, 0) / localDensities.length;
   
   // Moran's I for spatial autocorrelation
-  const { moransI, zScore } = calculateMoransI(points, property);
+  const { moransI, zScore, pValue: moransIPValue } = calculateMoransI(points, property);
   
   // Simple hotspot/coldspot detection
   const propValues = points.map(p => p.properties[property] ?? 0);
@@ -293,88 +312,111 @@ export function calculateSpatialDistribution(
   const hotspotCount = propValues.filter(v => v > propMean + 2 * propStd).length;
   const coldspotCount = propValues.filter(v => v < propMean - 2 * propStd).length;
   
-  // Cluster detection (simple k-means-like)
-  const clusterCount = detectClusters(points, property);
-
   return {
     pointDensity, densityVariance,
     meanNearestNeighborDist, nnRatio,
-    moransI, moransIZScore: zScore,
-    clusterCount, hotspotCount, coldspotCount
+    moransI, moransIZScore: zScore, moransIPValue,
+    hotspotCount, coldspotCount
   };
 }
 
-function calculateMoransI(points: IndentationPoint[], property: string): { moransI: number; zScore: number } {
-  if (points.length < 3) return { moransI: 0, zScore: 0 };
-  
+/**
+ * Global Moran's I with the proper randomisation-assumption variance.
+ *
+ * The z-score here previously used `expectedVariance = 1 / (n - 1)` with the
+ * comment "Simplified". That is not the variance of Moran's I under any
+ * assumption, so the significance claim attached to it was meaningless. This
+ * uses the standard randomisation variance (Cliff & Ord), which needs the S0,
+ * S1 and S2 weight sums and the kurtosis of the values.
+ */
+function calculateMoransI(
+  points: IndentationPoint[],
+  property: string,
+): { moransI: number; zScore: number; pValue: number } {
+  const n = points.length;
+  if (n < 4) return { moransI: 0, zScore: 0, pValue: 1 };
+
   const values = points.map(p => p.properties[property] ?? 0);
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
   const deviations = values.map(v => v - mean);
-  const variance = deviations.reduce((sum, d) => sum + d * d, 0) / values.length;
-  
-  if (variance === 0) return { moransI: 0, zScore: 0 };
-  
-  // Distance threshold for neighbors
+  const m2 = deviations.reduce((sum, d) => sum + d * d, 0) / n;
+
+  if (m2 === 0) return { moransI: 0, zScore: 0, pValue: 1 };
+
+  // Neighbour threshold: mean spacing scaled by the diagonal of the extent
   const xValues = points.map(p => p.x);
   const yValues = points.map(p => p.y);
-  const xRange = Math.max(...xValues) - Math.min(...xValues);
-  const yRange = Math.max(...yValues) - Math.min(...yValues);
-  const threshold = Math.sqrt(xRange ** 2 + yRange ** 2) / Math.sqrt(points.length);
-  
-  let sumWeighted = 0;
-  let sumWeights = 0;
-  
-  for (let i = 0; i < points.length; i++) {
-    for (let j = 0; j < points.length; j++) {
-      if (i !== j) {
-        const dist = Math.sqrt((points[i].x - points[j].x) ** 2 + (points[i].y - points[j].y) ** 2);
-        const weight = dist <= threshold ? 1 : 0;
-        sumWeighted += weight * deviations[i] * deviations[j];
-        sumWeights += weight;
+  const xRange = maxOf(xValues) - minOf(xValues);
+  const yRange = maxOf(yValues) - minOf(yValues);
+  const threshold = Math.sqrt(xRange ** 2 + yRange ** 2) / Math.sqrt(n);
+
+  // Binary symmetric weight matrix, stored as row lists to stay sparse
+  const neighbours: number[][] = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dist = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+      if (dist <= threshold) {
+        neighbours[i].push(j);
+        neighbours[j].push(i);
       }
     }
   }
-  
-  const n = points.length;
-  const moransI = sumWeights > 0 ? (n / sumWeights) * (sumWeighted / (variance * n)) : 0;
-  
-  // Expected value and z-score (simplified)
-  const expectedI = -1 / (n - 1);
-  const expectedVariance = 1 / (n - 1); // Simplified
-  const zScore = expectedVariance > 0 ? (moransI - expectedI) / Math.sqrt(expectedVariance) : 0;
-  
-  return { moransI, zScore };
-}
 
-function detectClusters(points: IndentationPoint[], property: string): number {
-  if (points.length < 4) return 1;
-  
-  // Simple variance-based cluster detection
-  const values = points.map(p => p.properties[property] ?? 0);
-  const sortedValues = [...values].sort((a, b) => a - b);
-  
-  // Find natural breaks (Jenks-like)
-  let maxGapIndex = 0;
-  let maxGap = 0;
-  
-  for (let i = 1; i < sortedValues.length; i++) {
-    const gap = sortedValues[i] - sortedValues[i - 1];
-    if (gap > maxGap) {
-      maxGap = gap;
-      maxGapIndex = i;
+  let sumWeighted = 0;
+  let S0 = 0;
+  for (let i = 0; i < n; i++) {
+    for (const j of neighbours[i]) {
+      sumWeighted += deviations[i] * deviations[j];
+      S0 += 1;
     }
   }
-  
-  // If there's a significant gap, we have at least 2 clusters
-  const range = sortedValues[sortedValues.length - 1] - sortedValues[0];
-  return maxGap > range * 0.3 ? 2 : 1;
+
+  if (S0 === 0) return { moransI: 0, zScore: 0, pValue: 1 };
+
+  const moransI = (n / S0) * (sumWeighted / (m2 * n));
+
+  // Weight sums for a symmetric binary matrix:
+  //   S1 = (1/2) * sum_ij (w_ij + w_ji)^2 = 2 * S0
+  //   S2 = sum_i (rowsum_i + colsum_i)^2  = sum_i (2 * deg_i)^2
+  const S1 = 2 * S0;
+  let S2 = 0;
+  for (let i = 0; i < n; i++) S2 += (2 * neighbours[i].length) ** 2;
+
+  // Kurtosis term b2 = n * sum(d^4) / (sum(d^2))^2
+  const sumD2 = deviations.reduce((s, d) => s + d * d, 0);
+  const sumD4 = deviations.reduce((s, d) => s + d ** 4, 0);
+  const b2 = (n * sumD4) / (sumD2 * sumD2);
+
+  const expectedI = -1 / (n - 1);
+
+  const numerator =
+    n * ((n * n - 3 * n + 3) * S1 - n * S2 + 3 * S0 * S0) -
+    b2 * ((n * n - n) * S1 - 2 * n * S2 + 6 * S0 * S0);
+  const denominator = (n - 1) * (n - 2) * (n - 3) * S0 * S0;
+
+  if (denominator === 0) return { moransI, zScore: 0, pValue: 1 };
+
+  const varI = numerator / denominator - expectedI * expectedI;
+  if (!(varI > 0)) return { moransI, zScore: 0, pValue: 1 };
+
+  const zScore = (moransI - expectedI) / Math.sqrt(varI);
+  const pValue = 2 * (1 - normalCDF(Math.abs(zScore)));
+
+  return { moransI, zScore, pValue: Math.max(0, Math.min(1, pValue)) };
 }
 
 // ============= VOLUME ANALYSIS =============
 
 export interface VolumeAnalysisResult {
-  boundingVolume: number;       // Volume of bounding box
-  convexHullVolume: number;     // Volume of 3D convex hull (estimated)
+  boundingVolume: number;       // Volume of the axis-aligned XYZ bounding box
+  /**
+   * Volume of the prism formed by the 2D convex hull of the measured XY
+   * footprint extruded over the Z range. This replaces a field previously
+   * called `convexHullVolume` that was computed as `boundingVolume * 0.65`
+   * — a hardcoded constant presented as a measurement.
+   */
+  hullPrismVolume: number;
+  hullFootprintArea: number;    // Area of the 2D convex hull of the XY footprint
   pointCoverage: number;        // Percentage of grid cells with data
   voidPercentage: number;       // Percentage of empty cells
   volumeUnderSurface: number;   // Volume between surface and base
@@ -385,7 +427,7 @@ export interface VolumeAnalysisResult {
 export function calculateVolumeAnalysis(points: IndentationPoint[]): VolumeAnalysisResult {
   if (points.length === 0) {
     return {
-      boundingVolume: 0, convexHullVolume: 0,
+      boundingVolume: 0, hullPrismVolume: 0, hullFootprintArea: 0,
       pointCoverage: 0, voidPercentage: 100,
       volumeUnderSurface: 0, fillingRatio: 0, meanSpacing: 0
     };
@@ -405,8 +447,10 @@ export function calculateVolumeAnalysis(points: IndentationPoint[]): VolumeAnaly
   
   const boundingVolume = xRange * yRange * zRange;
   
-  // Convex hull volume estimation (approximate as 0.6-0.7 of bounding box for typical data)
-  const convexHullVolume = boundingVolume * 0.65;
+  // Real geometry: convex hull of the measured XY footprint, extruded over Z.
+  // (Previously this was `boundingVolume * 0.65` — a made-up constant.)
+  const hullFootprintArea = polygonArea(convexHull2D(points.map(p => ({ x: p.x, y: p.y }))));
+  const hullPrismVolume = hullFootprintArea * zRange;
   
   // Grid coverage analysis
   const gridSize = Math.ceil(Math.cbrt(points.length));
@@ -459,7 +503,7 @@ export function calculateVolumeAnalysis(points: IndentationPoint[]): VolumeAnaly
   const meanSpacing = spacingCount > 0 ? totalSpacing / spacingCount : 0;
 
   return {
-    boundingVolume, convexHullVolume,
+    boundingVolume, hullPrismVolume, hullFootprintArea,
     pointCoverage, voidPercentage,
     volumeUnderSurface, fillingRatio, meanSpacing
   };
@@ -541,41 +585,82 @@ export function calculateGradientAnalysis(
   };
 }
 
+/**
+ * Multiple linear regression of the property on position: prop = a*x + b*y + c*z + d.
+ *
+ * The previous version's comment claimed multiple regression but the code ran
+ * three *independent* univariate fits (cov(x,v)/var(x) and so on). Those only
+ * agree with the true partial slopes when x, y and z are mutually uncorrelated
+ * — which is exactly what a tilted sample stage violates, since Z drifts with X
+ * and Y. This solves the 3x3 normal equations properly via Gaussian elimination
+ * with partial pivoting, falling back to per-axis slopes if the system is
+ * singular (e.g. a perfectly flat Z).
+ */
 function calculate3DGradient(points: IndentationPoint[], property: string): { gradX: number; gradY: number; gradZ: number } {
-  // Multiple linear regression: prop = a*x + b*y + c*z + d
-  // Simplified gradient calculation using covariance
+  const n = points.length;
   const values = points.map(p => p.properties[property] ?? 0);
-  const xValues = points.map(p => p.x);
-  const yValues = points.map(p => p.y);
-  const zValues = points.map(p => p.z);
-  
-  const meanV = values.reduce((a, b) => a + b, 0) / values.length;
-  const meanX = xValues.reduce((a, b) => a + b, 0) / xValues.length;
-  const meanY = yValues.reduce((a, b) => a + b, 0) / yValues.length;
-  const meanZ = zValues.reduce((a, b) => a + b, 0) / zValues.length;
-  
-  let covXV = 0, covYV = 0, covZV = 0;
-  let varX = 0, varY = 0, varZ = 0;
-  
-  for (let i = 0; i < points.length; i++) {
-    const dx = xValues[i] - meanX;
-    const dy = yValues[i] - meanY;
-    const dz = zValues[i] - meanZ;
+
+  const meanV = values.reduce((a, b) => a + b, 0) / n;
+  const meanX = points.reduce((s, p) => s + p.x, 0) / n;
+  const meanY = points.reduce((s, p) => s + p.y, 0) / n;
+  const meanZ = points.reduce((s, p) => s + p.z, 0) / n;
+
+  // Build the symmetric scatter matrix and the right-hand side
+  let sxx = 0, syy = 0, szz = 0, sxy = 0, sxz = 0, syz = 0;
+  let sxv = 0, syv = 0, szv = 0;
+
+  for (let i = 0; i < n; i++) {
+    const dx = points[i].x - meanX;
+    const dy = points[i].y - meanY;
+    const dz = points[i].z - meanZ;
     const dv = values[i] - meanV;
-    
-    covXV += dx * dv;
-    covYV += dy * dv;
-    covZV += dz * dv;
-    varX += dx * dx;
-    varY += dy * dy;
-    varZ += dz * dz;
+
+    sxx += dx * dx; syy += dy * dy; szz += dz * dz;
+    sxy += dx * dy; sxz += dx * dz; syz += dy * dz;
+    sxv += dx * dv; syv += dy * dv; szv += dz * dv;
   }
-  
-  const gradX = varX > 0 ? covXV / varX : 0;
-  const gradY = varY > 0 ? covYV / varY : 0;
-  const gradZ = varZ > 0 ? covZV / varZ : 0;
-  
-  return { gradX, gradY, gradZ };
+
+  // Augmented matrix [A | b]
+  const m: number[][] = [
+    [sxx, sxy, sxz, sxv],
+    [sxy, syy, syz, syv],
+    [sxz, syz, szz, szv],
+  ];
+
+  const scale = Math.max(sxx, syy, szz, 1);
+  const EPS = 1e-12 * scale;
+
+  // Gaussian elimination with partial pivoting
+  for (let col = 0; col < 3; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < 3; r++) {
+      if (Math.abs(m[r][col]) > Math.abs(m[pivot][col])) pivot = r;
+    }
+    if (Math.abs(m[pivot][col]) < EPS) {
+      // Singular — fall back to independent per-axis slopes
+      return {
+        gradX: sxx > 0 ? sxv / sxx : 0,
+        gradY: syy > 0 ? syv / syy : 0,
+        gradZ: szz > 0 ? szv / szz : 0,
+      };
+    }
+    if (pivot !== col) [m[col], m[pivot]] = [m[pivot], m[col]];
+
+    for (let r = col + 1; r < 3; r++) {
+      const factor = m[r][col] / m[col][col];
+      for (let c = col; c < 4; c++) m[r][c] -= factor * m[col][c];
+    }
+  }
+
+  // Back substitution
+  const coef = [0, 0, 0];
+  for (let r = 2; r >= 0; r--) {
+    let sum = m[r][3];
+    for (let c = r + 1; c < 3; c++) sum -= m[r][c] * coef[c];
+    coef[r] = sum / m[r][r];
+  }
+
+  return { gradX: coef[0], gradY: coef[1], gradZ: coef[2] };
 }
 
 function calculateDirectionalVariance(points: IndentationPoint[], property: string, direction: 'x' | 'y' | 'z'): number {

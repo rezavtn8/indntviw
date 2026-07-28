@@ -11,7 +11,7 @@ import {
   calculateEffectSize,
   oneWayANOVA,
   kruskalWallis,
-  tukeyHSD,
+  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
 import { Badge } from '@/components/ui/badge';
@@ -201,7 +201,7 @@ export const SampleLevelGroupComparison: React.FC<Props> = ({
     return {
       anova: oneWayANOVA(arrays),
       kw: kruskalWallis(arrays),
-      tukey: tukeyHSD(valid.map(g => ({ name: g.group.name, values: g.values }))),
+      tukey: pairwisePostHoc(valid.map(g => ({ name: g.group.name, values: g.values }))),
     };
   }, [groupSummaries]);
 
@@ -432,7 +432,7 @@ export const SampleLevelGroupComparison: React.FC<Props> = ({
           {multiGroupTests.tukey.length > 0 && (
             <div>
               <div className="text-muted-foreground uppercase text-[10px] font-mono mb-1">
-                Tukey HSD post-hoc
+                Pairwise post-hoc (Holm)
               </div>
               <ScrollArea className="h-32 border border-border rounded">
                 <div className="p-2 space-y-1">

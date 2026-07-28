@@ -49,7 +49,11 @@ export const calculateExtendedStatistics = (
   const min = values[0];
   const max = values[values.length - 1];
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+  // Sample standard deviation (n-1). These are samples of indents, not a whole
+  // population, and this must match calculateDescriptiveStats in
+  // advancedStatistics.ts — previously the two disagreed for the same points.
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+    Math.max(1, values.length - 1);
   const stdDev = Math.sqrt(variance);
 
   const getPercentile = (arr: number[], p: number) => {

@@ -93,7 +93,7 @@ export function calculateNiceAxisBounds(values: number[]): { niceMin: number; ni
   // Use 8% padding to give breathing room above/below data
   const padding = dataRange * 0.08;
   let paddedMin = rawMin - padding;
-  let paddedMax = rawMax + padding;
+  const paddedMax = rawMax + padding;
   
   // CRITICAL: If all values are non-negative, don't let min go below 0
   if (rawMin >= 0) {

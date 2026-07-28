@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Environment / secrets.
+# Lovable's default .gitignore omits these, which is how .env files end up
+# committed. Keep this block in every project.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

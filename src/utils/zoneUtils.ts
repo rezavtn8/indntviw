@@ -2,6 +2,7 @@ import { Zone, ZonePoint, ZoneStatistics, createDefaultZone } from '@/types/zone
 import { IndentationPoint } from '@/types/indentation';
 import { isPointInPolygon } from './statisticsUtils';
 import { generateZoneBoundary, boundaryToSVGPath } from './boundaryGenerator';
+import { minOf, maxOf } from './numeric';
 
 // Check if a data point is inside a zone
 export function isPointInZone(point: IndentationPoint, zone: Zone): boolean {
@@ -48,14 +49,26 @@ export function isPointInZone(point: IndentationPoint, zone: Zone): boolean {
   return false;
 }
 
-// Get all points inside a zone
+// Get all points inside a zone.
+// Member lookup goes through a Set: `memberPointIds.includes()` inside a filter
+// made this O(points x members), and it runs on every render of every analysis
+// panel. With a Set it is O(points).
 export function getPointsInZone(points: IndentationPoint[], zone: Zone): IndentationPoint[] {
+  if (!zone.visible) return [];
+
+  const memberIds = zone.memberPointIds ?? [];
+  if (memberIds.length > 0) {
+    const memberSet = new Set(memberIds);
+    return points.filter(p => memberSet.has(p.id));
+  }
+
   return points.filter(p => isPointInZone(p, zone));
 }
 
 // Get member points from IDs
 export function getMemberPoints(allPoints: IndentationPoint[], memberIds: number[]): IndentationPoint[] {
-  return allPoints.filter(p => memberIds.includes(p.id));
+  const memberSet = new Set(memberIds);
+  return allPoints.filter(p => memberSet.has(p.id));
 }
 
 // Calculate statistics for points in a zone
@@ -74,10 +87,12 @@ export function calculateZoneStatistics(
   }
 
   const count = values.length;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const min = minOf(values);
+  const max = maxOf(values);
   const mean = values.reduce((a, b) => a + b, 0) / count;
-  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / count;
+  // Sample standard deviation (n-1), consistent with the rest of the project
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+    Math.max(1, count - 1);
   const stdDev = Math.sqrt(variance);
 
   return { count, min, max, mean, stdDev };

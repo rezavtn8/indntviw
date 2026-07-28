@@ -1,10 +1,75 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { storageService, PersistedWorkspace, PersistedSession } from '@/utils/storageService';
+import { storageService, PersistedWorkspace, toPersistedSession } from '@/utils/storageService';
 import { FileSession } from '@/types/fileSession';
 import { SampleGroup } from '@/components/analysis/SampleGrouping';
 
 const DEBOUNCE_MS = 1000;
 const WORKSPACE_VERSION = 1;
+
+/**
+ * Cheap change signature for the workspace.
+ *
+ * The previous version hashed only `{sessionIds, zones.length, groups.length,
+ * activeSessionId, globalSelectedProperty}`. That meant deleting a point,
+ * editing a point's value, reshaping or renaming a zone, or changing colours
+ * all left the hash identical — so autosave decided nothing had changed and
+ * the work was never written. This walks the mutable state that actually
+ * matters, in O(points), which is fine behind the 1s debounce.
+ */
+function fingerprint(
+  sessions: FileSession[],
+  groups: SampleGroup[],
+  activeSessionId: string | null,
+  globalSelectedProperty: string,
+): string {
+  const parts: (string | number)[] = [
+    activeSessionId ?? '-',
+    globalSelectedProperty,
+    groups.length,
+  ];
+
+  for (const g of groups) {
+    parts.push(g.id, g.name, g.sessionIds.length, g.sessionIds.join('.'));
+  }
+
+  for (const s of sessions) {
+    parts.push(s.id, s.fileName, s.colorScheme, s.customMin ?? 'n', s.customMax ?? 'n');
+    parts.push(s.overrideColorRange ? 1 : 0);
+    parts.push(s.overlayImageDataUrl ? s.overlayImageDataUrl.length : 0);
+    parts.push(JSON.stringify(s.overlayTransform ?? null));
+    parts.push(JSON.stringify(s.overlayPointsTransform ?? null));
+    parts.push(JSON.stringify(s.overlayPointSettings ?? null));
+    parts.push(s.overlayActiveLayer ?? '-', s.overlayPointsVisible ? 1 : 0);
+
+    // Zone geometry and membership
+    parts.push(s.zones.length);
+    for (const z of s.zones) {
+      parts.push(z.id, z.name, z.color, z.memberPointIds.length, z.points.length);
+    }
+
+    // Point data: a running checksum catches edits, deletions and additions
+    // without serialising the whole dataset on every keystroke.
+    let idSum = 0;
+    let coordSum = 0;
+    let valueSum = 0;
+    for (const p of s.data.points) {
+      idSum += p.id;
+      coordSum += p.x + p.y + p.z;
+      for (const key in p.properties) {
+        const v = p.properties[key];
+        if (typeof v === 'number' && isFinite(v)) valueSum += v;
+      }
+    }
+    parts.push(
+      s.data.points.length,
+      idSum,
+      Math.round(coordSum * 1e6),
+      Math.round(valueSum * 1e3),
+    );
+  }
+
+  return parts.join('|');
+}
 
 interface UseWorkspacePersistenceProps {
   fileSessions: FileSession[];
@@ -27,18 +92,6 @@ export const useWorkspacePersistence = ({
   const hasLoadedRef = useRef(false);
   const lastSaveRef = useRef<string>('');
 
-  // Convert FileSession to PersistedSession (exclude transient state)
-  const toPersistedSession = useCallback((session: FileSession): PersistedSession => ({
-    id: session.id,
-    fileName: session.fileName,
-    data: session.data,
-    originalData: session.originalData,
-    zones: session.zones,
-    colorScheme: session.colorScheme,
-    customMin: session.customMin,
-    customMax: session.customMax,
-  }), []);
-
   // Save workspace
   const saveWorkspace = useCallback(async () => {
     if (!storageService.isIndexedDBAvailable()) return;
@@ -53,14 +106,7 @@ export const useWorkspacePersistence = ({
       globalSelectedProperty,
     };
 
-    // Check if anything changed (simple hash comparison)
-    const hash = JSON.stringify({
-      sessionIds: fileSessions.map(s => s.id),
-      zones: fileSessions.map(s => s.zones.length),
-      groups: groups.length,
-      activeSessionId,
-      globalSelectedProperty,
-    });
+    const hash = fingerprint(fileSessions, groups, activeSessionId, globalSelectedProperty);
 
     if (hash === lastSaveRef.current) return;
     lastSaveRef.current = hash;
@@ -71,7 +117,7 @@ export const useWorkspacePersistence = ({
     } catch (error) {
       console.error('[Persistence] Save failed:', error);
     }
-  }, [fileSessions, activeSessionId, groups, globalSelectedProperty, toPersistedSession]);
+  }, [fileSessions, activeSessionId, groups, globalSelectedProperty]);
 
   // Debounced save
   const debouncedSave = useCallback(() => {
@@ -112,18 +158,35 @@ export const useWorkspacePersistence = ({
     debouncedSave();
   }, [fileSessions, activeSessionId, groups, globalSelectedProperty, isInitialized, debouncedSave]);
 
-  // Save before unload
+  // Flush pending saves when the page is hidden.
+  //
+  // `beforeunload` alone is unreliable here: IndexedDB writes are async and the
+  // browser will not wait for them, so a pending debounce was routinely lost on
+  // tab close. `visibilitychange -> hidden` fires early enough (tab switch,
+  // minimise, navigation start) that the write actually completes, and it is
+  // the only lifecycle event mobile browsers reliably deliver.
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const flush = () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
-      // Sync save attempt (may not complete for large data)
-      saveWorkspace();
+      void saveWorkspace();
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
   }, [saveWorkspace]);
 
   // Cleanup timeout on unmount

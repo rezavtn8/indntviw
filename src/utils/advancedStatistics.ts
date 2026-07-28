@@ -75,7 +75,10 @@ export interface PostHocResult {
   group1: string;
   group2: string;
   meanDiff: number;
+  /** Holm-adjusted p-value — this is the one to report. */
   pValue: number;
+  /** Uncorrected p-value, retained for transparency. */
+  pRaw: number;
   isSignificant: boolean;
 }
 
@@ -109,12 +112,14 @@ export const normalCDF = (x: number): number => {
   return 0.5 * (1.0 + sign * y);
 };
 
-// t-distribution CDF approximation (using normal for large df)
-const tCDF = (t: number, df: number): number => {
-  if (df > 30) return normalCDF(t);
-  // Simple approximation for smaller df
+// Student's t CDF — exact via the regularized incomplete beta, valid for all df.
+// (Previously this fell back to the normal distribution above df=30, which made
+// two-tailed p-values roughly 2x too small in that range.)
+export const tCDF = (t: number, df: number): number => {
+  if (!isFinite(t) || df <= 0) return 0.5;
   const x = df / (df + t * t);
-  return 1 - 0.5 * incompleteBeta(x, df / 2, 0.5);
+  const tail = 0.5 * incompleteBeta(x, df / 2, 0.5);
+  return t > 0 ? 1 - tail : tail;
 };
 
 // Incomplete beta function approximation
@@ -132,6 +137,10 @@ const incompleteBeta = (x: number, a: number, b: number): number => {
 };
 
 const lgamma = (x: number): number => {
+  // Lanczos coefficients (g=5, n=6) as published. Written at full printed
+  // precision even though a double cannot hold every digit exactly — rounding
+  // to the nearest representable value is the intended behaviour here.
+  // eslint-disable-next-line no-loss-of-precision
   const cof = [76.18009172947146, -86.50532032941677, 24.01409824083091,
     -1.231739572450155, 0.001208650973866179, -0.000005395239384953];
   let y = x;
@@ -139,7 +148,7 @@ const lgamma = (x: number): number => {
   tmp -= (x + 0.5) * Math.log(tmp);
   let ser = 1.000000000190015;
   for (let j = 0; j <= 5; j++) ser += cof[j] / ++y;
-  return -tmp + Math.log(2.5066282746310005 * ser / x);
+  return -tmp + Math.log(Math.sqrt(2 * Math.PI) * ser / x);
 };
 
 const betaCF = (x: number, a: number, b: number): number => {
@@ -175,10 +184,52 @@ const betaCF = (x: number, a: number, b: number): number => {
   return h;
 };
 
-// Chi-squared CDF approximation
+// Regularized lower incomplete gamma P(a, x).
+// Series expansion below a+1, continued fraction above (Numerical Recipes gser/gcf).
+const gammaP = (a: number, x: number): number => {
+  if (x <= 0 || a <= 0) return 0;
+
+  if (x < a + 1) {
+    let ap = a;
+    let sum = 1 / a;
+    let del = sum;
+    for (let n = 1; n <= 500; n++) {
+      ap += 1;
+      del *= x / ap;
+      sum += del;
+      if (Math.abs(del) < Math.abs(sum) * 1e-14) break;
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - lgamma(a));
+  }
+
+  // Continued fraction gives Q(a,x) = 1 - P(a,x)
+  const TINY = 1e-300;
+  let b = x + 1 - a;
+  let c = 1 / TINY;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i <= 500; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < TINY) d = TINY;
+    c = b + an / c;
+    if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-14) break;
+  }
+  const q = Math.exp(-x + a * Math.log(x) - lgamma(a)) * h;
+  return 1 - q;
+};
+
+// Chi-squared CDF — P(k/2, x/2).
+// (Previously this used the *t-distribution* incomplete-beta formula, which made
+// every Kruskal-Wallis p-value wrong by factors of 1.5x to 30x.)
 const chiSquaredCDF = (x: number, df: number): number => {
   if (x <= 0) return 0;
-  return 1 - incompleteBeta(df / (df + x), df / 2, 0.5);
+  return gammaP(df / 2, x / 2);
 };
 
 // F-distribution CDF approximation
@@ -186,6 +237,88 @@ const fCDF = (f: number, df1: number, df2: number): number => {
   if (f <= 0) return 0;
   const x = df2 / (df2 + df1 * f);
   return 1 - incompleteBeta(x, df2 / 2, df1 / 2);
+};
+
+// Inverse standard normal CDF (Acklam's rational approximation, |error| < 1.2e-9)
+export const normalInv = (p: number): number => {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+    1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+    6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+    -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+    3.754408661907416e+00];
+
+  const pLow = 0.02425;
+  const pHigh = 1 - pLow;
+
+  if (p < pLow) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p > pHigh) {
+    const q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  const q = p - 0.5;
+  const r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+    (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+};
+
+// Inverse Student's t via bisection on tCDF. Used for confidence-interval
+// critical values, replacing the previous ad-hoc `2.0 + (30-n)*0.02` formula
+// which was up to 41% wrong at small n.
+export const tInv = (p: number, df: number): number => {
+  if (df <= 0) return NaN;
+  if (df > 2000) return normalInv(p);
+
+  let lo = -200;
+  let hi = 200;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (tCDF(mid, df) < p) lo = mid;
+    else hi = mid;
+    if (hi - lo < 1e-10) break;
+  }
+  return (lo + hi) / 2;
+};
+
+// Two-sided t critical value for a given confidence level (default 95%).
+export const tCritical = (n: number, confidence = 0.95): number => {
+  const df = n - 1;
+  if (df < 1) return NaN;
+  return tInv(1 - (1 - confidence) / 2, df);
+};
+
+/**
+ * Holm-Bonferroni step-down correction. Controls the family-wise error rate
+ * exactly, without assuming independence. Returns adjusted p-values in the
+ * same order as the input.
+ */
+export const holmAdjust = (pValues: number[]): number[] => {
+  const m = pValues.length;
+  if (m === 0) return [];
+
+  const order = pValues
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => a.p - b.p);
+
+  const adjusted = new Array<number>(m);
+  let running = 0;
+  order.forEach((entry, rank) => {
+    const scaled = Math.min(1, (m - rank) * entry.p);
+    running = Math.max(running, scaled); // enforce monotonicity
+    adjusted[entry.i] = running;
+  });
+
+  return adjusted;
 };
 
 // Calculate descriptive statistics
@@ -206,8 +339,8 @@ export const calculateDescriptiveStats = (values: number[]): DescriptiveStats =>
   const sd = Math.sqrt(variance);
   const sem = sd / Math.sqrt(n);
   
-  // 95% CI (using t-distribution critical value approximation)
-  const tCrit = n > 30 ? 1.96 : 2.0 + (30 - n) * 0.02;
+  // 95% CI using the exact t critical value for n-1 degrees of freedom
+  const tCrit = n > 1 ? tCritical(n, 0.95) : 0;
   const ci95Lower = mean - tCrit * sem;
   const ci95Upper = mean + tCrit * sem;
   
@@ -234,34 +367,93 @@ export const calculateDescriptiveStats = (values: number[]): DescriptiveStats =>
   return { n, mean, sem, sd, ci95Lower, ci95Upper, median, q1, q3, iqr, min, max, range, skewness, kurtosis, cv };
 };
 
-// Shapiro-Wilk approximation (simplified)
+/**
+ * Shapiro-Wilk normality test (Royston 1992, AS R94).
+ *
+ * The previous implementation invented its own coefficients
+ * `a_i = (n - 2i - 1) / (n * sqrt(n))` and then fed the resulting statistic into
+ * Royston's real p-value formula, so neither W nor p was meaningful. This uses
+ * Royston's actual expected-order-statistic weights.
+ */
 export const shapiroWilkTest = (values: number[]): NormalityTest => {
   const n = values.length;
   if (n < 3) return { shapiroWilk: { statistic: 1, pValue: 1 }, isNormal: true };
-  
+
   const sorted = [...values].sort((a, b) => a - b);
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  
-  // Calculate W statistic approximation
-  let numerator = 0;
-  for (let i = 0; i < Math.floor(n / 2); i++) {
-    const a = (n - 2 * i - 1) / (n * Math.sqrt(n));
-    numerator += a * (sorted[n - 1 - i] - sorted[i]);
+  const mean = sorted.reduce((a, b) => a + b, 0) / n;
+
+  const ss = sorted.reduce((sum, v) => sum + (v - mean) ** 2, 0);
+  if (ss <= 0) {
+    // Zero variance — degenerate, not meaningfully testable
+    return { shapiroWilk: { statistic: 1, pValue: 1 }, isNormal: true };
   }
-  numerator = numerator * numerator;
-  
-  const denominator = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0);
-  const W = denominator > 0 ? numerator / denominator : 1;
-  
-  // Approximate p-value
-  const mu = 0.0038915 * Math.log(n) * Math.log(n) * Math.log(n) - 0.083751 * Math.log(n) * Math.log(n) - 0.31082 * Math.log(n) - 1.5861;
-  const sigma = Math.exp(0.0030302 * Math.log(n) * Math.log(n) - 0.082676 * Math.log(n) - 0.4803);
-  const z = (Math.log(1 - W) - mu) / sigma;
-  const pValue = 1 - normalCDF(z);
-  
+
+  // m_i = Phi^-1((i - 3/8) / (n + 1/4))
+  const m: number[] = [];
+  for (let i = 1; i <= n; i++) {
+    m.push(normalInv((i - 0.375) / (n + 0.25)));
+  }
+  const mSumSq = m.reduce((sum, v) => sum + v * v, 0);
+
+  // Royston's polynomial corrections for the two extreme weights
+  const rsn = 1 / Math.sqrt(n);
+  const a = new Array<number>(n).fill(0);
+
+  const cn = m[n - 1] / Math.sqrt(mSumSq);
+  const cn1 = m[n - 2] / Math.sqrt(mSumSq);
+
+  const an = -2.706056 * rsn ** 5 + 4.434685 * rsn ** 4 - 2.071190 * rsn ** 3
+    - 0.147981 * rsn ** 2 + 0.221157 * rsn + cn;
+
+  let phi: number;
+  if (n > 5) {
+    const an1 = -3.582633 * rsn ** 5 + 5.682633 * rsn ** 4 - 1.752461 * rsn ** 3
+      - 0.293762 * rsn ** 2 + 0.042981 * rsn + cn1;
+    phi = (mSumSq - 2 * m[n - 1] ** 2 - 2 * m[n - 2] ** 2) /
+      (1 - 2 * an ** 2 - 2 * an1 ** 2);
+    a[n - 1] = an;
+    a[0] = -an;
+    a[n - 2] = an1;
+    a[1] = -an1;
+    for (let i = 2; i < n - 2; i++) a[i] = m[i] / Math.sqrt(phi);
+  } else {
+    phi = (mSumSq - 2 * m[n - 1] ** 2) / (1 - 2 * an ** 2);
+    a[n - 1] = an;
+    a[0] = -an;
+    for (let i = 1; i < n - 1; i++) a[i] = m[i] / Math.sqrt(phi);
+  }
+
+  let numerator = 0;
+  for (let i = 0; i < n; i++) numerator += a[i] * sorted[i];
+  const W = Math.min(1, (numerator * numerator) / ss);
+
+  // Royston's p-value: different normalising transforms for small vs larger n
+  let pValue: number;
+  if (n === 3) {
+    // Exact for n = 3
+    const pi6 = 6 / Math.PI;
+    const stqr = Math.asin(Math.sqrt(0.75));
+    pValue = Math.max(0, Math.min(1, pi6 * (Math.asin(Math.sqrt(W)) - stqr)));
+  } else if (n <= 11) {
+    const gamma = -2.273 + 0.459 * n;
+    const mu = 0.5440 - 0.39978 * n + 0.025054 * n ** 2 - 0.0006714 * n ** 3;
+    const sigma = Math.exp(1.3822 - 0.77857 * n + 0.062767 * n ** 2 - 0.0020322 * n ** 3);
+    const arg = gamma - Math.log(1 - W);
+    if (arg <= 0) return { shapiroWilk: { statistic: W, pValue: 0 }, isNormal: false };
+    const z = (-Math.log(arg) - mu) / sigma;
+    pValue = 1 - normalCDF(z);
+  } else {
+    const ln = Math.log(n);
+    const mu = 0.0038915 * ln ** 3 - 0.083751 * ln ** 2 - 0.31082 * ln - 1.5861;
+    const sigma = Math.exp(0.0030302 * ln ** 2 - 0.082676 * ln - 0.4803);
+    const z = (Math.log(1 - W) - mu) / sigma;
+    pValue = 1 - normalCDF(z);
+  }
+
+  const p = Math.max(0, Math.min(1, pValue));
   return {
-    shapiroWilk: { statistic: W, pValue: Math.max(0, Math.min(1, pValue)) },
-    isNormal: pValue > 0.05
+    shapiroWilk: { statistic: W, pValue: p },
+    isNormal: p > 0.05,
   };
 };
 
@@ -285,8 +477,9 @@ export const welchTTest = (group1: number[], group2: number[]): WelchTTestResult
   const df = den > 0 ? num / den : 1;
   
   const pValue = 2 * (1 - tCDF(Math.abs(t), df));
-  
-  const tCrit = df > 30 ? 1.96 : 2.0;
+
+  // Exact t critical value on the Welch-Satterthwaite df
+  const tCrit = df >= 1 ? tInv(0.975, df) : 0;
   const ci95Lower = meanDiff - tCrit * seDiff;
   const ci95Upper = meanDiff + tCrit * seDiff;
   
@@ -426,7 +619,22 @@ export const kruskalWallis = (groups: number[][]): KruskalWallisResult => {
     }
   }
   H = (12 / (N * (N + 1))) * H - 3 * (N + 1);
-  
+
+  // Tie correction: H / (1 - sum(t^3 - t) / (N^3 - N)).
+  // Without this, H is biased downward whenever values repeat — common with
+  // instrument data quantised to a fixed number of decimals.
+  let tieSum = 0;
+  let ti = 0;
+  while (ti < allValues.length) {
+    let tj = ti;
+    while (tj < allValues.length && allValues[tj].value === allValues[ti].value) tj++;
+    const t = tj - ti;
+    if (t > 1) tieSum += t ** 3 - t;
+    ti = tj;
+  }
+  const tieCorrection = N > 1 ? 1 - tieSum / (N ** 3 - N) : 1;
+  if (tieCorrection > 0) H = H / tieCorrection;
+
   const df = k - 1;
   const pValue = 1 - chiSquaredCDF(H, df);
   
@@ -465,47 +673,69 @@ export const calculateEffectSize = (group1: number[], group2: number[]): EffectS
   return { cohensD, hedgesG, interpretation };
 };
 
-// Tukey HSD post-hoc test
-export const tukeyHSD = (groups: { name: string; values: number[] }[]): PostHocResult[] => {
-  const results: PostHocResult[] = [];
+/**
+ * Pairwise post-hoc comparisons with Holm-Bonferroni family-wise error control.
+ *
+ * This replaces a function that was labelled "Tukey HSD" but actually ran an
+ * uncorrected pairwise z-test — with 5 groups (10 comparisons) that gives a
+ * family-wise error rate near 40% rather than 5%.
+ *
+ * Each pair is compared with a t-test on the pooled within-group variance
+ * (the same MSE an ANOVA uses), then the resulting p-values are Holm-adjusted.
+ * Holm is uniformly more powerful than Bonferroni and, unlike the studentized
+ * range, is exact to compute — so the number shown is the number you get.
+ *
+ * `pValue` is the adjusted (reportable) value; `pRaw` is kept for transparency.
+ */
+export const pairwisePostHoc = (groups: { name: string; values: number[] }[]): PostHocResult[] => {
   const k = groups.length;
-  
-  // Calculate MSE (within-group variance)
-  const allValues = groups.flatMap(g => g.values);
-  const N = allValues.length;
+  if (k < 2) return [];
+
+  const usable = groups.filter(g => g.values.length > 0);
+  if (usable.length < 2) return [];
+
+  // Pooled within-group mean square error, as in one-way ANOVA
+  const N = usable.reduce((sum, g) => sum + g.values.length, 0);
   let ssWithin = 0;
-  for (const group of groups) {
+  for (const group of usable) {
     const mean = group.values.reduce((a, b) => a + b, 0) / group.values.length;
-    ssWithin += group.values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0);
+    ssWithin += group.values.reduce((sum, val) => sum + (val - mean) ** 2, 0);
   }
-  const mse = ssWithin / (N - k);
-  
-  // Pairwise comparisons
-  for (let i = 0; i < k; i++) {
-    for (let j = i + 1; j < k; j++) {
-      const g1 = groups[i];
-      const g2 = groups[j];
-      const mean1 = g1.values.reduce((a, b) => a + b, 0) / g1.values.length;
-      const mean2 = g2.values.reduce((a, b) => a + b, 0) / g2.values.length;
+  const dfWithin = N - usable.length;
+  const mse = dfWithin > 0 ? ssWithin / dfWithin : 0;
+
+  const pending: { group1: string; group2: string; meanDiff: number; pRaw: number }[] = [];
+
+  for (let i = 0; i < usable.length; i++) {
+    for (let j = i + 1; j < usable.length; j++) {
+      const g1 = usable[i];
+      const g2 = usable[j];
+      const n1 = g1.values.length;
+      const n2 = g2.values.length;
+      const mean1 = g1.values.reduce((a, b) => a + b, 0) / n1;
+      const mean2 = g2.values.reduce((a, b) => a + b, 0) / n2;
       const meanDiff = mean1 - mean2;
-      
-      const se = Math.sqrt(mse * (1 / g1.values.length + 1 / g2.values.length) / 2);
-      const q = se > 0 ? Math.abs(meanDiff) / se : 0;
-      
-      // Approximate p-value using normal distribution
-      const pValue = 2 * (1 - normalCDF(q / Math.sqrt(2)));
-      
-      results.push({
-        group1: g1.name,
-        group2: g2.name,
-        meanDiff,
-        pValue: Math.max(0, Math.min(1, pValue)),
-        isSignificant: pValue < 0.05
-      });
+
+      const se = Math.sqrt(mse * (1 / n1 + 1 / n2));
+      const t = se > 0 ? meanDiff / se : 0;
+      const pRaw = dfWithin > 0
+        ? Math.max(0, Math.min(1, 2 * (1 - tCDF(Math.abs(t), dfWithin))))
+        : 1;
+
+      pending.push({ group1: g1.name, group2: g2.name, meanDiff, pRaw });
     }
   }
-  
-  return results;
+
+  const adjusted = holmAdjust(pending.map(c => c.pRaw));
+
+  return pending.map((c, idx) => ({
+    group1: c.group1,
+    group2: c.group2,
+    meanDiff: c.meanDiff,
+    pRaw: c.pRaw,
+    pValue: adjusted[idx],
+    isSignificant: adjusted[idx] < 0.05,
+  }));
 };
 
 // Pearson and Spearman correlation

@@ -10,7 +10,7 @@ import {
   calculateEffectSize,
   oneWayANOVA,
   kruskalWallis,
-  tukeyHSD,
+  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
 import { Badge } from '@/components/ui/badge';
@@ -164,7 +164,7 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
     return {
       anova: oneWayANOVA(valueArrays),
       kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: groupZoneData.length > 2 ? tukeyHSD(namedGroups) : null,
+      postHoc: groupZoneData.length > 2 ? pairwisePostHoc(namedGroups) : null,
     };
   }, [groupZoneData]);
 
@@ -370,7 +370,7 @@ export const ZoneBetweenGroupsAnalysis: React.FC<ZoneBetweenGroupsAnalysisProps>
           {/* Post-hoc */}
           {multiGroupTests.postHoc && multiGroupTests.postHoc.length > 0 && (
             <div className="pt-2 border-t border-border">
-              <span className="font-mono text-[10px] font-bold">Tukey HSD Post-hoc:</span>
+              <span className="font-mono text-[10px] font-bold">Pairwise post-hoc (Holm):</span>
               <div className="mt-1 grid grid-cols-1 gap-1">
                 {multiGroupTests.postHoc.map((ph, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-[10px] font-mono">

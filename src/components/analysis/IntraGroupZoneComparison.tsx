@@ -14,7 +14,7 @@ import {
   mannWhitneyU,
   oneWayANOVA,
   kruskalWallis,
-  tukeyHSD,
+  pairwisePostHoc,
   calculateEffectSize,
   shapiroWilkTest,
   getPropertyValues,
@@ -150,7 +150,7 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
       // Multi-group comparison
       const anova = oneWayANOVA(groups);
       const kw = kruskalWallis(groups);
-      const tukey = tukeyHSD(pooledZones.map(z => ({ name: z.displayName, values: z.values })));
+      const tukey = pairwisePostHoc(pooledZones.map(z => ({ name: z.displayName, values: z.values })));
 
       return {
         normalityTests,
@@ -343,10 +343,10 @@ export const IntraGroupZoneComparison: React.FC<IntraGroupZoneComparisonProps> =
                   </div>
                 </div>
 
-                {/* Tukey HSD */}
+                {/* Pairwise post-hoc */}
                 {statisticalTests.multiGroup.anova.isSignificant && statisticalTests.multiGroup.tukey.length > 0 && (
                   <div>
-                    <p className="font-bold text-muted-foreground mb-1">Tukey HSD Post-hoc</p>
+                    <p className="font-bold text-muted-foreground mb-1">Pairwise post-hoc (Holm)</p>
                     <ScrollArea className="h-24">
                       <div className="space-y-1">
                         {statisticalTests.multiGroup.tukey.map((t, i) => (

@@ -4,8 +4,8 @@ import { FileSession, createFileSession, generateSessionId } from '@/types/fileS
 import { SampleGroup } from '@/components/analysis/SampleGrouping';
 import { parseTabSeparatedData } from '@/utils/dataParser';
 import { useWorkspacePersistence } from '@/hooks/useWorkspacePersistence';
-import { PersistedWorkspace, PersistedSession } from '@/utils/storageService';
-import { storageService } from '@/utils/storageService';
+import { PersistedWorkspace } from '@/utils/storageService';
+import { storageService, toPersistedSession } from '@/utils/storageService';
 import { saveProjectToFile, loadProjectFromFile } from '@/utils/projectFileService';
 import { toast } from 'sonner';
 
@@ -129,7 +129,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const allValues: number[] = [];
     let samplesWithProperty = 0;
     let samplesMissingProperty = 0;
-    let propertyNameForToast = globalSelectedProperty;
+    const propertyNameForToast = globalSelectedProperty;
 
     fileSessions.forEach(s => {
       const prop = s.data.propertyNames.includes(globalSelectedProperty)
@@ -349,18 +349,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     toast.success('Workspace cleared');
   }, []);
 
-  // Convert FileSession to PersistedSession
-  const toPersistedSession = useCallback((session: FileSession): PersistedSession => ({
-    id: session.id,
-    fileName: session.fileName,
-    data: session.data,
-    originalData: session.originalData,
-    zones: session.zones,
-    colorScheme: session.colorScheme,
-    customMin: session.customMin,
-    customMax: session.customMax,
-  }), []);
-
   const saveProjectFile = useCallback(async () => {
     if (fileSessions.length === 0) {
       toast.error('Nothing to save — open some files first');
@@ -381,7 +369,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('Failed to save project:', error);
       toast.error('Failed to save project');
     }
-  }, [fileSessions, activeSessionId, groups, globalSelectedProperty, toPersistedSession]);
+  }, [fileSessions, activeSessionId, groups, globalSelectedProperty]);
 
   const loadProjectFile = useCallback(async (file: File) => {
     try {

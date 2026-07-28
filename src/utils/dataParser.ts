@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { IndentationData, IndentationPoint } from '@/types/indentation';
+import { minOf, maxOf } from './numeric';
 
 const HEADER_MAPPINGS: Record<string, string> = {
   'HIT [kPa]': 'HIT',
@@ -45,15 +46,55 @@ function normalizeHeader(header: string): string {
   return HEADER_MAPPINGS[trimmed] || trimmed;
 }
 
+/**
+ * Detect the column delimiter.
+ *
+ * The uploader accepts .csv and .tsv, but this parser previously split on '\t'
+ * unconditionally — so a genuine comma-separated export either threw
+ * "Could not find header row" or parsed every row into a single column.
+ * We pick whichever candidate yields the most consistent column count across
+ * the first few populated lines.
+ */
+function detectDelimiter(lines: string[]): string {
+  const candidates = ['\t', ',', ';'];
+  let best = '\t';
+  let bestScore = -1;
+
+  for (const delim of candidates) {
+    const counts = lines
+      .slice(0, 15)
+      .map(l => l.split(delim).length)
+      .filter(n => n > 1);
+
+    if (counts.length === 0) continue;
+
+    // Favour delimiters that split into many columns, consistently
+    const maxCols = Math.max(...counts);
+    const consistent = counts.filter(n => n === maxCols).length;
+    const score = maxCols * consistent;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = delim;
+    }
+  }
+
+  return best;
+}
+
 export function parseTabSeparatedData(content: string): IndentationData {
-  const lines = content.split('\n').filter(line => line.trim());
-  
+  // Strip a UTF-8 BOM and normalise CRLF — both appear in Windows exports
+  const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n').filter(line => line.trim());
+
+  const delimiter = detectDelimiter(lines);
+
   // Find header line (contains column names)
   let headerLineIndex = -1;
   let rawHeaders: string[] = [];
-  
+
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
-    const cells = lines[i].split('\t').map(c => c.trim());
+    const cells = lines[i].split(delimiter).map(c => c.trim());
     if (cells.some(c => c.includes('X position') || c.includes('HIT'))) {
       headerLineIndex = i;
       rawHeaders = cells;
@@ -71,7 +112,7 @@ export function parseTabSeparatedData(content: string): IndentationData {
   let pairedLabelRowIndex = -1;
   
   for (let i = headerLineIndex + 1; i < Math.min(lines.length, headerLineIndex + 5); i++) {
-    const cells = lines[i].split('\t').map(c => c.trim());
+    const cells = lines[i].split(delimiter).map(c => c.trim());
     if (cells.some(c => c === 'Calibration') && cells.some(c => c === 'Matrix')) {
       isPairedFormat = true;
       pairedLabelRowIndex = i;
@@ -85,7 +126,7 @@ export function parseTabSeparatedData(content: string): IndentationData {
   let columnIndexMap: number[] = []; // Maps effective column index to actual cell index
   
   if (isPairedFormat) {
-    const labelRow = lines[pairedLabelRowIndex].split('\t').map(c => c.trim());
+    const labelRow = lines[pairedLabelRowIndex].split(delimiter).map(c => c.trim());
     
     // For paired format, we want the "Matrix" columns (second of each pair)
     // Headers are duplicated, so we take every unique header with its Matrix column
@@ -138,7 +179,7 @@ export function parseTabSeparatedData(content: string): IndentationData {
   
   let id = 0;
   for (let i = dataStartIndex; i < lines.length; i++) {
-    const cells = lines[i].split('\t').map(c => c.trim());
+    const cells = lines[i].split(delimiter).map(c => c.trim());
     
     // Get the first non-empty cell for checking
     const firstCell = cells[0] || '';
@@ -259,21 +300,24 @@ function calculateStatistics(
       return;
     }
 
-    min[prop] = Math.min(...values);
-    max[prop] = Math.max(...values);
+    min[prop] = minOf(values);
+    max[prop] = maxOf(values);
     mean[prop] = values.reduce((a, b) => a + b, 0) / values.length;
-    
-    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean[prop], 2), 0) / values.length;
+
+    // Sample standard deviation (n-1), consistent with advancedStatistics.ts
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean[prop], 2), 0) /
+      Math.max(1, values.length - 1);
     stdDev[prop] = Math.sqrt(variance);
   });
 
   // Also calculate for coordinates
   ['X', 'Y', 'Z'].forEach((coord) => {
     const values = points.map((p) => coord === 'X' ? p.x : coord === 'Y' ? p.y : p.z);
-    min[coord] = Math.min(...values);
-    max[coord] = Math.max(...values);
+    min[coord] = minOf(values);
+    max[coord] = maxOf(values);
     mean[coord] = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean[coord], 2), 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean[coord], 2), 0) /
+      Math.max(1, values.length - 1);
     stdDev[coord] = Math.sqrt(variance);
   });
 

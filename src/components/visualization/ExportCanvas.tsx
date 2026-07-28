@@ -132,8 +132,8 @@ export const ExportCanvas = forwardRef<ExportCanvasRef, ExportCanvasProps>(({
     const baseY = plotHeight - (y - yMin) * scaleY;
     
     // Apply flip (mirror around center of plot)
-    let flippedX = flipXAxis ? (plotWidth - baseX) : baseX;
-    let flippedY = flipYAxis ? (plotHeight - baseY) : baseY;
+    const flippedX = flipXAxis ? (plotWidth - baseX) : baseX;
+    const flippedY = flipYAxis ? (plotHeight - baseY) : baseY;
     
     // Apply stretch from center of plot
     const centerX = plotWidth / 2;

@@ -5,7 +5,7 @@ import {
   oneWayANOVA,
   kruskalWallis,
   calculateEffectSize,
-  tukeyHSD,
+  pairwisePostHoc,
   shapiroWilkTest,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
@@ -65,7 +65,7 @@ export const CrossSampleTests: React.FC<CrossSampleTestsProps> = ({ samples, sel
     return {
       anova: oneWayANOVA(groups),
       kruskalWallis: kruskalWallis(groups),
-      postHoc: samples.length > 2 ? tukeyHSD(namedGroups) : null,
+      postHoc: samples.length > 2 ? pairwisePostHoc(namedGroups) : null,
     };
   }, [samples]);
 
@@ -260,7 +260,7 @@ export const CrossSampleTests: React.FC<CrossSampleTestsProps> = ({ samples, sel
           {/* Post-hoc Tests */}
           {multiSampleTests.postHoc && multiSampleTests.postHoc.length > 0 && (
             <div className="mt-4">
-              <h5 className="font-mono text-sm font-bold mb-2">Post-hoc Pairwise Comparisons (Tukey HSD)</h5>
+              <h5 className="font-mono text-sm font-bold mb-2">Pairwise post-hoc (Holm-corrected)</h5>
               <div className="space-y-1">
                 {multiSampleTests.postHoc.map((ph, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 bg-muted/20 rounded text-xs font-mono">

@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { SegmentedTabs } from '@/components/layout';
 import { BarChart3, GitCompare, Layers, Users, ChevronDown, MapPin, Sparkles } from 'lucide-react';
 
 interface CrossSamplePanelProps {
@@ -29,6 +30,70 @@ interface CrossSamplePanelProps {
   propertyNames: string[];
   onPropertyChange: (property: string) => void;
 }
+
+type GroupView = 'sample-level' | 'pooled' | 'within' | 'zones-between' | 'zones-within';
+type ZoneView = 'manual' | 'auto';
+
+/**
+ * Every group-level analysis answers "compare what, counting what?". Stating the
+ * unit of analysis in the caption matters here: pooling every indent inflates n
+ * to thousands and treats indents from one sample as independent replicates,
+ * which reviewers flag as pseudoreplication. Sample-level is the default for
+ * that reason.
+ */
+const GROUP_VIEWS: { id: GroupView; label: string; caption: string }[] = [
+  {
+    id: 'sample-level',
+    label: 'Between groups · per-sample',
+    caption: 'Each sample collapses to one summary value, then groups are compared on those. n = number of samples. This is the statistically defensible default for treatment comparisons.',
+  },
+  {
+    id: 'pooled',
+    label: 'Between groups · pooled',
+    caption: 'Every indent from every sample in a group is pooled. n = number of indents. Higher power, but treats indents as independent replicates — report with care.',
+  },
+  {
+    id: 'within',
+    label: 'Within a group',
+    caption: 'Sample-to-sample variability inside each treatment group. Use this to check whether replicates agree before comparing groups.',
+  },
+  {
+    id: 'zones-between',
+    label: 'Zones · between groups',
+    caption: 'Compares matching zones across treatment groups.',
+  },
+  {
+    id: 'zones-within',
+    label: 'Zones · within groups',
+    caption: 'Compares zones against each other inside each treatment group.',
+  },
+];
+
+const ZONE_VIEWS: { id: ZoneView; label: string; caption: string }[] = [
+  {
+    id: 'manual',
+    label: 'Manual selection',
+    caption: 'Pick specific zones from specific samples and compare them directly.',
+  },
+  {
+    id: 'auto',
+    label: 'Auto-matched zones',
+    caption: 'Finds zones sharing a name across samples and compares them automatically.',
+  },
+];
+
+const ViewCaption: React.FC<{ caption?: string }> = ({ caption }) =>
+  caption ? (
+    <p className="text-xs text-muted-foreground leading-relaxed border-l-2 border-border pl-3">
+      {caption}
+    </p>
+  ) : null;
+
+const EmptyHint: React.FC<{ text: string }> = ({ text }) => (
+  <div className="border border-dashed border-border rounded-md p-6 text-center">
+    <p className="text-muted-foreground font-mono text-xs">{text}</p>
+  </div>
+);
 
 export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   fileSessions,
@@ -44,6 +109,8 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
   const [showJitter, setShowJitter] = useState(true);
   const [blackAndWhite, setBlackAndWhite] = useState(false);
   const [groupingOpen, setGroupingOpen] = useState(true);
+  const [groupView, setGroupView] = useState<GroupView>('sample-level');
+  const [zoneView, setZoneView] = useState<ZoneView>('manual');
 
   useEffect(() => {
     const sessionIds = fileSessions.map(session => session.id);
@@ -220,15 +287,15 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
               </TabsTrigger>
               <TabsTrigger value="comparison" className="font-mono text-sm gap-2">
                 <GitCompare className="w-4 h-4" />
-                Tests
+                By Sample
               </TabsTrigger>
               <TabsTrigger value="groups" className="font-mono text-sm gap-2">
                 <Users className="w-4 h-4" />
-                Groups
+                By Group
               </TabsTrigger>
               <TabsTrigger value="zones" className="font-mono text-sm gap-2">
                 <MapPin className="w-4 h-4" />
-                Zones
+                By Zone
               </TabsTrigger>
             </TabsList>
           </div>
@@ -272,89 +339,94 @@ export const CrossSamplePanel: React.FC<CrossSamplePanelProps> = ({
                 ) : null}
               </TabsContent>
 
+              {/* Treatment groups.
+                  These five analyses used to be stacked in one scroll, so finding
+                  the right one meant scrolling past four others — and the pooled
+                  and sample-level comparisons sat next to each other as if they
+                  were complementary rather than alternatives. They are now
+                  selectable views, with the unit of analysis stated up front. */}
               <TabsContent value="groups" className="mt-0 space-y-4">
-                {/* Intra-Group Analysis - Within Group */}
-                {groups.length > 0 && (
-                  <div>
-                    <h4 className="font-mono text-sm font-bold uppercase mb-3">Within-Group Analysis</h4>
-                     <IntraGroupAnalysis
-                       fileSessions={selectedSampleSessions}
-                       groups={scopedGroups}
-                      selectedProperty={selectedProperty}
-                    />
-                  </div>
-                )}
+                <SegmentedTabs
+                  activeId={groupView}
+                  onChange={id => setGroupView(id as GroupView)}
+                  tabs={GROUP_VIEWS.map(v => ({ id: v.id, label: v.label }))}
+                />
+                <ViewCaption caption={GROUP_VIEWS.find(v => v.id === groupView)?.caption} />
 
-                {/* Between-Group Comparison (pooled) */}
-                <div className={groups.length > 0 ? "pt-4 border-t border-border" : ""}>
-                  <h4 className="font-mono text-sm font-bold uppercase mb-3">
-                    Between-Group Comparison <span className="text-muted-foreground font-normal normal-case">(pooled — n = points)</span>
-                  </h4>
-                   <GroupComparison
-                     fileSessions={selectedSampleSessions}
-                     groups={scopedGroups}
-                    selectedProperty={selectedProperty}
-                  />
-                </div>
-
-                {/* Sample-Level Comparison (per-sample summaries) */}
-                <div className="pt-4 border-t border-border">
-                  <h4 className="font-mono text-sm font-bold uppercase mb-3">
-                    Sample-Level Comparison <span className="text-muted-foreground font-normal normal-case">(per-sample — n = samples)</span>
-                  </h4>
+                {groupView === 'sample-level' && (
                   <SampleLevelGroupComparison
                     fileSessions={selectedSampleSessions}
                     groups={scopedGroups}
                     selectedProperty={selectedProperty}
                   />
-                </div>
-
-                 {scopedGroups.filter(group => group.sessionIds.length > 0).length >= 2 && (
-                  <div className="pt-4 border-t border-border">
-                    <h4 className="font-mono text-sm font-bold uppercase mb-3">Zone Comparison Between Groups</h4>
-                    <ZoneBetweenGroupsAnalysis
-                       fileSessions={selectedSampleSessions}
-                       groups={scopedGroups}
-                      selectedProperty={selectedProperty}
-                    />
-                  </div>
                 )}
-                 {scopedGroups.length > 0 && (
-                  <div className="pt-4 border-t border-border">
-                    <h4 className="font-mono text-sm font-bold uppercase mb-3">Zone Analysis within Groups</h4>
-                    <GroupZoneAnalysis
-                       fileSessions={selectedSampleSessions}
-                       groups={scopedGroups}
+
+                {groupView === 'pooled' && (
+                  <GroupComparison
+                    fileSessions={selectedSampleSessions}
+                    groups={scopedGroups}
+                    selectedProperty={selectedProperty}
+                  />
+                )}
+
+                {groupView === 'within' && (
+                  groups.length > 0 ? (
+                    <IntraGroupAnalysis
+                      fileSessions={selectedSampleSessions}
+                      groups={scopedGroups}
                       selectedProperty={selectedProperty}
                     />
-                  </div>
+                  ) : (
+                    <EmptyHint text="Define at least one treatment group in the sidebar to inspect within-group variability." />
+                  )
+                )}
+
+                {groupView === 'zones-between' && (
+                  scopedGroups.filter(group => group.sessionIds.length > 0).length >= 2 ? (
+                    <ZoneBetweenGroupsAnalysis
+                      fileSessions={selectedSampleSessions}
+                      groups={scopedGroups}
+                      selectedProperty={selectedProperty}
+                    />
+                  ) : (
+                    <EmptyHint text="Needs at least two treatment groups with samples assigned." />
+                  )
+                )}
+
+                {groupView === 'zones-within' && (
+                  scopedGroups.length > 0 ? (
+                    <GroupZoneAnalysis
+                      fileSessions={selectedSampleSessions}
+                      groups={scopedGroups}
+                      selectedProperty={selectedProperty}
+                    />
+                  ) : (
+                    <EmptyHint text="Define at least one treatment group in the sidebar." />
+                  )
                 )}
               </TabsContent>
 
               <TabsContent value="zones" className="mt-0 space-y-4">
-                <Collapsible defaultOpen>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors mb-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
-                      <span className="font-mono text-sm font-medium">Smart Zone Analysis (Auto-detect matching zones)</span>
-                    </div>
-                    <ChevronDown className="w-4 h-4" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SmartZoneAnalysis
-                       fileSessions={selectedSampleSessions}
-                      selectedProperty={selectedProperty}
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
+                <SegmentedTabs
+                  activeId={zoneView}
+                  onChange={id => setZoneView(id as ZoneView)}
+                  tabs={ZONE_VIEWS.map(v => ({ id: v.id, label: v.label }))}
+                />
+                <ViewCaption caption={ZONE_VIEWS.find(v => v.id === zoneView)?.caption} />
 
-                <div className="pt-4 border-t border-border">
-                  <h4 className="font-mono text-sm font-bold uppercase mb-3">Manual Zone Selection</h4>
+                {zoneView === 'manual' && (
                   <ZoneAcrossSamplesPanel
-                     fileSessions={selectedSampleSessions}
+                    fileSessions={selectedSampleSessions}
                     selectedProperty={selectedProperty}
                   />
-                </div>
+                )}
+
+                {zoneView === 'auto' && (
+                  <SmartZoneAnalysis
+                    fileSessions={selectedSampleSessions}
+                    selectedProperty={selectedProperty}
+                  />
+                )}
               </TabsContent>
             </div>
           </ScrollArea>

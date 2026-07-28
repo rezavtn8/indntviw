@@ -128,7 +128,7 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
               <MetricCard
                 label="Z-Score"
                 value={analysis.moransIZScore.toFixed(2)}
-                tooltip="Statistical significance. |Z| > 1.96 is significant at p<0.05"
+                tooltip="Standardised deviation from the expected value under spatial randomness, using the randomisation-assumption variance (Cliff & Ord)."
               />
             </div>
 
@@ -141,11 +141,10 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
               <p className="text-xs text-muted-foreground mt-1">
                 {autocorrelationType.desc}
               </p>
-              {Math.abs(analysis.moransIZScore) > 1.96 && (
-                <Badge variant="outline" className="mt-2 text-xs">
-                  Statistically Significant (p &lt; 0.05)
-                </Badge>
-              )}
+              <Badge variant="outline" className="mt-2 text-xs">
+                p = {analysis.moransIPValue < 0.001 ? '<0.001' : analysis.moransIPValue.toFixed(3)}
+                {analysis.moransIPValue < 0.05 ? ' — significant' : ' — not significant'}
+              </Badge>
             </div>
 
             {/* Moran's I visualization */}
@@ -163,16 +162,16 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
           </CardContent>
         </Card>
 
-        {/* Hotspots & Clusters */}
+        {/* Hotspots & Coldspots */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Flame className="w-4 h-4" />
-              Hotspots & Clusters
+              Hotspots & Coldspots
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-lg text-center" style={{ background: '#e8594f1a' }}>
                 <div className="text-2xl font-bold" style={{ color: '#e8594f' }}>{analysis.hotspotCount}</div>
                 <div className="text-xs text-muted-foreground">Hotspots</div>
@@ -182,10 +181,6 @@ export const SpatialDistribution: React.FC<SpatialDistributionProps> = ({
                 <div className="text-2xl font-bold" style={{ color: '#2a4d8f' }}>{analysis.coldspotCount}</div>
                 <div className="text-xs text-muted-foreground">Coldspots</div>
                 <div className="text-xs text-muted-foreground">(Low {property})</div>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg text-center">
-                <div className="text-2xl font-bold">{analysis.clusterCount}</div>
-                <div className="text-xs text-muted-foreground">Est. Clusters</div>
               </div>
             </div>
 

@@ -10,7 +10,7 @@ import {
   calculateEffectSize,
   oneWayANOVA,
   kruskalWallis,
-  tukeyHSD,
+  pairwisePostHoc,
   DescriptiveStats,
 } from '@/utils/advancedStatistics';
 import { Badge } from '@/components/ui/badge';
@@ -129,7 +129,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
     return {
       anova: oneWayANOVA(valueArrays),
       kruskalWallis: kruskalWallis(valueArrays),
-      postHoc: groupData.length > 2 ? tukeyHSD(namedGroups) : null,
+      postHoc: groupData.length > 2 ? pairwisePostHoc(namedGroups) : null,
     };
   }, [groupData]);
 
@@ -280,7 +280,7 @@ export const GroupComparison: React.FC<GroupComparisonProps> = ({ fileSessions, 
           </div>
           {multiGroupTests.postHoc && multiGroupTests.postHoc.length > 0 && (
             <div className="space-y-1">
-              <span className="font-mono text-[10px] font-bold">Post-hoc (Tukey)</span>
+              <span className="font-mono text-[10px] font-bold">Post-hoc (Holm)</span>
               <ScrollArea className="h-24">
                 <div className="space-y-1">
                   {multiGroupTests.postHoc.map((ph, idx) => (

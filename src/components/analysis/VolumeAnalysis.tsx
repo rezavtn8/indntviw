@@ -44,10 +44,10 @@ export const VolumeAnalysis: React.FC<VolumeAnalysisProps> = ({ points }) => {
                 tooltip="Volume of the smallest box containing all points"
               />
               <MetricCard
-                label="Convex Hull Volume"
-                value={analysis.convexHullVolume.toFixed(4)}
+                label="Hull Prism Volume"
+                value={analysis.hullPrismVolume.toFixed(4)}
                 unit="unit³"
-                tooltip="Estimated volume of the convex hull (~65% of bounding box)"
+                tooltip="Convex hull of the measured XY footprint, extruded over the Z range. Computed from the actual point positions."
               />
               <div className="col-span-2">
                 <MetricCard
@@ -70,8 +70,8 @@ export const VolumeAnalysis: React.FC<VolumeAnalysisProps> = ({ points }) => {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-primary/60 rounded" />
-                  <span className="text-xs flex-1">Convex Hull (est.)</span>
-                  <span className="text-xs font-mono">{analysis.convexHullVolume.toFixed(2)}</span>
+                  <span className="text-xs flex-1">Hull Prism</span>
+                  <span className="text-xs font-mono">{analysis.hullPrismVolume.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-primary rounded" />

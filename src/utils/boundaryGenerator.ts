@@ -54,7 +54,7 @@ function extractBoundaryFromEdges(
   const orderedPoints: ZonePoint[] = [];
   const usedEdges = new Set<number>();
 
-  let currentEdge = boundaryEdges[0];
+  const currentEdge = boundaryEdges[0];
   usedEdges.add(0);
   orderedPoints.push(points[currentEdge[0]]);
   let currentVertex = currentEdge[1];

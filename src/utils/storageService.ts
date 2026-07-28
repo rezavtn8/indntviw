@@ -7,7 +7,11 @@ const DB_VERSION = 1;
 const STORE_NAME = 'workspace';
 const WORKSPACE_KEY = 'main';
 
-// Persisted session structure (subset of FileSession)
+// Persisted session structure (subset of FileSession).
+//
+// The overlay fields used to be missing here even though the loader read them
+// back with `(ps as any).overlayImageDataUrl` — so micrograph registration was
+// silently discarded on every reload.
 export interface PersistedSession {
   id: string;
   fileName: string;
@@ -17,6 +21,13 @@ export interface PersistedSession {
   colorScheme: ColorScheme;
   customMin: number | null;
   customMax: number | null;
+  overrideColorRange?: boolean;
+  overlayImageDataUrl?: string | null;
+  overlayTransform?: unknown;
+  overlayPointSettings?: unknown;
+  overlayPointsTransform?: unknown;
+  overlayActiveLayer?: string;
+  overlayPointsVisible?: boolean;
 }
 
 export interface PersistedWorkspace {
@@ -27,6 +38,45 @@ export interface PersistedWorkspace {
   groups: SampleGroup[];
   globalSelectedProperty: string;
 }
+
+/**
+ * Project the live FileSession down to what we persist, dropping transient
+ * selection state. Single definition — this used to be duplicated in both
+ * SessionContext and useWorkspacePersistence, and the two copies had drifted.
+ */
+export const toPersistedSession = (session: {
+  id: string;
+  fileName: string;
+  data: IndentationData;
+  originalData: IndentationData;
+  zones: Zone[];
+  colorScheme: ColorScheme;
+  customMin: number | null;
+  customMax: number | null;
+  overrideColorRange?: boolean;
+  overlayImageDataUrl?: string | null;
+  overlayTransform?: unknown;
+  overlayPointSettings?: unknown;
+  overlayPointsTransform?: unknown;
+  overlayActiveLayer?: string;
+  overlayPointsVisible?: boolean;
+}): PersistedSession => ({
+  id: session.id,
+  fileName: session.fileName,
+  data: session.data,
+  originalData: session.originalData,
+  zones: session.zones,
+  colorScheme: session.colorScheme,
+  customMin: session.customMin,
+  customMax: session.customMax,
+  overrideColorRange: session.overrideColorRange,
+  overlayImageDataUrl: session.overlayImageDataUrl,
+  overlayTransform: session.overlayTransform,
+  overlayPointSettings: session.overlayPointSettings,
+  overlayPointsTransform: session.overlayPointsTransform,
+  overlayActiveLayer: session.overlayActiveLayer,
+  overlayPointsVisible: session.overlayPointsVisible,
+});
 
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {

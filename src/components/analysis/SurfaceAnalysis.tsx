@@ -39,19 +39,24 @@ export const SurfaceAnalysis: React.FC<SurfaceAnalysisProps> = ({ points }) => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Waves className="w-4 h-4" />
-              Surface Roughness
+              Z-Height Scatter
               <StatusChip tone={roughnessClass.tone}>{roughnessClass.label}</StatusChip>
             </CardTitle>
+            <p className="text-xs text-muted-foreground pt-1 leading-relaxed">
+              Scatter of the recorded indent Z positions about the mean plane. Useful for
+              comparing samples measured the same way, and for spotting stage tilt — but
+              not ISO 4287 roughness, which requires a filtered, densely sampled profile.
+            </p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               <MetricCard
-                label="Ra (Avg. Roughness)"
+                label="Ra (mean |ΔZ|)"
                 value={analysis.Ra.toFixed(4)}
                 tooltip="Arithmetic average of absolute deviations from mean height"
               />
               <MetricCard
-                label="Rq (RMS Roughness)"
+                label="Rq (RMS ΔZ)"
                 value={analysis.Rq.toFixed(4)}
                 tooltip="Root mean square of height deviations"
               />
@@ -104,7 +109,7 @@ export const SurfaceAnalysis: React.FC<SurfaceAnalysisProps> = ({ points }) => {
             
             {/* Visual roughness indicator */}
             <div className="mt-4">
-              <div className="text-xs text-muted-foreground mb-1">Roughness Scale</div>
+              <div className="text-xs text-muted-foreground mb-1">Z-Scatter Scale</div>
               <div className="h-2 rounded-full relative" style={{ background: 'linear-gradient(90deg, #3aa0a0 0%, #888 50%, #e8594f 100%)' }}>
                 <div 
                   className="absolute w-3 h-3 bg-foreground rounded-full border-2 border-background -top-0.5 transform -translate-x-1/2"
