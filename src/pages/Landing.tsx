@@ -20,7 +20,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { APP_VERSION_LABEL } from '@/version';
+import { APP_VERSION_LABEL, SOURCE_URL, LICENSE_NAME } from '@/version';
 import appPreview from '@/assets/app-preview.png';
 
 const features = [
@@ -638,7 +638,12 @@ const Landing = () => {
           <div className="border-t border-border pt-6">
             <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-2 font-mono text-[10px] text-muted-foreground tracking-wide">
               <span>© {new Date().getFullYear()} IndentView · {APP_VERSION_LABEL}</span>
-              <span>All processing happens locally in your browser.</span>
+              <span className="flex items-center gap-3">
+                <span>All processing happens locally in your browser.</span>
+                <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors underline-offset-2 hover:underline">
+                  {LICENSE_NAME} · source
+                </a>
+              </span>
             </div>
           </div>
         </footer>

@@ -12,3 +12,17 @@ export const APP_VERSION = '2.3.0';
 export const APP_VERSION_LABEL = 'v2.3';
 
 export const APP_NAME = 'IndentView';
+
+/**
+ * Public source repository.
+ *
+ * This is not decoration. IndentView is licensed under the AGPL-3.0, and
+ * section 13 requires that anyone interacting with the software over a network
+ * be offered the Corresponding Source of the version they are running. For a
+ * browser application that means a visible, working link to this repository in
+ * the interface itself — shipping the built bundle without it is a licence
+ * violation, including for anyone who forks and hosts a modified copy.
+ */
+export const SOURCE_URL = 'https://github.com/rezavtn8/indntviw';
+
+export const LICENSE_NAME = 'AGPL-3.0';

@@ -3,7 +3,7 @@
 **Visualization and statistical analysis for instrumented indentation data.**
 
 [![CI](https://github.com/rezavtn8/indntviw/actions/workflows/ci.yml/badge.svg)](https://github.com/rezavtn8/indntviw/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
 IndentView reads the matrix exports produced by nanoindentation testers, renders
 them as spatial property maps, lets you draw regions of interest directly on the
@@ -188,4 +188,26 @@ changelog explains why.
 
 ## License
 
-[MIT](LICENSE) © Mohammadreza Vatankhah
+**[GNU AGPL-3.0](LICENSE)** © Mohammadreza Vatankhah
+
+Free to use, study, modify and share. If you run a modified version — including
+hosting it for others to use over a network — you must make your source
+available under the same licence. That network clause is the difference between
+the AGPL and the ordinary GPL, and it is deliberate: this is a browser
+application, so "hosting a modified copy" is the normal way it would be
+redistributed.
+
+For academic and non-commercial use there is nothing to do. Use it, cite it,
+fork it, publish with it.
+
+### Commercial licensing
+
+If you want to include IndentView in a commercial product — an instrument
+vendor's analysis suite, for example — and cannot release your own source under
+the AGPL, a separate commercial licence is available. Open an issue or get in
+touch.
+
+This dual arrangement is why contributions are covered by a
+[CLA](CLA.md): granting a commercial licence requires holding rights to the
+whole codebase. You keep the copyright to your own work — see the document, it
+is short.

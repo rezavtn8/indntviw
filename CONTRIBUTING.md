@@ -4,6 +4,20 @@ Thanks for your interest. This is a small scientific tool, so the bar is
 practical rather than bureaucratic: if a change makes the analysis more correct
 or the workflow less tedious, it is welcome.
 
+## Before your first pull request: the CLA
+
+IndentView is AGPL-3.0, with commercial licences available separately for
+companies that cannot open-source their own products. That dual arrangement
+only works if the maintainer holds rights to the whole codebase, so
+contributions are covered by a one-line [CLA](CLA.md).
+
+**You keep the copyright to your work.** You are granting a relicensing right,
+not giving anything away. Add this to your first pull request description:
+
+```
+I have read CLA.md and I agree to its terms for this and future contributions.
+```
+
 ## Getting set up
 
 ```sh

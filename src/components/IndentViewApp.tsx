@@ -53,7 +53,7 @@ import { useSession, useVisualization, useZones, useEditor } from '@/contexts';
 import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, Image, Package } from 'lucide-react';
-import { APP_VERSION_LABEL } from '@/version';
+import { APP_VERSION_LABEL, APP_NAME, SOURCE_URL, LICENSE_NAME } from '@/version';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'overlay' | 'analysis' | 'export'>('2d');
@@ -667,7 +667,20 @@ export const IndentViewApp: React.FC = () => {
       footer={
         <div className="flex items-center justify-between text-xs text-muted-foreground font-mono px-6 py-2">
           <span>{data ? `${data.points.length} points loaded` : 'No data loaded'}</span>
-          <Wordmark size="sm" />
+          <div className="flex items-center gap-3">
+            {/* AGPL-3.0 section 13: users interacting over a network must be
+                offered the Corresponding Source. Do not remove this link. */}
+            <a
+              href={SOURCE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors underline-offset-2 hover:underline"
+              title={`${APP_NAME} is free software under the ${LICENSE_NAME}. View or download the source.`}
+            >
+              {LICENSE_NAME} · source
+            </a>
+            <Wordmark size="sm" />
+          </div>
         </div>
       }
       modals={
