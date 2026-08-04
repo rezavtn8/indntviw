@@ -31,7 +31,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verify:stats": "esbuild scripts/verify-statistics.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/verify-stats.mjs --log-level=error && node node_modules/.cache/verify-stats.mjs"
+    "verify:stats": "esbuild scripts/verify-statistics.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/verify-stats.mjs --log-level=error && node node_modules/.cache/verify-stats.mjs",
+    "paper:analysis": "esbuild paper/reproduce-analysis.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/paper-analysis.mjs --log-level=error && node node_modules/.cache/paper-analysis.mjs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",
