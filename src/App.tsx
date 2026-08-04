@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { SessionProvider, VisualizationProvider, ZonesProvider, EditorProvider } from "@/contexts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -16,6 +17,7 @@ const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'analysis' | 'export'>('2d');
   
   return (
+    <ErrorBoundary label="IndentView">
     <SessionProvider>
       <VisualizationProvider>
         <ZonesProvider activeView={activeView}>
@@ -25,6 +27,7 @@ const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         </ZonesProvider>
       </VisualizationProvider>
     </SessionProvider>
+    </ErrorBoundary>
   );
 };
 

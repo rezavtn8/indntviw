@@ -37,8 +37,15 @@ export const ViewSidebar: React.FC<ViewSidebarProps> = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={() => onViewChange(item.id)}
+                  // These buttons carry only an icon, so without an accessible
+                  // name a screen reader announces them as "button" and they
+                  // cannot be targeted by name in automated tests.
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  title={item.label}
                   className={cn(
                     'relative w-10 h-10 flex items-center justify-center rounded transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isActive
                       ? 'text-foreground bg-muted'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -54,7 +61,7 @@ export const ViewSidebar: React.FC<ViewSidebarProps> = ({
                       }}
                     />
                   )}
-                  <Icon className="w-5 h-5" />
+                  <Icon className="w-5 h-5" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="font-mono text-xs">

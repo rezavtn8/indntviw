@@ -54,6 +54,7 @@ import { usePageDropZone } from '@/hooks/usePageDropZone';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, Image, Package } from 'lucide-react';
 import { APP_VERSION_LABEL, APP_NAME, SOURCE_URL, LICENSE_NAME } from '@/version';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const IndentViewApp: React.FC = () => {
   const [activeView, setActiveView] = useState<'2d' | '3d' | 'overlay' | 'analysis' | 'export'>('2d');
@@ -712,7 +713,7 @@ export const IndentViewApp: React.FC = () => {
         </>
       }
     >
-      {renderContent()}
+      <ErrorBoundary label={`${activeView.toUpperCase()} view`}>{renderContent()}</ErrorBoundary>
     </AppLayout>
   );
 };

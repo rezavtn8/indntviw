@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+title: >-
+  IndentView: spatially resolved analysis of instrumented
+  indentation data
+message: >-
+  If you use this software in published work, please cite it and
+  state the version. Results produced before version 2.3.0 are
+  not comparable to later results; see CHANGELOG.md.
+type: software
+authors:
+  - given-names: Mohammadreza
+    family-names: Vatankhah
+    email: mohammadrvatankhah@gmail.com
+    # orcid: 'https://orcid.org/0000-0000-0000-0000'   # add your ORCID
+repository-code: 'https://github.com/rezavtn8/indntviw'
+url: 'https://github.com/rezavtn8/indntviw'
+abstract: >-
+  IndentView is an open-source, browser-based platform for
+  spatially resolved analysis of instrumented indentation
+  (nanoindentation) data. It renders indentation matrices as
+  property maps, supports definition of regions of interest
+  directly on the map, and performs group comparisons in which
+  the unit of analysis is an explicit choice rather than an
+  implicit consequence of how the data were tabulated. All
+  statistical routines are verified against published reference
+  values in continuous integration. The application runs entirely
+  client-side; measurement data never leaves the operator's
+  machine.
+keywords:
+  - nanoindentation
+  - instrumented indentation
+  - materials characterisation
+  - soft tissue mechanics
+  - property mapping
+  - spatial autocorrelation
+  - pseudoreplication
+  - scientific visualisation
+license: AGPL-3.0-only
+version: 2.3.0
+date-released: '2026-08-04'
