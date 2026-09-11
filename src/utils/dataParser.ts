@@ -82,6 +82,143 @@ function detectDelimiter(lines: string[]): string {
   return best;
 }
 
+/**
+ * Some exports place two (or more) measurement series side by side: every
+ * property column is repeated once per series, and a label row under the
+ * header names each series (e.g. "Lateral" / "Medial", or the older
+ * "Calibration" / "Matrix" pairing).
+ *
+ * Returns the label row index plus the distinct series labels, or null when
+ * the file is an ordinary single-series table.
+ */
+function findSeriesLabelRow(
+  lines: string[],
+  headerLineIndex: number,
+  delimiter: string
+): { index: number; labels: string[]; cells: string[] } | null {
+  for (let i = headerLineIndex + 1; i < Math.min(lines.length, headerLineIndex + 6); i++) {
+    const cells = lines[i].split(delimiter).map(c => c.trim());
+    const values = cells.slice(1).filter(c => c !== '');
+    if (values.length < 2) continue;
+
+    // A label row is text-only (numeric rows are data or summary statistics)
+    if (values.some(c => !isNaN(parseFloat(c)))) continue;
+
+    const distinct = [...new Set(values)];
+    // Rows like "Oliver & Pharr" repeated across all columns carry no series info
+    if (distinct.length < 2) continue;
+
+    return { index: i, labels: distinct, cells };
+  }
+  return null;
+}
+
+interface SeriesPlan {
+  label: string | null;
+  headers: string[];
+  columnIndexMap: number[];
+}
+
+function buildSeriesPlans(
+  rawHeaders: string[],
+  labelRow: { labels: string[]; cells: string[] } | null
+): SeriesPlan[] {
+  if (!labelRow) {
+    const headers = rawHeaders.map(normalizeHeader);
+    return [{ label: null, headers, columnIndexMap: headers.map((_, i) => i) }];
+  }
+
+  // Legacy Calibration/Matrix exports: only the Matrix column holds real data
+  const isCalibrationMatrix =
+    labelRow.labels.includes('Calibration') && labelRow.labels.includes('Matrix');
+  const labels = isCalibrationMatrix ? ['Matrix'] : labelRow.labels;
+
+  return labels.map(label => {
+    const headers: string[] = [];
+    const columnIndexMap: number[] = [];
+    const seen = new Set<string>();
+
+    for (let i = 0; i < rawHeaders.length; i++) {
+      const header = normalizeHeader(rawHeaders[i]);
+      if (!header || seen.has(header)) continue;
+
+      const cellLabel = labelRow.cells[i] || '';
+      if (cellLabel === label) {
+        seen.add(header);
+        headers.push(header);
+        columnIndexMap.push(i);
+      } else if (cellLabel === '') {
+        // Unlabelled column (e.g. row index) is shared by every series
+        seen.add(header);
+        headers.push(header);
+        columnIndexMap.push(i);
+      }
+    }
+
+    return { label, headers, columnIndexMap };
+  });
+}
+
+const SKIP_KEYWORDS = ['Min', 'Max', 'Mean', 'Std dev', 'Median', 'N', 'Oliver', '3rd try', 'Setting', 'Calibration', 'Matrix'];
+
+function extractPoints(
+  lines: string[],
+  dataStartIndex: number,
+  delimiter: string,
+  plan: SeriesPlan,
+  startId: number
+): IndentationPoint[] {
+  const { headers, columnIndexMap } = plan;
+  const xIdx = headers.findIndex(h => h === 'X');
+  const yIdx = headers.findIndex(h => h === 'Y');
+  const zIdx = headers.findIndex(h => h === 'Z');
+
+  if (xIdx === -1 || yIdx === -1) {
+    throw new Error('Could not find X and Y position columns');
+  }
+
+  const points: IndentationPoint[] = [];
+  let id = startId;
+
+  for (let i = dataStartIndex; i < lines.length; i++) {
+    const cells = lines[i].split(delimiter).map(c => c.trim());
+
+    const firstCell = cells[0] || '';
+    const secondCell = cells[1] || '';
+    const checkCell = firstCell || secondCell;
+
+    if (SKIP_KEYWORDS.some(keyword => checkCell.includes(keyword))) continue;
+    if (cells.every(c => c === '')) continue;
+
+    const isMeasurementRow =
+      firstCell.includes('Measurement') ||
+      /^\d+$/.test(firstCell) ||
+      (firstCell === '' && !isNaN(parseFloat(secondCell)) && !secondCell.includes('Setting'));
+
+    if (!isMeasurementRow) continue;
+
+    const x = parseFloat(cells[columnIndexMap[xIdx]]);
+    const y = parseFloat(cells[columnIndexMap[yIdx]]);
+    const z = zIdx !== -1 ? parseFloat(cells[columnIndexMap[zIdx]]) : 0;
+
+    if (isNaN(x) || isNaN(y)) continue;
+
+    const properties: Record<string, number> = {};
+    headers.forEach((header, effectiveIdx) => {
+      if (header && !['X', 'Y', 'Z', ''].includes(header)) {
+        const val = parseFloat(cells[columnIndexMap[effectiveIdx]]);
+        if (!isNaN(val)) {
+          properties[header] = val;
+        }
+      }
+    });
+
+    points.push({ id: id++, x, y, z, properties: { ...properties, ...(isNaN(z) ? {} : {}) } });
+  }
+
+  return points;
+}
+
 export function parseTabSeparatedData(content: string): IndentationData {
   // Strip a UTF-8 BOM and normalise CRLF — both appear in Windows exports
   const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
@@ -101,145 +238,34 @@ export function parseTabSeparatedData(content: string): IndentationData {
       break;
     }
   }
-  
+
   if (headerLineIndex === -1) {
     throw new Error('Could not find header row in data file');
   }
 
-  // Detect if this is a "Calibration/Matrix" paired column format
-  // Check the row after header for "Calibration" and "Matrix" labels
-  let isPairedFormat = false;
-  let pairedLabelRowIndex = -1;
-  
-  for (let i = headerLineIndex + 1; i < Math.min(lines.length, headerLineIndex + 5); i++) {
-    const cells = lines[i].split(delimiter).map(c => c.trim());
-    if (cells.some(c => c === 'Calibration') && cells.some(c => c === 'Matrix')) {
-      isPairedFormat = true;
-      pairedLabelRowIndex = i;
-      break;
-    }
-  }
+  const labelRow = findSeriesLabelRow(lines, headerLineIndex, delimiter);
+  const plans = buildSeriesPlans(rawHeaders, labelRow);
+  const dataStartIndex = labelRow ? labelRow.index + 1 : headerLineIndex + 1;
 
-  // Build effective column mapping
-  // For paired format: find which column index contains "Matrix" data for each property
-  let headers: string[] = [];
-  let columnIndexMap: number[] = []; // Maps effective column index to actual cell index
-  
-  if (isPairedFormat) {
-    const labelRow = lines[pairedLabelRowIndex].split(delimiter).map(c => c.trim());
-    
-    // For paired format, we want the "Matrix" columns (second of each pair)
-    // Headers are duplicated, so we take every unique header with its Matrix column
-    const seenHeaders = new Set<string>();
-    
-    for (let i = 0; i < rawHeaders.length; i++) {
-      const header = normalizeHeader(rawHeaders[i]);
-      const label = labelRow[i] || '';
-      
-      // For X, Y, Z position columns, they might not have Calibration/Matrix labels
-      // Check if this is a Matrix column OR if it's a position column without pairs
-      const isMatrix = label === 'Matrix' || label === '';
-      
-      if (header && !seenHeaders.has(header) && isMatrix) {
-        seenHeaders.add(header);
-        headers.push(header);
-        columnIndexMap.push(i);
-      } else if (header && !seenHeaders.has(header) && i + 1 < rawHeaders.length) {
-        // If we haven't seen this header yet and it's not a Matrix column,
-        // check if the next column is the Matrix version
-        const nextLabel = labelRow[i + 1] || '';
-        if (nextLabel === 'Matrix') {
-          seenHeaders.add(header);
-          headers.push(header);
-          columnIndexMap.push(i + 1); // Use the Matrix column
-        }
-      }
-    }
-  } else {
-    // Standard format - use headers as-is
-    headers = rawHeaders.map(normalizeHeader);
-    columnIndexMap = headers.map((_, i) => i);
-  }
-
-  // Find column indices in our effective headers
-  const xIdx = headers.findIndex(h => h === 'X');
-  const yIdx = headers.findIndex(h => h === 'Y');
-  const zIdx = headers.findIndex(h => h === 'Z');
-  
-  if (xIdx === -1 || yIdx === -1) {
-    throw new Error('Could not find X and Y position columns');
-  }
-
-  // Find data rows (skip summary rows like Min, Max, Mean, etc.)
+  // Side-by-side series are merged into a single dataset: each series
+  // contributes its own measurement points, all pooled into one point cloud.
   const points: IndentationPoint[] = [];
-  const skipKeywords = ['Min', 'Max', 'Mean', 'Std dev', 'Median', 'N', 'Oliver', '3rd try', 'Setting', 'Calibration', 'Matrix'];
-  
-  // Start after paired label row if it exists
-  const dataStartIndex = isPairedFormat ? pairedLabelRowIndex + 1 : headerLineIndex + 1;
-  
-  let id = 0;
-  for (let i = dataStartIndex; i < lines.length; i++) {
-    const cells = lines[i].split(delimiter).map(c => c.trim());
-    
-    // Get the first non-empty cell for checking
-    const firstCell = cells[0] || '';
-    const secondCell = cells[1] || '';
-    const checkCell = firstCell || secondCell;
-    
-    // Skip summary rows and metadata rows
-    if (skipKeywords.some(keyword => checkCell.includes(keyword))) {
-      continue;
-    }
-    
-    // Skip empty rows
-    if (cells.every(c => c === '')) {
-      continue;
-    }
-    
-    // Check if this is a measurement row
-    const isMeasurementRow = firstCell.includes('Measurement') || 
-                              /^\d+$/.test(firstCell) ||
-                              (firstCell === '' && !isNaN(parseFloat(secondCell)) && !secondCell.includes('Setting'));
-    
-    if (isMeasurementRow) {
-      // Get X, Y, Z using the column index map
-      const xCellIdx = columnIndexMap[xIdx];
-      const yCellIdx = columnIndexMap[yIdx];
-      const zCellIdx = zIdx !== -1 ? columnIndexMap[zIdx] : -1;
-      
-      const x = parseFloat(cells[xCellIdx]);
-      const y = parseFloat(cells[yCellIdx]);
-      const z = zCellIdx !== -1 ? parseFloat(cells[zCellIdx]) : 0;
-      
-      // Skip if X or Y are not valid numbers
-      if (isNaN(x) || isNaN(y)) continue;
-      
-      const properties: Record<string, number> = {};
-      headers.forEach((header, effectiveIdx) => {
-        if (header && !['X', 'Y', 'Z', ''].includes(header)) {
-          const cellIdx = columnIndexMap[effectiveIdx];
-          const val = parseFloat(cells[cellIdx]);
-          if (!isNaN(val)) {
-            properties[header] = val;
-          }
-        }
-      });
-      
-      points.push({ id: id++, x, y, z, properties });
-    }
+  for (const plan of plans) {
+    points.push(...extractPoints(lines, dataStartIndex, delimiter, plan, points.length));
   }
 
-  // Get unique property names (excluding coordinates)
-  const propertyNames = [...new Set(headers.filter(h => h && !['X', 'Y', 'Z', ''].includes(h)))];
+  const headers = [...new Set(plans.flatMap(p => p.headers).filter(Boolean))];
+  const propertyNames = headers.filter(h => h && !['X', 'Y', 'Z', ''].includes(h));
   const statistics = calculateStatistics(points, propertyNames);
 
   return {
     points,
-    headers: [...new Set(headers)], // Deduplicate headers
+    headers,
     propertyNames,
     statistics,
   };
 }
+
 
 export async function parseExcelFile(file: File): Promise<IndentationData> {
   return new Promise((resolve, reject) => {
