@@ -213,7 +213,7 @@ function extractPoints(
       }
     });
 
-    points.push({ id: id++, x, y, z, properties: { ...properties, ...(isNaN(z) ? {} : {}) } });
+    points.push({ id: id++, x, y, z: isNaN(z) ? 0 : z, properties });
   }
 
   return points;
