@@ -287,12 +287,25 @@ export async function parseExcelFile(file: File): Promise<IndentationData> {
   });
 }
 
+/**
+ * Instrument exports are often Windows/Latin-1 encoded, which mangles unit
+ * symbols (µm, °C) when decoded as UTF-8. Try strict UTF-8 first and fall back
+ * to windows-1252.
+ */
+function decodeTextBuffer(buffer: ArrayBuffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer);
+  }
+}
+
 export async function parseTextFile(file: File): Promise<IndentationData> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const content = e.target?.result as string;
+        const content = decodeTextBuffer(e.target?.result as ArrayBuffer);
         const result = parseTabSeparatedData(content);
         resolve(result);
       } catch (error) {
@@ -300,9 +313,10 @@ export async function parseTextFile(file: File): Promise<IndentationData> {
       }
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   });
 }
+
 
 function calculateStatistics(
   points: IndentationPoint[],
