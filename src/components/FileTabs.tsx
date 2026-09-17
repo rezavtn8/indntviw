@@ -283,7 +283,28 @@ export const FileTabs: React.FC<FileTabsProps> = ({
                   title={isRenaming ? undefined : `${session.fileName}\nDouble-click to rename · Drag to reorder`}
                 >
                   {isRenaming ? (
-                    <BrandMark className="w-3 h-3 shrink-0 opacity-80" />
+                    <>
+                      <BrandMark className="w-3 h-3 shrink-0 opacity-80" />
+                      <input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            commitRename();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            cancelRename();
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-background border border-primary rounded px-1 py-0 font-mono text-xs outline-none min-w-[80px]"
+                        style={{ width: `${Math.max(8, renameValue.length + 1)}ch` }}
+                      />
+                    </>
                   ) : (
                     <>
                       {hasChanges && (
