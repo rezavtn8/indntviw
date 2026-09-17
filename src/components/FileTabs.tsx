@@ -297,28 +297,6 @@ export const FileTabs: React.FC<FileTabsProps> = ({
                       <span>{truncateFileName(session.fileName)}</span>
                     </>
                   )}
-                    <input
-                      ref={renameInputRef}
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          commitRename();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          cancelRename();
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="bg-background border border-primary rounded px-1 py-0 font-mono text-xs outline-none min-w-[80px]"
-                      style={{ width: `${Math.max(8, renameValue.length + 1)}ch` }}
-                    />
-                  ) : (
-                    <span>{truncateFileName(session.fileName)}</span>
-                  )}
                   {!isRenaming && (
                     <button
                       className="p-0.5 rounded hover:bg-destructive/20 transition-colors opacity-60 hover:opacity-100 shrink-0"
