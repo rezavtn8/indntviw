@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, ChevronDown, FileText, Pencil, ArrowLeftRight } from 'lucide-react';
 import { FileSession } from '@/types/fileSession';
 import { cn } from '@/lib/utils';
+import { BrandMark } from '@/components/layout/Brand';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -281,14 +282,21 @@ export const FileTabs: React.FC<FileTabsProps> = ({
                   }}
                   title={isRenaming ? undefined : `${session.fileName}\nDouble-click to rename · Drag to reorder`}
                 >
-                  {hasChanges && !isRenaming && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
-                      style={{ background: '#e8594f' }}
-                      title="Unsaved changes"
-                    />
-                  )}
                   {isRenaming ? (
+                    <BrandMark className="w-3 h-3 shrink-0 opacity-80" />
+                  ) : (
+                    <>
+                      {hasChanges && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ background: '#e8594f' }}
+                          title="Unsaved changes"
+                        />
+                      )}
+                      <BrandMark className={cn('w-3 h-3 shrink-0 transition-opacity', isActive ? 'opacity-100' : 'opacity-50')} />
+                      <span>{truncateFileName(session.fileName)}</span>
+                    </>
+                  )}
                     <input
                       ref={renameInputRef}
                       value={renameValue}
